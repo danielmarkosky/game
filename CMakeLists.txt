@@ -10,4 +10,4 @@ add_executable(game main.cpp ${SRC_FILES})
 target_link_libraries(game PRIVATE sfml-system sfml-window sfml-graphics sfml-audio sfml-network)
 
 add_executable(game_tests ${SRC_FILES} ${TEST_SRC})
-target_link_libraries(game_tests PRIVATE gtest gtest_main)
+target_link_libraries(game_tests PRIVATE gtest)
