@@ -2,9 +2,7 @@
 #include <SFML/Graphics.hpp>
 #include <string>
 
-Level::Level() {
-    // Walls should be defined in derived classes, so base constructor does nothing
-}
+Level::Level() {}
 
 const std::vector<Wall>& Level::getWalls() const {
     return walls;

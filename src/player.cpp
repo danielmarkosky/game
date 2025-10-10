@@ -5,8 +5,12 @@ Player::Player(const sf::Vector2f& startPos, std::shared_ptr<Level> level)
     : level(std::move(level))
 {
     shape.setSize(sf::Vector2f(16.f, 24.f)); // Example size
-    shape.setFillColor(sf::Color::Yellow);
+    shape.setFillColor(sf::Color::Transparent);
+    shape.setOutlineThickness(2.f);
+    shape.setOutlineColor(sf::Color::Green);
     shape.setPosition(startPos);
+
+    jumpStrength = 320.f; // Increased jump strength for higher jumps
 }
 
 void Player::update(float dt) {

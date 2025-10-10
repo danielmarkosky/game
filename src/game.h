@@ -3,6 +3,7 @@
 #include <memory>
 #include "player.h"
 #include "level.h"
+#include "projectiles.h"
 
 class Game {
 public:
@@ -19,17 +20,10 @@ private:
     int score = 0;
     bool gameOver = false;
 
-    float projectileSpawnTimer = 0.f;
-    struct Projectile {
-        sf::CircleShape shape;
-        sf::Vector2f velocity;
-    };
-    std::vector<Projectile> projectiles;
+    ProjectileManager projectileManager;
 
     void processEvents();
     void update(float dt);
     void render();
-    void spawnProjectile();
-    void handleCollisions();
     void reset();
 };

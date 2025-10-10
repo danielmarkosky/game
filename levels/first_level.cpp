@@ -40,4 +40,9 @@ FirstLevel::FirstLevel() {
         sf::FloatRect(0.f, 180.f - 8.f, 320.f, 8.f),
         loadTexture("assets/floor.png")
     ));
+    // Middle plank (platform)
+    addWall(Wall(
+        sf::FloatRect(80.f, 100.f, 160.f, 8.f),
+        loadTexture("assets/plank.png")
+    ));
 }
