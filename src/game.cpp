@@ -1,19 +1,29 @@
 #include "game.h"
-#include <SFML/Window.hpp>
-#include <SFML/System.hpp>
-#include <cstdlib>
+#include "levels/first_level.h"
+#include <cmath>
 
-Game::Game() : window(sf::VideoMode(800, 600), "Jump & Dodge"), player(sf::Vector2f(50, 50)) {
-    player.setFillColor(sf::Color::Green);
-    player.setPosition(100, groundY);
+Game::Game()
+    : window(sf::VideoMode(320, 180), "Jump & Dodge Game", sf::Style::Close)
+{
+    level = std::make_shared<FirstLevel>();
+    player = std::make_unique<Player>(sf::Vector2f(32.f, 180.f - 32.f), level);
+
+    font.loadFromFile("assets/BBHSansBogle-Regular.ttf");
+    scoreText.setFont(font);
+    scoreText.setCharacterSize(16);
+    scoreText.setFillColor(sf::Color::White);
+    scoreText.setPosition(8.f, 8.f);
+    scoreText.setString("Score: 0");
 }
 
 void Game::run() {
     sf::Clock clock;
     while (window.isOpen()) {
+        float dt = clock.restart().asSeconds();
         processEvents();
-        sf::Time dt = clock.restart();
-        update(dt);
+        if (!gameOver) {
+            update(dt);
+        }
         render();
     }
 }
@@ -23,102 +33,88 @@ void Game::processEvents() {
     while (window.pollEvent(event)) {
         if (event.type == sf::Event::Closed)
             window.close();
-        if (event.type == sf::Event::KeyPressed)
-            handlePlayerInput(event.key.code, true);
-    }
-}
-
-void Game::handlePlayerInput(sf::Keyboard::Key key, bool isPressed) {
-    if (gameOver && key == sf::Keyboard::R) {
-        reset();
-        return;
-    }
-    if (key == sf::Keyboard::Space && !isJumping && !gameOver) {
-        isJumping = true;
-        playerVelocityY = jumpStrength;
-    }
-}
-
-void Game::update(sf::Time dt) {
-    if (gameOver) return;
-    // Player jump physics
-    if (isJumping) {
-        player.move(0, playerVelocityY * dt.asSeconds());
-        playerVelocityY += gravity * dt.asSeconds();
-        if (player.getPosition().y >= groundY) {
-            player.setPosition(player.getPosition().x, groundY);
-            isJumping = false;
-            playerVelocityY = 0.f;
+        if (!gameOver && event.type == sf::Event::KeyPressed) {
+            if (event.key.code == sf::Keyboard::Left)
+                player->moveLeft();
+            if (event.key.code == sf::Keyboard::Right)
+                player->moveRight();
+            if (event.key.code == sf::Keyboard::Space)
+                player->jump();
+        }
+        if (!gameOver && event.type == sf::Event::KeyReleased) {
+            if (event.key.code == sf::Keyboard::Left || event.key.code == sf::Keyboard::Right)
+                player->stopHorizontal();
+        }
+        if (gameOver && event.type == sf::Event::KeyPressed && event.key.code == sf::Keyboard::R) {
+            reset();
         }
     }
-    // Spawn projectiles
-    if (projectileClock.getElapsedTime().asSeconds() > 1.0f) {
+}
+
+void Game::update(float dt) {
+    player->update(dt);
+    projectileSpawnTimer += dt;
+    if (projectileSpawnTimer > 1.0f) {
         spawnProjectile();
-        projectileClock.restart();
+        projectileSpawnTimer = 0.f;
     }
-    // Move projectiles and check for dodges
     for (auto& proj : projectiles) {
-        proj.shape.move(-300.f * dt.asSeconds(), 0);
-        // If projectile passed player and not scored, and no collision
-        if (!proj.scored && proj.shape.getPosition().x + proj.shape.getSize().x < player.getPosition().x) {
-            if (!player.getGlobalBounds().intersects(proj.shape.getGlobalBounds())) {
-                score++;
-                proj.scored = true;
-            }
-        }
+        proj.shape.move(proj.velocity * dt);
     }
-    // Remove off-screen projectiles
-    projectiles.erase(std::remove_if(projectiles.begin(), projectiles.end(), [](const Projectile& proj) {
-        return proj.shape.getPosition().x + proj.shape.getSize().x < 0;
-    }), projectiles.end());
-    // Collision detection
-    for (const auto& proj : projectiles) {
-        if (player.getGlobalBounds().intersects(proj.shape.getGlobalBounds())) {
-            gameOver = true;
-        }
-    }
-}
-
-void Game::spawnProjectile() {
-    Projectile proj;
-    proj.shape = sf::RectangleShape(sf::Vector2f(30, 30));
-    proj.shape.setFillColor(sf::Color::Red);
-    proj.shape.setPosition(800, groundY + (std::rand() % 2 == 0 ? 0 : -100)); // ground or air
-    proj.scored = false;
-    projectiles.push_back(proj);
+    handleCollisions();
 }
 
 void Game::render() {
-    window.clear(bgColor);
-    window.draw(player);
-    for (const auto& proj : projectiles)
+    window.clear(sf::Color::Black);
+    level->draw(window);
+    player->draw(window);
+    for (const auto& proj : projectiles) {
         window.draw(proj.shape);
-    // Draw score at the top
-    sf::Font font;
-    if (font.loadFromFile("assets/BBHSansBogle-Regular.ttf")) {
-        sf::Text scoreText("Score: " + std::to_string(score), font, 24);
-        scoreText.setFillColor(sf::Color::White);
-        scoreText.setPosition(10, 10);
-        window.draw(scoreText);
     }
+    window.draw(scoreText);
     if (gameOver) {
-        sf::Font font;
-        if (font.loadFromFile("assets/BBHSansBogle-Regular.ttf")) {
-            sf::Text text("Game Over! Press R to restart", font, 32);
-            text.setFillColor(sf::Color::White);
-            text.setPosition(200, 250);
-            window.draw(text);
-        }
+        sf::Text overText("Game Over! Press R to restart", font, 16);
+        overText.setFillColor(sf::Color::Red);
+        overText.setPosition(40.f, 80.f);
+        window.draw(overText);
     }
     window.display();
 }
 
-void Game::reset() {
-    player.setPosition(100, groundY);
-    isJumping = false;
-    playerVelocityY = 0.f;
-    projectiles.clear();
-    gameOver = false;
-    projectileClock.restart();
-    score = 0;
+void Game::spawnProjectile() {
+    Projectile proj;
+    proj.shape = sf::CircleShape(8.f);
+    proj.shape.setOutlineThickness(2.f);
+    proj.shape.setOutlineColor(sf::Color::Red);
+    proj.shape.setFillColor(sf::Color::Transparent);
+    float y = 32.f + static_cast<float>(std::rand() % 120);
+    proj.shape.setPosition(320.f, y);
+    proj.velocity = sf::Vector2f(-120.f, 0.f);
+    projectiles.push_back(proj);
 }
+
+void Game::handleCollisions() {
+    auto playerBounds = player->getBounds();
+    for (auto it = projectiles.begin(); it != projectiles.end();) {
+        if (it->shape.getGlobalBounds().intersects(playerBounds)) {
+            gameOver = true;
+            return;
+        }
+        if (it->shape.getPosition().x + it->shape.getRadius() * 2 < 0) {
+            score++;
+            scoreText.setString("Score: " + std::to_string(score));
+            it = projectiles.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+void Game::reset() {
+    score = 0;
+    scoreText.setString("Score: 0");
+    gameOver = false;
+    projectiles.clear();
+    player = std::make_unique<Player>(sf::Vector2f(32.f, 180.f - 32.f), level);
+}
+

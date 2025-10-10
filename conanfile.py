@@ -14,6 +14,7 @@ class GameConan(ConanFile):
     def requirements(self):
         self.requires("sfml/2.5.1")
         self.requires("gtest/1.14.0")
+        self.requires("boost/1.83.0")
 
     def build(self):
         cmake = CMake(self)

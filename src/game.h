@@ -1,34 +1,35 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-#include <vector>
-
-struct Projectile {
-    sf::RectangleShape shape;
-    bool scored = false;
-};
+#include <memory>
+#include "player.h"
+#include "level.h"
 
 class Game {
 public:
     Game();
     void run();
-protected:
-    void processEvents();
-    void update(sf::Time dt);
-    void render();
-    void handlePlayerInput(sf::Keyboard::Key key, bool isPressed);
-    void spawnProjectile();
-    void reset();
 
+private:
     sf::RenderWindow window;
-    sf::RectangleShape player;
-    std::vector<Projectile> projectiles;
-    sf::Color bgColor = sf::Color::Black;
-    bool isJumping = false;
-    float playerVelocityY = 0.f;
-    float gravity = 1000.f;
-    float jumpStrength = -500.f;
-    float groundY = 500.f;
-    sf::Clock projectileClock;
-    bool gameOver = false;
+    std::shared_ptr<Level> level;
+    std::unique_ptr<Player> player;
+
+    sf::Font font;
+    sf::Text scoreText;
     int score = 0;
+    bool gameOver = false;
+
+    float projectileSpawnTimer = 0.f;
+    struct Projectile {
+        sf::CircleShape shape;
+        sf::Vector2f velocity;
+    };
+    std::vector<Projectile> projectiles;
+
+    void processEvents();
+    void update(float dt);
+    void render();
+    void spawnProjectile();
+    void handleCollisions();
+    void reset();
 };
