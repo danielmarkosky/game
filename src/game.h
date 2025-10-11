@@ -1,9 +1,8 @@
 #pragma once
 #include <SFML/Graphics.hpp>
 #include <memory>
-#include "player.h"
-#include "level.h"
-#include "projectiles.h"
+#include "characters/duck.h"
+#include "levels/first_level.h"
 
 class Game {
 public:
@@ -12,6 +11,7 @@ public:
 
 private:
     sf::RenderWindow window;
+    sf::View view;
     std::shared_ptr<Level> level;
     std::unique_ptr<Player> player;
 
@@ -20,9 +20,7 @@ private:
     int score = 0;
     bool gameOver = false;
 
-    ProjectileManager projectileManager;
-
-    void processEvents();
+    void handleEvents();
     void update(float dt);
     void render();
     void reset();

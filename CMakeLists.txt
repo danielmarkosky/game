@@ -21,6 +21,6 @@ add_executable(game_tests ${SRC_FILES} ${LEVELS_FILES} ${TEST_FILES})
 target_link_libraries(game_tests PRIVATE gtest sfml-graphics sfml-window sfml-system Boost::program_options)
 target_include_directories(game_tests PRIVATE ${CMAKE_SOURCE_DIR})
 
-add_executable(game_debug ${SRC_FILES} ${LEVELS_FILES} ${DEBUG_FILES})
+add_executable(game_debug ${SRC_FILES} ${LEVELS_FILES} ${DEBUG_FILES} ${CHARACTER_FILES})
 target_link_libraries(game_debug PRIVATE sfml-graphics sfml-window sfml-system Boost::program_options)
 target_include_directories(game_debug PRIVATE ${CMAKE_SOURCE_DIR})

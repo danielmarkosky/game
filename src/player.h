@@ -25,9 +25,10 @@ protected:
     sf::Vector2f velocity;
     bool isJumping = false;
     std::shared_ptr<Level> level;
-    float moveSpeed = 100.f;
-    float jumpStrength = 200.f;
-    float gravity = 400.f;
+    float moveSpeed;
+    float jumpStrength;
+    float gravity;
 
     bool canMove(const sf::Vector2f& offset) const;
+    // Player parameters are not initialized here, but in derived classes
 };
