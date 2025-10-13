@@ -2,16 +2,7 @@
 #include <algorithm>
 
 Player::Player(const sf::Vector2f& startPos, std::shared_ptr<Level> level)
-    : level(std::move(level))
-{
-    shape.setSize(sf::Vector2f(16.f, 24.f)); // Example size
-    shape.setFillColor(sf::Color::Transparent);
-    shape.setOutlineThickness(2.f);
-    shape.setOutlineColor(sf::Color::Green);
-    shape.setPosition(startPos);
-
-    jumpStrength = 320.f; // Increased jump strength for higher jumps
-}
+    : level(std::move(level)) {}
 
 void Player::update(float dt) {
     // Apply gravity
@@ -25,11 +16,17 @@ void Player::update(float dt) {
     if (!canMove(sf::Vector2f(velocity.x * dt, 0))) {
         velocity.x = 0;
     }
+    float prevVelocityY = velocity.y;
+    isOnGround = false; // Reset before collision check
     if (!canMove(sf::Vector2f(0, velocity.y * dt))) {
+        // If falling and hit ground, set isOnGround true
+        if (prevVelocityY > 0) {
+            isOnGround = true;
+            isJumping = false;
+            // Snap player to ground
+        }
         velocity.y = 0;
-        isJumping = false;
     }
-
     // Move player
     shape.move(velocity * dt);
 }
@@ -39,17 +36,28 @@ void Player::draw(sf::RenderWindow& window) {
 }
 
 void Player::moveLeft() {
-    velocity.x = -moveSpeed;
+    // Only move left if no wall
+    if (canMove(sf::Vector2f(-moveSpeed * 0.016f, 0))) { // 0.016f ~ 60 FPS frame
+        velocity.x = -moveSpeed;
+    } else {
+        velocity.x = 0;
+    }
 }
 
 void Player::moveRight() {
-    velocity.x = moveSpeed;
+    // Only move right if no wall
+    if (canMove(sf::Vector2f(moveSpeed * 0.016f, 0))) {
+        velocity.x = moveSpeed;
+    } else {
+        velocity.x = 0;
+    }
 }
 
 void Player::jump() {
-    if (!isJumping) {
+    if (isOnGround) {
         velocity.y = -jumpStrength;
         isJumping = true;
+        isOnGround = false;
     }
 }
 
@@ -75,4 +83,17 @@ bool Player::canMove(const sf::Vector2f& offset) const {
         }
     }
     return true;
+}
+
+void Player::handleEvent(const sf::Event& event) {
+    if (event.type == sf::Event::KeyPressed) {
+        if (event.key.code == sf::Keyboard::A) moveLeft();
+        if (event.key.code == sf::Keyboard::D) moveRight();
+        if (event.key.code == sf::Keyboard::Space) jump();
+    }
+    if (event.type == sf::Event::KeyReleased) {
+        if (event.key.code == sf::Keyboard::A || event.key.code == sf::Keyboard::D) {
+            stopHorizontal();
+        }
+    }
 }

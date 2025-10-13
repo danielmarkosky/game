@@ -1,5 +1,5 @@
 #include "levels/first_level.h"
-#include "src/wall.h"
+#include "environment/wall.h"
 #include <SFML/Graphics.hpp>
 #include <memory>
 

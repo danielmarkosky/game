@@ -1,22 +1,16 @@
 #pragma once
 #include <SFML/Graphics.hpp>
-#include <vector>
 
-struct Projectile {
+class Projectile {
+public:
+    Projectile();
+    virtual ~Projectile() = default;
+    virtual void update(float dt); // Moves the projectile
+    virtual void draw(sf::RenderWindow& window) const; // Draws the projectile
+    sf::FloatRect getBounds() const; // Returns bounding box
+    sf::Vector2f getVelocity() const; // Returns velocity
+    bool handleCollision(const sf::FloatRect& playerBounds) const; // Checks collision with player
+    void reset(float startX, float startY, const sf::Vector2f& newVelocity); // Resets position/velocity
     sf::CircleShape shape;
     sf::Vector2f velocity;
-};
-
-class ProjectileManager {
-public:
-    ProjectileManager(unsigned int viewWidth, unsigned int viewHeight);
-    void spawnProjectile();
-    void update(float dt);
-    void draw(sf::RenderWindow& window) const;
-    bool handleCollisions(const sf::FloatRect& playerBounds, int& score);
-    void reset();
-private:
-    std::vector<Projectile> projectiles;
-    float spawnTimer = 0.f;
-    unsigned int viewWidth, viewHeight;
 };

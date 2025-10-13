@@ -3,6 +3,7 @@
 #include <memory>
 #include "characters/duck.h"
 #include "levels/first_level.h"
+#include "ui/score.h"
 
 namespace
 {
@@ -13,20 +14,15 @@ namespace
 Game::Game()
 {
     window.create(sf::VideoMode(VIEW_WIDTH * 4, VIEW_HEIGHT * 4), "Jump & Dodge Game", sf::Style::Close);
+    window.setFramerateLimit(60); // Limit to 60 FPS to reduce CPU usage
+    window.setVerticalSyncEnabled(true); // Enable vertical sync for smooth rendering
     view.setSize(VIEW_WIDTH, VIEW_HEIGHT);
     view.setCenter(VIEW_WIDTH / 2.f, VIEW_HEIGHT / 2.f);
     window.setView(view);
 
     level = std::make_shared<FirstLevel>();
     player = std::make_unique<Duck>(sf::Vector2f(32.f, 80.f), level);
-
-    font.loadFromFile("assets/BBHSansBogle-Regular.ttf");
-    scoreText.setFont(font);
-    scoreText.setCharacterSize(16);
-    scoreText.setFillColor(sf::Color::White);
-    scoreText.setPosition(8.f, 8.f);
-    scoreText.setString("Score: 0");
-    score = 0;
+    score = std::make_unique<Score>();
     gameOver = false;
 }
 
@@ -45,15 +41,14 @@ void Game::handleEvents() {
     while (window.pollEvent(event)) {
         if (event.type == sf::Event::Closed)
             window.close();
-        // Handle input
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) player->moveLeft();
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) player->moveRight();
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) player->jump();
+        // Delegate input handling to player
+        player->handleEvent(event);
     }
 }
 
 void Game::update(float dt) {
     player->update(dt);
+    // Example: score->add(1); // Add score logic here as needed
     // ...update projectiles, check collisions, update score...
 }
 
@@ -61,6 +56,7 @@ void Game::render() {
     window.clear(sf::Color::Black);
     level->draw(window);
     player->draw(window);
+    // score->draw(window);
     // ...draw projectiles, score...
     window.display();
 }

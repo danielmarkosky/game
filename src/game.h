@@ -3,6 +3,7 @@
 #include <memory>
 #include "characters/duck.h"
 #include "levels/first_level.h"
+#include "ui/score.h"
 
 class Game {
 public:
@@ -14,10 +15,7 @@ private:
     sf::View view;
     std::shared_ptr<Level> level;
     std::unique_ptr<Player> player;
-
-    sf::Font font;
-    sf::Text scoreText;
-    int score = 0;
+    std::unique_ptr<Score> score; // Use Score class for score logic
     bool gameOver = false;
 
     void handleEvents();

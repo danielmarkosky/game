@@ -2,7 +2,7 @@
 
 #include <SFML/Graphics.hpp>
 #include <vector>
-#include "wall.h"
+#include "environment/wall.h"
 
 class Level {
 public:
