@@ -4,7 +4,7 @@ Firebomb::Firebomb(float startX, float startY)
     : speed(120.f)
 {
     shape = sf::CircleShape(8.f); // Size
-    shape.setOutlineThickness(2.f);
+    shape.setOutlineThickness(1.f);
     shape.setOutlineColor(sf::Color::Red);
     shape.setFillColor(sf::Color::Transparent);
     shape.setPosition(startX, startY);

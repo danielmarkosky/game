@@ -40,9 +40,14 @@ FirstLevel::FirstLevel() {
         sf::FloatRect(0.f, 180.f - 8.f, 320.f, 8.f),
         loadTexture("assets/floor.png")
     ));
-    // Middle plank (platform)
+    // Middle plank (platform) - lowered for easier jumping
     addWall(Wall(
-        sf::FloatRect(80.f, 100.f, 160.f, 8.f),
+        sf::FloatRect(80.f, 140.f, 160.f, 8.f),
         loadTexture("assets/plank.png")
     ));
+    // Spawn a Firebomb projectile from the right edge
+    // Example: spawn at (312, 120) and move left
+    // You may need to adapt this to your game's projectile management system
+    // Firebomb firebomb(312.f, 120.f);
+    // addProjectile(firebomb); // Uncomment and adapt if you have addProjectile
 }

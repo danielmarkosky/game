@@ -4,6 +4,7 @@
 #include "characters/duck.h"
 #include "levels/first_level.h"
 #include "ui/score.h"
+#include "environment/firebomb.h"
 
 namespace
 {
@@ -24,6 +25,9 @@ Game::Game()
     player = std::make_unique<Duck>(sf::Vector2f(32.f, 80.f), level);
     score = std::make_unique<Score>();
     gameOver = false;
+
+    // Spawn a Firebomb projectile from the right edge, moving left
+    projectileManager.addProjectile(std::make_unique<Firebomb>(312.f, 120.f));
 }
 
 void Game::run() {
@@ -48,6 +52,13 @@ void Game::handleEvents() {
 
 void Game::update(float dt) {
     player->update(dt);
+    projectileManager.updateAll(dt);
+    // Repeated projectile spawning
+    projectileSpawnTimer += dt;
+    if (projectileSpawnTimer >= projectileSpawnInterval) {
+        projectileManager.addProjectile(std::make_unique<Firebomb>(312.f, 120.f));
+        projectileSpawnTimer = 0.0f;
+    }
     // Example: score->add(1); // Add score logic here as needed
     // ...update projectiles, check collisions, update score...
 }
@@ -56,6 +67,7 @@ void Game::render() {
     window.clear(sf::Color::Black);
     level->draw(window);
     player->draw(window);
+    projectileManager.drawAll(window);
     // score->draw(window);
     // ...draw projectiles, score...
     window.display();

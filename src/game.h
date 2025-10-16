@@ -4,6 +4,7 @@
 #include "characters/duck.h"
 #include "levels/first_level.h"
 #include "ui/score.h"
+#include "src/projectile_manager.h"
 
 class Game {
 public:
@@ -16,6 +17,9 @@ private:
     std::shared_ptr<Level> level;
     std::unique_ptr<Player> player;
     std::unique_ptr<Score> score; // Use Score class for score logic
+    ProjectileManager projectileManager; // Manages projectiles
+    float projectileSpawnTimer = 0.0f; // Timer for repeated projectile spawning
+    const float projectileSpawnInterval = 1.0f; // Interval in seconds
     bool gameOver = false;
 
     void handleEvents();
