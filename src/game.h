@@ -4,7 +4,7 @@
 #include "characters/duck.h"
 #include "levels/first_level.h"
 #include "ui/score.h"
-#include "src/projectile_manager.h"
+#include "projectile_manager.h"
 
 class Game {
 public:
