@@ -1,5 +1,6 @@
-#include "src/empty.h"
+#include "src/game.h"
 
 int main() {
-    empty();
+    Game game;
+    game.run();
 }
