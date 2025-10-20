@@ -17,3 +17,12 @@ void Level::draw(sf::RenderWindow& window) const {
 void Level::addWall(const Wall& wall) {
     walls.push_back(wall);
 }
+
+bool Level::collidesWithWall(const sf::FloatRect& rect) const {
+    for (const auto& wall : walls) {
+        if (wall.getBounds().intersects(rect)) {
+            return true;
+        }
+    }
+    return false;
+}

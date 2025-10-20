@@ -5,7 +5,7 @@
 class Wall {
 public:
     explicit Wall(const sf::FloatRect& rect, std::shared_ptr<sf::Texture> texture = nullptr);
-    sf::FloatRect getRect() const;
+    sf::FloatRect getBounds() const;
     void draw(sf::RenderWindow& window) const;
 private:
     sf::FloatRect rect;

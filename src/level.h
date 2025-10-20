@@ -15,6 +15,9 @@ public:
     // Draws all walls
     virtual void draw(sf::RenderWindow& window) const;
 
+    // Returns true if rect collides with any wall
+    bool collidesWithWall(const sf::FloatRect& rect) const;
+
 protected:
     void addWall(const Wall& wall);
 

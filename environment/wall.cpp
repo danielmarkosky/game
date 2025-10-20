@@ -17,7 +17,7 @@ Wall::Wall(const sf::FloatRect& rect, std::shared_ptr<sf::Texture> texture)
     }
 }
 
-sf::FloatRect Wall::getRect() const {
+sf::FloatRect Wall::getBounds() const {
     return rect;
 }
 

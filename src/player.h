@@ -23,7 +23,8 @@ public:
     sf::FloatRect getBounds() const;
 
 protected:
-    sf::RectangleShape shape;
+    sf::Sprite sprite; // Use sprite for rendering and collision
+    sf::Texture texture; // Texture for the sprite
     sf::Vector2f velocity;
     bool isJumping = false;
     bool isOnGround = false; // Track if player is on ground
