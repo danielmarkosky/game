@@ -27,10 +27,7 @@ void Player::update(float dt)
 {
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) velocity.x = (-1) * moveSpeed;
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) velocity.x = moveSpeed;
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) and canJump) {
-        velocity.y = jumpSpeed;
-        canJump = false;
-    }
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) and canJump()) velocity.y = jumpSpeed;
 
     velocity.y -= gravity * dt;
     if (velocity.y < maxFallSpeed) velocity.y = maxFallSpeed;
@@ -47,9 +44,6 @@ void Player::update(float dt)
     if (level->isEmptySpace(nextPos, height, width)) {
         position = nextPos;
     } else {
-        if (velocity.y < 0.f) {
-            canJump = true;
-        }
         velocity.y = 0.f;
     }
 
@@ -60,4 +54,10 @@ void Player::update(float dt)
 sf::Vector2f Player::centre() const
 {
     return position + sf::Vector2f(width * .5f, height * .5f);
+}
+
+bool Player::canJump()
+{
+    sf::Vector2f belowPos = position + sf::Vector2f(0.f, -1.f);
+    return not level->isEmptySpace(belowPos, 1.f, width);
 }

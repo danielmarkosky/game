@@ -8,9 +8,13 @@ int main() {
     constexpr unsigned GAME_WIDTH = 320;
     constexpr unsigned GAME_HEIGHT = 180;
 
-    auto desktop = sf::VideoMode::getDesktopMode();
+    constexpr unsigned k = 4;
 
-    sf::RenderWindow window(desktop, "Celeste-like Game", sf::Style::Fullscreen);
+    sf::RenderWindow window(
+        sf::VideoMode(GAME_WIDTH * k, GAME_HEIGHT * k),
+        "Celeste-like Game",
+        sf::Style::Close
+    );
     window.setFramerateLimit(60);
 
     sf::RenderTexture renderTexture;
@@ -41,18 +45,7 @@ int main() {
 
         window.clear();
         sf::Sprite scaledSprite(renderTexture.getTexture());
-
-        float scaleX = desktop.width / static_cast<float>(GAME_WIDTH);
-        float scaleY = desktop.height / static_cast<float>(GAME_HEIGHT);
-        float scale = std::min(scaleX, scaleY);
-        scale = static_cast<int>(scale);
-
-        float offsetX = (desktop.width - GAME_WIDTH * scale) / 2.f;
-        float offsetY = (desktop.height - GAME_HEIGHT * scale) / 2.f;
-
-        scaledSprite.setScale(scale, scale);
-        scaledSprite.setPosition(offsetX, offsetY);
-
+        scaledSprite.setScale(static_cast<float>(k), static_cast<float>(k));
         window.draw(scaledSprite);
         window.display();
     }
