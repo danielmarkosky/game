@@ -16,8 +16,13 @@ public:
 protected:
     sf::Vector2f position;
     sf::Vector2f velocity;
-    float width = 7.f;
-    float height = 11.f;
+    const float width = 7.f;
+    const float height = 11.f;
+    const float moveSpeed = 100.f;
+    const float jumpSpeed = 380.f;
+    const float gravity = 1100.f;
+    const float maxFallSpeed = (-1) * 900.f;
+    bool canJump = false;
     sf::Texture texture;
     sf::Sprite sprite;
     std::shared_ptr<const Level> level;

@@ -1,6 +1,7 @@
 #include <SFML/Graphics.hpp>
 #include "src/Level.h"
 #include "src/Player.h"
+#include "src/utils.h"
 #include <memory>
 
 int main() {
@@ -35,6 +36,7 @@ int main() {
         sf::Vector2f center = player->centre();
         level->draw(renderTexture, center);
         player->draw(renderTexture);
+        // drawDebugGrid(renderTexture, center, 25, 25, Level::TILE_SIZE, sf::Color::Green);
         renderTexture.display();
 
         window.clear();

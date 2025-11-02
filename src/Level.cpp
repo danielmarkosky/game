@@ -13,14 +13,13 @@ Level::Level()
             if (y == 0 || y == 22 || x == 0 || x == 39) {
                 m_tileMap[x][y] = dist(rng);
             } else {
-                m_tileMap[x][y] = 0; // empty
+                m_tileMap[x][y] = 0;
             }
         }
     }
-    // Example: add a platform
-    m_tileMap[10][10] = 2;
-    m_tileMap[11][10] = 1;
-    m_tileMap[12][10] = 2;
+    m_tileMap[10][5] = 2;
+    m_tileMap[11][5] = 1;
+    m_tileMap[12][5] = 2;
 
     m_tileset.loadFromFile("assets/tiles_map.png");
     m_tileSprite.setTexture(m_tileset);
@@ -38,7 +37,8 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr)
     for (const auto& [x, col] : m_tileMap) {
         for (const auto& [y, tile] : col) {
             if (tile == 0) continue;
-            m_tileSprite.setPosition(viewCoordinates(sf::Vector2f(x * TILE_SIZE, y * TILE_SIZE), centr));
+            auto pos = viewCoordinates(sf::Vector2f(x * TILE_SIZE, (y + 1) * TILE_SIZE), centr);
+            m_tileSprite.setPosition(std::floor(pos.x + 0.5f), std::floor(pos.y + 0.5f));
             m_tileSprite.setTextureRect(sf::IntRect((tile - 1) * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE));
             target.draw(m_tileSprite);
         }
