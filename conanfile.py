@@ -12,7 +12,7 @@ class GameConan(ConanFile):
         cmake_layout(self)
 
     def requirements(self):
-        self.requires("sfml/2.5.1")
+        self.requires("sfml/2.6.1")
         self.requires("gtest/1.14.0")
         self.requires("boost/1.83.0")
 
