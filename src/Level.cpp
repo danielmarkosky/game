@@ -38,20 +38,32 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr)
         for (const auto& [y, tile] : col) {
             if (tile == 0) continue;
             auto pos = viewCoordinates(sf::Vector2f(x * TILE_SIZE, (y + 1) * TILE_SIZE), centr);
-            m_tileSprite.setPosition(std::floor(pos.x + 0.5f), std::floor(pos.y + 0.5f));
+            m_tileSprite.setPosition(std::floor(pos.x), std::floor(pos.y));
             m_tileSprite.setTextureRect(sf::IntRect((tile - 1) * TILE_SIZE, 0, TILE_SIZE, TILE_SIZE));
             target.draw(m_tileSprite);
         }
     }
 }
 
-bool Level::isSolid(int x, int y) const
+int Level::tileAt(int x, int y) const
 {
     auto itx = m_tileMap.find(x);
-    if (itx == m_tileMap.end()) return false;
+    if (itx == m_tileMap.end()) return 0;
     auto ity = itx->second.find(y);
-    if (ity == itx->second.end()) return false;
-    return ity->second != 0;
+    if (ity == itx->second.end()) return 0;
+    return ity->second;
+}
+
+bool Level::isSolid(int x, int y) const
+{
+    int tile = this->tileAt(x, y);
+    return tile == 1 or tile == 2;
+}
+
+bool Level::isDangerous(int x, int y) const
+{
+    int tile = this->tileAt(x, y);
+    return tile == 3;
 }
 
 bool Level::isEmptySpace(sf::Vector2f pos, float hight, float width) const
@@ -64,4 +76,11 @@ bool Level::isEmptySpace(sf::Vector2f pos, float hight, float width) const
         }
     }
     return true;
+}
+
+void Level::resetLevel() {}
+
+sf::Vector2f Level::getStartPos() const
+{
+    return m_startPos;
 }

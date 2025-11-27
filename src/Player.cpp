@@ -6,16 +6,17 @@
 #include <iostream>
 #include <cmath>
 
-Player::Player(const sf::Vector2f& startPos, std::shared_ptr<const Level> lvl)
-    : position(startPos), level(std::move(lvl)), velocity(50.f, 50.f)
+Player::Player(std::shared_ptr<const Level> lvl)
+    : level(std::move(lvl)), velocity(50.f, 50.f)
 {
-    if (!texture.loadFromFile("assets/player.png")) {
+	position = level->getStartPos();
+    if (!texture.loadFromFile("assets/temp_player.png")) {
         throw std::runtime_error("No image porfawor");
     }
     sprite.setTexture(texture);
-    sprite.setOrigin(0.f, height);
-    auto p0 = viewCoordinates(position, centre());
-    sprite.setPosition(std::floor(p0.x + 0.5f), std::floor(p0.y + 0.5f));
+    sprite.setTextureRect(sf::IntRect(0, 0, 9, 12));
+    auto p0 = viewCoordinates(position + sf::Vector2f(-1, 12), centre());
+    sprite.setPosition(p0);
 }
 
 void Player::draw(sf::RenderTarget& target) const
@@ -25,8 +26,14 @@ void Player::draw(sf::RenderTarget& target) const
 
 void Player::update(float dt)
 {
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) velocity.x = (-1) * moveSpeed;
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) velocity.x = moveSpeed;
+    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+        velocity.x = -moveSpeed;
+    } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+        velocity.x = moveSpeed;
+    } else {
+        velocity.x = 0.f;
+    }
+
     if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) and canJump()) velocity.y = jumpSpeed;
 
     velocity.y -= gravity * dt;
@@ -37,8 +44,9 @@ void Player::update(float dt)
     nextPos = position + sf::Vector2f(velocity.x, 0.f) * dt;
     if (level->isEmptySpace(nextPos, height, width)) {
         position = nextPos;
+    } else {
+        velocity.x = 0.f;
     }
-    velocity.x = 0.f;
 
     nextPos = position + sf::Vector2f(0.f, velocity.y) * dt;
     if (level->isEmptySpace(nextPos, height, width)) {
@@ -47,13 +55,19 @@ void Player::update(float dt)
         velocity.y = 0.f;
     }
 
-    auto p = viewCoordinates(position, centre());
-    sprite.setPosition(std::floor(p.x + 0.5f), std::floor(p.y + 0.5f));
+    auto p = viewCoordinates(position + sf::Vector2f(-1.f, 12.f), centre());
+    sprite.setPosition(std::floor(p.x), std::floor(p.y));
 }
 
 sf::Vector2f Player::centre() const
 {
     return position + sf::Vector2f(width * .5f, height * .5f);
+}
+
+void Player::resetPlayer()
+{
+    position = this->level->getStartPos();
+    velocity = sf::Vector2f(0.f, 0.f);
 }
 
 bool Player::canJump()

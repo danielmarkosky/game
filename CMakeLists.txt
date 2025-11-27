@@ -4,7 +4,7 @@ project(game LANGUAGES CXX)
 include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake OPTIONAL)
 
 find_package(Boost REQUIRED COMPONENTS program_options)
-find_package(SFML 2.5 COMPONENTS graphics window system REQUIRED)
+find_package(SFML 2.6 COMPONENTS graphics window system REQUIRED)
 find_package(GTest REQUIRED)
 
 file(GLOB SRC_FILES src/*.cpp)

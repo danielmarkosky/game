@@ -22,7 +22,7 @@ int main() {
     renderTexture.setSmooth(false);
 
     auto level = std::make_shared<Level>();
-    auto player = std::make_unique<Player>(sf::Vector2f{100.f, 100.f}, level);
+    auto player = std::make_unique<Player>(level);
 
     sf::Clock clock;
 
@@ -36,7 +36,7 @@ int main() {
         float dt = clock.restart().asSeconds();
         player->update(dt);
 
-        renderTexture.clear(sf::Color::Black);
+        renderTexture.clear(sf::Color(24, 28, 36));
         sf::Vector2f center = player->centre();
         level->draw(renderTexture, center);
         player->draw(renderTexture);
