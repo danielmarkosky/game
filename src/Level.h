@@ -15,6 +15,7 @@ public:
     bool isSolid(int x, int y) const;
     bool isDangerous(int x, int y) const;
     bool isEmptySpace(sf::Vector2f pos, float hight, float width) const;
+	bool isDangerousSpace(sf::Vector2f pos, float hight, float width) const;
     void resetLevel();
 	sf::Vector2f getStartPos() const;
 

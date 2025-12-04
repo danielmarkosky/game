@@ -21,6 +21,11 @@ Level::Level()
     m_tileMap[11][5] = 1;
     m_tileMap[12][5] = 2;
 
+    m_tileMap[17][5] = 3;
+    m_tileMap[18][5] = 3;
+    m_tileMap[19][5] = 4;
+    m_tileMap[20][5] = 4;
+
     m_tileset.loadFromFile("assets/tiles_map.png");
     m_tileSprite.setTexture(m_tileset);
 }
@@ -63,7 +68,7 @@ bool Level::isSolid(int x, int y) const
 bool Level::isDangerous(int x, int y) const
 {
     int tile = this->tileAt(x, y);
-    return tile == 3;
+    return tile == 3 or tile == 4;
 }
 
 bool Level::isEmptySpace(sf::Vector2f pos, float hight, float width) const
@@ -76,6 +81,18 @@ bool Level::isEmptySpace(sf::Vector2f pos, float hight, float width) const
         }
     }
     return true;
+}
+
+bool Level::isDangerousSpace(sf::Vector2f pos, float hight, float width) const
+{
+    std::pair<int, int> start = tailNumbers(pos);
+    std::pair<int, int> stop  = tailNumbers(pos + sf::Vector2f(width, hight));
+    for (int ii = start.first; ii <= stop.first; ii++) {
+        for (int jj = start.second; jj <= stop.second; jj++) {
+            if (isDangerous(ii, jj)) return true;
+        }
+    }
+    return false;
 }
 
 void Level::resetLevel() {}

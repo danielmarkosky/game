@@ -55,6 +55,10 @@ void Player::update(float dt)
         velocity.y = 0.f;
     }
 
+    if (level->isDangerousSpace(position, height, width)) {
+        resetPlayer();
+    }
+
     auto p = viewCoordinates(position + sf::Vector2f(-1.f, 12.f), centre());
     sprite.setPosition(std::floor(p.x), std::floor(p.y));
 }
