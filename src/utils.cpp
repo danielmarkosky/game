@@ -15,16 +15,15 @@ std::pair<int, int> tailNumbers(sf::Vector2f pos)
     return {x, y};
 }
 
-void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int rows, float tileSize, sf::Color color) {
-
-
+void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int rows, float tileSize, sf::Color color)
+{
     for (int x = 0; x <= cols; ++x) {
         float gx = x * tileSize;
         auto p1 = viewCoordinates(sf::Vector2f(gx, 0), centr);
         auto p2 = viewCoordinates(sf::Vector2f(gx, rows * tileSize), centr);
         sf::Vertex line[] = {
-            sf::Vertex(sf::Vector2f(std::floor(p1.x + 0.5f), std::floor(p1.y + 0.5f)), color),
-            sf::Vertex(sf::Vector2f(std::floor(p2.x + 0.5f), std::floor(p2.y + 0.5f)), color)
+            sf::Vertex(sf::Vector2f(std::floor(p1.x), std::floor(p1.y)), color),
+            sf::Vertex(sf::Vector2f(std::floor(p2.x), std::floor(p2.y)), color)
         };
         target.draw(line, 2, sf::Lines);
     }
@@ -33,8 +32,8 @@ void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int r
         auto p1 = viewCoordinates(sf::Vector2f(0, gy), centr);
         auto p2 = viewCoordinates(sf::Vector2f(cols * tileSize, gy), centr);
         sf::Vertex line[] = {
-            sf::Vertex(sf::Vector2f(std::floor(p1.x + 0.5f), std::floor(p1.y + 0.5f)), color),
-            sf::Vertex(sf::Vector2f(std::floor(p2.x + 0.5f), std::floor(p2.y + 0.5f)), color)
+            sf::Vertex(sf::Vector2f(std::floor(p1.x), std::floor(p1.y)), color),
+            sf::Vertex(sf::Vector2f(std::floor(p2.x), std::floor(p2.y)), color)
         };
         target.draw(line, 2, sf::Lines);
     }
@@ -45,6 +44,13 @@ void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int r
     sf::CircleShape dot(2.f);
     dot.setFillColor(sf::Color::Red);
     dot.setOrigin(2.f, 2.f);
-    dot.setPosition(std::floor(screenPos.x + 0.5f), std::floor(screenPos.y + 0.5f));
+    dot.setPosition(std::floor(screenPos.x), std::floor(screenPos.y));
     target.draw(dot);
 }
+
+double distance(sf::Vector2f p1, sf::Vector2f p2)
+{
+    return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
+}
+
+

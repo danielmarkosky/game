@@ -4,6 +4,8 @@
 #include "src/utils.h"
 #include <memory>
 
+#include "src/Rope.h"
+
 int main() {
     constexpr unsigned GAME_WIDTH = 320;
     constexpr unsigned GAME_HEIGHT = 180;
@@ -23,6 +25,7 @@ int main() {
 
     auto level = std::make_shared<Level>();
     auto player = std::make_unique<Player>(level);
+    auto rope = std::make_unique<Rope>(sf::Vector2f{30,30}, sf::Vector2f{100,100}, 15, level);
 
     sf::Clock clock;
 
@@ -34,12 +37,17 @@ int main() {
         }
 
         float dt = clock.restart().asSeconds();
+        const float MAX_DT = 1.0f / 30.0f;
+        dt = std::min(dt, MAX_DT);
+
         player->update(dt);
+        rope->update(dt);
 
         renderTexture.clear(sf::Color(24, 28, 36));
         sf::Vector2f center = player->centre();
         level->draw(renderTexture, center);
         player->draw(renderTexture);
+        rope->draw(renderTexture, center);
         // drawDebugGrid(renderTexture, center, 25, 25, Level::TILE_SIZE, sf::Color::Green);
         renderTexture.display();
 

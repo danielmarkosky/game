@@ -17,14 +17,21 @@ Level::Level()
             }
         }
     }
-    m_tileMap[10][5] = 2;
-    m_tileMap[11][5] = 1;
-    m_tileMap[12][5] = 2;
+    // m_tileMap[10][5] = 2;
+    // m_tileMap[11][5] = 1;
+    // m_tileMap[12][5] = 2;
+
+    m_tileMap[14][5] = dist(rng);
 
     m_tileMap[17][5] = 3;
     m_tileMap[18][5] = 3;
     m_tileMap[19][5] = 4;
     m_tileMap[20][5] = 4;
+    m_tileMap[21][5] = 4;
+    m_tileMap[22][5] = 4;
+
+    m_tileMap[0][1] = 0;
+
 
     m_tileset.loadFromFile("assets/tiles_map.png");
     m_tileSprite.setTexture(m_tileset);

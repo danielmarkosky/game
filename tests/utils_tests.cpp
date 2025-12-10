@@ -45,3 +45,15 @@ TEST(Utils_TailNumbers, NegativeFlooring) {
     EXPECT_EQ(p2.first, -2);
     EXPECT_EQ(p2.second, -3);
 }
+
+TEST(Utils_Distance, BasicDistances) {
+    sf::Vector2f p1{0.f, 0.f};
+    sf::Vector2f p2{0.f, -1.f};
+    double dist = distance(p1, p2);
+    EXPECT_DOUBLE_EQ(dist, 1.0);
+
+    sf::Vector2f p3{-1.f, -1.f};
+    sf::Vector2f p4{2.f, 3.f};
+    dist = distance(p3, p4);
+    EXPECT_DOUBLE_EQ(dist, 5.0);
+}
