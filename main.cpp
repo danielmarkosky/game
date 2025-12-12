@@ -2,6 +2,7 @@
 #include "src/Level.h"
 #include "src/Player.h"
 #include "src/utils.h"
+#include "src/InputManager.h"
 #include <memory>
 
 #include "src/Rope.h"
@@ -24,6 +25,7 @@ int main() {
     renderTexture.setSmooth(false);
 
     auto level = std::make_shared<Level>();
+    auto inputManager = std::make_unique<InputManager>();
     auto player = std::make_unique<Player>(level);
     auto rope = std::make_unique<Rope>(sf::Vector2f{30,30}, sf::Vector2f{100,100}, 15, level);
 

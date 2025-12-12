@@ -1,9 +1,12 @@
 #pragma once
 
 #include "src/Level.h"
+#include "src/Rope.h"
 
 #include <SFML/Graphics.hpp>
 #include <memory>
+
+#include "InputManager.h"
 
 class Player
 {
@@ -26,6 +29,8 @@ protected:
     sf::Texture texture;
     sf::Sprite sprite;
     std::shared_ptr<const Level> level;
+    std::unique_ptr<Rope> rope;
+    std::unique_ptr<InputManager> inputManager;
     enum class AnimState {
         Idle,
         Moving,

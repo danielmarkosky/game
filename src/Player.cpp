@@ -1,13 +1,14 @@
 #include "Player.h"
 
 #include "src/utils.h"
+#include "src/InputManager.h"
 #include <SFML/Window/Keyboard.hpp>
 #include <SFML/Graphics.hpp>
 #include <iostream>
 #include <cmath>
 
 Player::Player(std::shared_ptr<const Level> lvl)
-    : level(std::move(lvl)), velocity(50.f, 50.f)
+    : level(std::move(lvl)), velocity(50.f, 50.f), inputManager(std::make_unique<InputManager>())
 {
 	position = level->getStartPos();
     if (!texture.loadFromFile("assets/temp_player.png")) {
@@ -22,19 +23,25 @@ Player::Player(std::shared_ptr<const Level> lvl)
 void Player::draw(sf::RenderTarget& target) const
 {
     target.draw(sprite);
+
+    if (rope) {
+        rope->draw(target, centre());
+    }
 }
 
 void Player::update(float dt)
 {
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::A)) {
+    inputManager->update();
+
+    if (inputManager->isKeyPressed(sf::Keyboard::A)) {
         velocity.x = -moveSpeed;
-    } else if (sf::Keyboard::isKeyPressed(sf::Keyboard::D)) {
+    } else if (inputManager->isKeyPressed(sf::Keyboard::D)) {
         velocity.x = moveSpeed;
     } else {
         velocity.x = 0.f;
     }
 
-    if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space) and canJump()) velocity.y = jumpSpeed;
+    if (inputManager->isKeyPressed(sf::Keyboard::Space) and canJump()) velocity.y = jumpSpeed;
 
     velocity.y -= gravity * dt;
     if (velocity.y < maxFallSpeed) velocity.y = maxFallSpeed;
@@ -61,6 +68,10 @@ void Player::update(float dt)
 
     auto p = viewCoordinates(position + sf::Vector2f(-1.f, 12.f), centre());
     sprite.setPosition(std::floor(p.x), std::floor(p.y));
+
+    if (rope) {
+        rope->update(dt);
+    }
 }
 
 sf::Vector2f Player::centre() const
