@@ -53,4 +53,27 @@ double distance(sf::Vector2f p1, sf::Vector2f p2)
     return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
 }
 
+std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level, float maxDistance)
+{
+    float length = static_cast<float>(distance(from, to));
+    if (length == 0) return std::nullopt;
+    sf::Vector2f dirNorm = (to - from) / length;
+    float searchLimit = std::min(length, maxDistance);
+
+    float currentDist = 0.0f;
+    const float step = 1.0f;
+
+    while (currentDist <= searchLimit) {
+        sf::Vector2f currentPos = from + dirNorm * currentDist;
+
+        auto [tileX, tileY] = tailNumbers(currentPos);
+        if (level->isSolid(tileX, tileY)) {
+            return sf::Vector2f(std::floor(currentPos.x), std::floor(currentPos.y));
+        }
+
+        currentDist += step;
+    }
+
+    return std::nullopt;
+}
 

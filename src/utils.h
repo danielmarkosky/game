@@ -1,6 +1,8 @@
 #pragma once
 
 #include <SFML/Graphics.hpp>
+#include "src/Level.h"
+#include <optional>
 
 sf::Vector2f viewCoordinates(sf::Vector2f pos , sf::Vector2f centr);
 
@@ -10,4 +12,4 @@ void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int r
 
 double distance(sf::Vector2f p1, sf::Vector2f p2);
 
-
+std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level, float maxDistance);

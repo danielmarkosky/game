@@ -6,9 +6,8 @@
 static constexpr float TILE_SIZE = 8.0f;
 
 namespace {
-    std::unordered_map<int, std::unordered_map<int,int>> makeTiles()
-    {
-        std::unordered_map<int, std::unordered_map<int,int>> tiles;
+    std::unordered_map<int, std::unordered_map<int, int>> makeTiles() {
+        std::unordered_map<int, std::unordered_map<int, int>> tiles;
         tiles[0][0]   = 1;
         tiles[1][1]   = 2;
         tiles[2][2]   = 1;
