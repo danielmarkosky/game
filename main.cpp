@@ -8,6 +8,7 @@
 #include "src/Rope.h"
 
 int main() {
+    // TODO rope shooting
     constexpr unsigned GAME_WIDTH = 320;
     constexpr unsigned GAME_HEIGHT = 180;
 
@@ -26,8 +27,8 @@ int main() {
 
     auto level = std::make_shared<Level>();
     auto inputManager = std::make_shared<InputManager>();
-    auto player = std::make_unique<Player>(level, inputManager);
-    auto rope = std::make_unique<Rope>(sf::Vector2f{20,80}, sf::Vector2f{100,100}, level);
+    auto rope = std::make_shared<Rope>(sf::Vector2f{20,80}, sf::Vector2f{100,100}, level);
+    auto player = std::make_shared<Player>(level, inputManager, rope);
 
     sf::Clock clock;
 
@@ -45,7 +46,6 @@ int main() {
         inputManager->update();
         // level->update(dt);
         player->update(dt);
-        rope->update(dt);
 
         renderTexture.clear(sf::Color(24, 28, 36));
         sf::Vector2f center = player->centre();

@@ -6,9 +6,11 @@ Rope::Rope(sf::Vector2f startPos, sf::Vector2f endPos, std::shared_ptr<Level> le
     : m_level(std::move(level))
 {
     float dis = distance(startPos, endPos);
-    float segmentLength = 4.f;
 
-    int numSegments = static_cast<int>(std::ceil(dis / segmentLength));
+    int numSegments = static_cast<int>(std::max(1.f, std::round(dis / 4.f)));
+
+    m_segmentLength = dis / static_cast<float>(numSegments);
+
     int numNodes = numSegments + 1;
 
     nodes.reserve(numNodes);
@@ -24,7 +26,7 @@ Rope::Rope(sf::Vector2f startPos, sf::Vector2f endPos, std::shared_ptr<Level> le
 void Rope::update(float dt)
 {
     const int iterations = 30;
-    const float stiffness = 1.f;
+    const float stiffness = 1.0f;
     const float damping = 0.98f;
 
     for (auto& node : nodes) {
@@ -47,8 +49,7 @@ void Rope::update(float dt)
 
             if (currentLength < 0.05f) continue;
 
-            float restLength = 4.f;
-            float diff = (currentLength - restLength) / currentLength;
+            float diff = (currentLength - m_segmentLength) / currentLength;
 
             if (!a.isFixed) {
                 a.position += stiffness * diff * delta * 0.5f;
@@ -89,4 +90,9 @@ void Rope::draw(sf::RenderTarget& target, sf::Vector2f centr) const
         nodeShape.setPosition(std::floor(p.x), std::floor(p.y));
         target.draw(nodeShape);
     }
+}
+
+const std::vector<RopeNode>& Rope::getNodes() const
+{
+    return nodes;
 }

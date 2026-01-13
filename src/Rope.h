@@ -20,8 +20,10 @@ public:
     Rope(sf::Vector2f startPos, sf::Vector2f endPos, std::shared_ptr<Level> level);
     void update(float dt);
     void draw(sf::RenderTarget& target, sf::Vector2f centr) const;
+    const std::vector<RopeNode>& getNodes() const;
 
 private:
     std::vector<RopeNode> nodes;
     std::shared_ptr<Level> m_level;
+    float m_segmentLength;
 };

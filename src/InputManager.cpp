@@ -19,9 +19,14 @@ bool InputManager::isKeyPressed(sf::Keyboard::Key key) const
     return m_currentKeys.at(key);
 }
 
-bool InputManager::isMouseClicked() const
+bool InputManager::wasMouseClicked() const
 {
     return (not m_wasMousePressed and m_isMousePressed);
+}
+
+bool InputManager::wasMouseReleased() const
+{
+    return (m_wasMousePressed and not m_isMousePressed);
 }
 
 sf::Vector2f InputManager::mousePosition() const

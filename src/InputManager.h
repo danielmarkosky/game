@@ -9,7 +9,8 @@ public:
     InputManager();
     void update();
     bool isKeyPressed(sf::Keyboard::Key key) const;
-    bool isMouseClicked() const;
+    bool wasMouseClicked() const;
+    bool wasMouseReleased() const;
     sf::Vector2f mousePosition() const;
 
 private:

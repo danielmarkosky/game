@@ -55,7 +55,7 @@ float distance(sf::Vector2f p1, sf::Vector2f p2)
 
 std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level, float maxDistance)
 {
-    float length = static_cast<float>(distance(from, to));
+    float length = distance(from, to);
     if (length == 0) return std::nullopt;
     sf::Vector2f dirNorm = (to - from) / length;
     float searchLimit = std::min(length, maxDistance);
