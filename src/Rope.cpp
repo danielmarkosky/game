@@ -1,13 +1,21 @@
 #include "Rope.h"
 #include "utils.h"
+#include <cmath>
 
-Rope::Rope(sf::Vector2f startPos, sf::Vector2f endPos, int numNodes, std::shared_ptr<Level> level)
+Rope::Rope(sf::Vector2f startPos, sf::Vector2f endPos, std::shared_ptr<Level> level)
     : m_level(std::move(level))
 {
+    float dis = distance(startPos, endPos);
+    float segmentLength = 4.f;
+
+    int numSegments = static_cast<int>(std::ceil(dis / segmentLength));
+    int numNodes = numSegments + 1;
+
     nodes.reserve(numNodes);
     for (int ii = 0; ii < numNodes; ii++) {
-        float t = static_cast<float>(ii) / (numNodes - 1);
+        float t = static_cast<float>(ii) / static_cast<float>(numSegments);
         sf::Vector2f pos = startPos + t * (endPos - startPos);
+
         bool isFixed = (ii == numNodes - 1);
         nodes.emplace_back(pos, isFixed);
     }
@@ -15,16 +23,18 @@ Rope::Rope(sf::Vector2f startPos, sf::Vector2f endPos, int numNodes, std::shared
 
 void Rope::update(float dt)
 {
-    const int iterations = 5;
-    const float stiffness = 0.5f;
+    const int iterations = 30;
+    const float stiffness = 1.f;
+    const float damping = 0.98f;
 
     for (auto& node : nodes) {
         if (node.isFixed) continue;
 
         sf::Vector2f velocity = node.position - node.previousPosition;
         node.previousPosition = node.position;
-        node.position += velocity;
-        node.position.y -= 900.f * dt * dt;
+
+        node.position += velocity * damping;
+        node.position.y -= 890.f * dt * dt;
     }
 
     for (int it = 0; it < iterations; ++it) {
@@ -34,7 +44,9 @@ void Rope::update(float dt)
 
             sf::Vector2f delta = b.position - a.position;
             float currentLength = std::sqrt(delta.x * delta.x + delta.y * delta.y);
-            if (currentLength == 0.f) continue;
+
+            if (currentLength < 0.05f) continue;
+
             float restLength = 4.f;
             float diff = (currentLength - restLength) / currentLength;
 

@@ -17,7 +17,7 @@ struct RopeNode
 class Rope
 {
 public:
-    Rope(sf::Vector2f startPos, sf::Vector2f endPos, int numNodes, std::shared_ptr<Level> level);
+    Rope(sf::Vector2f startPos, sf::Vector2f endPos, std::shared_ptr<Level> level);
     void update(float dt);
     void draw(sf::RenderTarget& target, sf::Vector2f centr) const;
 

@@ -48,7 +48,7 @@ void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int r
     target.draw(dot);
 }
 
-double distance(sf::Vector2f p1, sf::Vector2f p2)
+float distance(sf::Vector2f p1, sf::Vector2f p2)
 {
     return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
 }

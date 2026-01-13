@@ -11,7 +11,7 @@
 class Player
 {
 public:
-    explicit Player(std::shared_ptr<const Level> lvl);
+    explicit Player(std::shared_ptr<Level> lvl, std::shared_ptr<InputManager> inputManager);
     void draw(sf::RenderTarget& target) const;
     void update(float dt);
     sf::Vector2f centre() const;
@@ -22,15 +22,15 @@ protected:
     sf::Vector2f velocity;
     const float width = 7.f;
     const float height = 11.f;
-    const float moveSpeed = 100.f;
-    const float jumpSpeed = 300.f;
-    const float gravity = 900.f;
-    const float maxFallSpeed = (-1) * 900.f;
+    const float moveSpeed = 80.f;
+    const float jumpSpeed = 235.f;
+    const float gravity = 890.f;
+    const float maxFallSpeed = (-1) * 500.f;
     sf::Texture texture;
     sf::Sprite sprite;
     std::shared_ptr<const Level> level;
     std::unique_ptr<Rope> rope;
-    std::unique_ptr<InputManager> inputManager;
+    std::shared_ptr<InputManager> inputManager;
     enum class AnimState {
         Idle,
         Moving,

@@ -1,7 +1,7 @@
 #include "InputManager.h"
 #include <SFML/Graphics.hpp>
 
-InputManager::InputManager() : isMousePressed(false) {}
+InputManager::InputManager() : m_isMousePressed(false) {}
 
 void InputManager::update()
 {
@@ -10,10 +10,21 @@ void InputManager::update()
         sf::Keyboard::Key key = static_cast<sf::Keyboard::Key>(ii);
         m_currentKeys[key] = sf::Keyboard::isKeyPressed(key);
     }
-    isMousePressed = sf::Mouse::isButtonPressed(sf::Mouse::Left);
+    m_wasMousePressed = m_isMousePressed;
+    m_isMousePressed = sf::Mouse::isButtonPressed(sf::Mouse::Left);
 }
 
 bool InputManager::isKeyPressed(sf::Keyboard::Key key) const
 {
     return m_currentKeys.at(key);
+}
+
+bool InputManager::isMouseClicked() const
+{
+    return (not m_wasMousePressed and m_isMousePressed);
+}
+
+sf::Vector2f InputManager::mousePosition() const
+{
+    return m_mousePosition;
 }

@@ -25,9 +25,9 @@ int main() {
     renderTexture.setSmooth(false);
 
     auto level = std::make_shared<Level>();
-    auto inputManager = std::make_unique<InputManager>();
-    auto player = std::make_unique<Player>(level);
-    auto rope = std::make_unique<Rope>(sf::Vector2f{30,30}, sf::Vector2f{100,100}, 15, level);
+    auto inputManager = std::make_shared<InputManager>();
+    auto player = std::make_unique<Player>(level, inputManager);
+    auto rope = std::make_unique<Rope>(sf::Vector2f{20,80}, sf::Vector2f{100,100}, level);
 
     sf::Clock clock;
 
@@ -42,6 +42,8 @@ int main() {
         const float MAX_DT = 1.0f / 30.0f;
         dt = std::min(dt, MAX_DT);
 
+        inputManager->update();
+        // level->update(dt);
         player->update(dt);
         rope->update(dt);
 

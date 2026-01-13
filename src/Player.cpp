@@ -7,8 +7,8 @@
 #include <iostream>
 #include <cmath>
 
-Player::Player(std::shared_ptr<const Level> lvl)
-    : level(std::move(lvl)), velocity(50.f, 50.f), inputManager(std::make_unique<InputManager>())
+Player::Player(std::shared_ptr<Level> lvl, std::shared_ptr<InputManager> inMan)
+    : level(std::move(lvl)), velocity(50.f, 50.f), inputManager(inMan)
 {
 	position = level->getStartPos();
     if (!texture.loadFromFile("assets/temp_player.png")) {
@@ -31,7 +31,6 @@ void Player::draw(sf::RenderTarget& target) const
 
 void Player::update(float dt)
 {
-    inputManager->update();
 
     if (inputManager->isKeyPressed(sf::Keyboard::A)) {
         velocity.x = -moveSpeed;
