@@ -1,7 +1,7 @@
 #include "InputManager.h"
 #include <SFML/Graphics.hpp>
 
-InputManager::InputManager() : m_isMousePressed(false) {}
+InputManager::InputManager(std::shared_ptr<sf::RenderWindow> window) : window(window), m_isMousePressed(false), m_wasMousePressed(false) {}
 
 void InputManager::update()
 {
@@ -12,6 +12,7 @@ void InputManager::update()
     }
     m_wasMousePressed = m_isMousePressed;
     m_isMousePressed = sf::Mouse::isButtonPressed(sf::Mouse::Left);
+    m_mousePosition = scaleMouseInput(sf::Mouse::getPosition(*window));
 }
 
 bool InputManager::isKeyPressed(sf::Keyboard::Key key) const
@@ -33,3 +34,20 @@ sf::Vector2f InputManager::mousePosition() const
 {
     return m_mousePosition;
 }
+
+sf::Vector2f InputManager::scaleMouseInput(sf::Vector2i pixelPos) const
+{
+    sf::Vector2u windowSize = window->getSize();
+
+    constexpr float LOGICAL_WIDTH = 320.f;
+    constexpr float LOGICAL_HEIGHT = 180.f;
+
+    float scaleX = static_cast<float>(windowSize.x) / LOGICAL_WIDTH;
+    float scaleY = static_cast<float>(windowSize.y) / LOGICAL_HEIGHT;
+
+    return sf::Vector2f(
+        static_cast<float>(pixelPos.x) / scaleX,
+        static_cast<float>(pixelPos.y) / scaleY
+    );
+}
+

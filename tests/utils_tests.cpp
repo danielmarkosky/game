@@ -67,6 +67,7 @@ namespace
         tiles[1][1]   = 2;
         tiles[2][2]   = 1;
         tiles[2][4]   = 2;
+        tiles[0][-2] = 1;
         return tiles;
     }
 }
@@ -74,36 +75,66 @@ namespace
 TEST(nearestSolidPoint, FindsSolidPoint) {
     auto level = std::make_shared<Level>(makeTiles());
 
-    sf::Vector2f from{0.f, -10.f};
-    sf::Vector2f direction{0.f, 1.f};
-    float maxDistance = 20.f;
+    sf::Vector2f from{0.f, -20.f};
+    sf::Vector2f to{0.f, 100.f};
 
-    auto result = nearestSolidPoint(from, direction, level, maxDistance);
+    auto result = nearestSolidPoint(from, to, level);
     ASSERT_TRUE(result.has_value());
-    EXPECT_FLOAT_EQ(result->x, 0.f);
-    EXPECT_FLOAT_EQ(result->y, 0.f);
+
+    EXPECT_EQ(tailNumbers(*result).first, 0);
+    EXPECT_EQ(tailNumbers(*result).second, -2);
 }
 
-TEST(nearestSolidPoint, NoSolidPointWithinMaxDistance) {
+TEST(nearestSolidPoint, NoSolidPoint) {
     auto level = std::make_shared<Level>(makeTiles());
 
     sf::Vector2f from{100.f, 100.f};
     sf::Vector2f to{200.f, 200.f};
-    float maxDistance = 500.f;
 
-    auto result = nearestSolidPoint(from, to, level, maxDistance);
+    auto result = nearestSolidPoint(from, to, level);
     EXPECT_FALSE(result.has_value());
 }
 
-TEST(nearestSolidPoint, FindsFirstSolidPointAlongDiagonal) {
+TEST(nearestSolidPoint, FindsSolidPointAlongDiagonal) {
     auto level = std::make_shared<Level>(makeTiles());
 
-    sf::Vector2f from{-10.f, -8.f};
-    sf::Vector2f direction{10.f, 8.f};
-    float maxDistance = 30.f;
+    sf::Vector2f from{-20.f, -20.f};
+    sf::Vector2f to{100.f, 100.f};
 
-    auto result = nearestSolidPoint(from, direction, level, maxDistance);
+    auto result = nearestSolidPoint(from, to, level);
     ASSERT_TRUE(result.has_value());
-    EXPECT_FLOAT_EQ(result->x, 0.f);
-    EXPECT_FLOAT_EQ(result->y, 0.f);
+
+    auto [tx, ty] = tailNumbers(*result);
+    EXPECT_TRUE(level->isSolid(tx, ty));
+}
+
+TEST(Utils_WorldCoordinates, ZeroPositionAndCenter) {
+    sf::Vector2f screenPos{160.f, 110.f};
+    sf::Vector2f center{0.f, 0.f};
+    sf::Vector2f out = worldCoordinates(screenPos, center);
+
+    EXPECT_FLOAT_EQ(out.x, 0.f);
+    EXPECT_FLOAT_EQ(out.y, 0.f);
+}
+
+TEST(Utils_WorldCoordinates, InverseOfViewCoordinates) {
+    sf::Vector2f originalWorldPos{10.f, 5.f};
+    sf::Vector2f center{2.f, 3.f};
+
+    sf::Vector2f screenPos = viewCoordinates(originalWorldPos, center);
+
+    sf::Vector2f backToWorld = worldCoordinates(screenPos, center);
+
+    EXPECT_FLOAT_EQ(backToWorld.x, originalWorldPos.x);
+    EXPECT_FLOAT_EQ(backToWorld.y, originalWorldPos.y);
+}
+
+TEST(Utils_WorldCoordinates, SpecificValues) {
+    sf::Vector2f screenPos{170.f, 100.f};
+    sf::Vector2f center{0.f, 0.f};
+
+    sf::Vector2f out = worldCoordinates(screenPos, center);
+
+    EXPECT_FLOAT_EQ(out.x, 10.f);
+    EXPECT_FLOAT_EQ(out.y, 10.f);
 }

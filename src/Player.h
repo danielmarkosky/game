@@ -11,12 +11,12 @@
 class Player
 {
 public:
-    explicit Player(std::shared_ptr<Level> lvl, std::shared_ptr<InputManager> inputManager, std::shared_ptr<Rope> rope);
+    explicit Player(std::shared_ptr<Level> lvl, std::shared_ptr<InputManager> inputManager);
     void draw(sf::RenderTarget& target) const;
     void update(float dt);
     sf::Vector2f centre() const;
     void resetPlayer();
-    // void shootRope();
+    void handleShootRope();
 
 protected:
     sf::Vector2f position;

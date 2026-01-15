@@ -17,9 +17,9 @@ Level::Level()
             }
         }
     }
-    // m_tileMap[10][5] = 2;
-    // m_tileMap[11][5] = 1;
-    // m_tileMap[12][5] = 2;
+    m_tileMap[10][5] = 2;
+    m_tileMap[11][5] = 1;
+    m_tileMap[12][5] = 2;
 
     m_tileMap[14][5] = dist(rng);
 

@@ -7,10 +7,10 @@
 #include <iostream>
 #include <cmath>
 
-Player::Player(std::shared_ptr<Level> lvl, std::shared_ptr<InputManager> inMan, std::shared_ptr<Rope> rope)
-    : level(lvl), velocity(50.f, 50.f), inputManager(inMan), rope(rope)
+Player::Player(std::shared_ptr<Level> lvl, std::shared_ptr<InputManager> inMan)
+    : level(lvl), velocity(50.f, 50.f), inputManager(inMan)
 {
-	position = level->getStartPos();
+ position = level->getStartPos();
     if (!texture.loadFromFile("assets/temp_player.png")) {
         throw std::runtime_error("No image porfawor");
     }
@@ -67,6 +67,8 @@ void Player::update(float dt)
     auto p = viewCoordinates(position + sf::Vector2f(-1.f, 12.f), centre());
     sprite.setPosition(std::floor(p.x), std::floor(p.y));
 
+    handleShootRope();
+
     if (rope) {
         rope->update(dt);
     }
@@ -87,4 +89,24 @@ bool Player::canJump()
 {
     sf::Vector2f belowPos = position + sf::Vector2f(0.f, -1.f);
     return not level->isEmptySpace(belowPos, 1.f, width);
+}
+
+void Player::handleShootRope()
+{
+    if (inputManager->wasMouseClicked()) {
+        sf::Vector2f screenPos = inputManager->mousePosition();
+        sf::Vector2f targetWorldPos = worldCoordinates(screenPos, centre());
+        sf::Vector2f startPos = centre();
+
+        auto hitPoint = nearestSolidPoint(startPos, targetWorldPos, level);
+
+        if (hitPoint) {
+            auto mutableLevel = std::const_pointer_cast<Level>(level);
+            rope = std::make_shared<Rope>(startPos, *hitPoint, mutableLevel);
+        }
+    }
+
+    if (inputManager->wasMouseReleased()) {
+        rope = nullptr;
+    }
 }

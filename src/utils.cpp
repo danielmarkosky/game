@@ -7,6 +7,13 @@ sf::Vector2f viewCoordinates(sf::Vector2f pos , sf::Vector2f centr)
     return {pos.x + 160.f - centr.x, -pos.y + 110.f + centr.y};
 }
 
+sf::Vector2f worldCoordinates(sf::Vector2f screenPos, sf::Vector2f centr)
+{
+    float wx = screenPos.x - 160.f + centr.x;
+    float wy = centr.y + 110.f - screenPos.y;
+    return {wx, wy};
+}
+
 std::pair<int, int> tailNumbers(sf::Vector2f pos)
 {
     constexpr float TILE_SIZE = 8.f;
@@ -53,14 +60,19 @@ float distance(sf::Vector2f p1, sf::Vector2f p2)
     return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
 }
 
-std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level, float maxDistance)
+std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level)
 {
-    float length = distance(from, to);
-    if (length == 0) return std::nullopt;
-    sf::Vector2f dirNorm = (to - from) / length;
-    float searchLimit = std::min(length, maxDistance);
+    float minDistance = 8.f;
+    float maxDistance = 100.f;
 
-    float currentDist = 0.0f;
+    float length = distance(from, to);
+    if (length <= minDistance) return std::nullopt;
+
+    sf::Vector2f dirNorm = (to - from) / length;
+
+    float searchLimit = maxDistance;
+
+    float currentDist = minDistance;
     const float step = 1.0f;
 
     while (currentDist <= searchLimit) {

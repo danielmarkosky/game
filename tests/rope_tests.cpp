@@ -44,7 +44,7 @@ TEST(RopeTest, Initialization_FixedPoint) {
 TEST(RopeTest, Update_GravityMovesNonFixedNodes) {
     auto level = createMockLevel();
     sf::Vector2f start(0.f, 0.f);
-    sf::Vector2f end(10.f, 0.f); // Horizontal rope
+    sf::Vector2f end(10.f, 0.f);
 
     Rope rope(start, end, level);
 
