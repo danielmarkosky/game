@@ -10,6 +10,7 @@ public:
     InputManager(std::shared_ptr<sf::RenderWindow> window);
     void update();
     bool isKeyPressed(sf::Keyboard::Key key) const;
+    bool wasKeyJustPressed(sf::Keyboard::Key key) const; // New method
     bool wasMouseClicked() const;
     bool wasMouseReleased() const;
     sf::Vector2f mousePosition() const;

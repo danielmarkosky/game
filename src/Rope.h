@@ -22,6 +22,13 @@ public:
     void draw(sf::RenderTarget& target, sf::Vector2f centr) const;
     const std::vector<RopeNode>& getNodes() const;
 
+    sf::Vector2f getNodePosition(int index) const;
+    sf::Vector2f getNodeVelocity(int index, float dt) const;
+    void setNodePosition(int index, sf::Vector2f pos);
+    void setNodeVelocity(int index, sf::Vector2f velocity, float dt);
+    void applyForceToNode(int index, sf::Vector2f force);
+    void applyFrictionToNode(int index, float factor);
+
 private:
     std::vector<RopeNode> nodes;
     std::shared_ptr<Level> m_level;

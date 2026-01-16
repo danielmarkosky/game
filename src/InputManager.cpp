@@ -17,7 +17,20 @@ void InputManager::update()
 
 bool InputManager::isKeyPressed(sf::Keyboard::Key key) const
 {
-    return m_currentKeys.at(key);
+    // Using count to avoid exceptions for uninitialized keys in obscure cases
+    if (m_currentKeys.count(key)) return m_currentKeys.at(key);
+    return false;
+}
+
+bool InputManager::wasKeyJustPressed(sf::Keyboard::Key key) const
+{
+    bool isPressed = false;
+    if (m_currentKeys.count(key)) isPressed = m_currentKeys.at(key);
+
+    bool wasPressed = false;
+    if (m_previousKeys.count(key)) wasPressed = m_previousKeys.at(key);
+
+    return isPressed && !wasPressed;
 }
 
 bool InputManager::wasMouseClicked() const
@@ -50,4 +63,3 @@ sf::Vector2f InputManager::scaleMouseInput(sf::Vector2i pixelPos) const
         static_cast<float>(pixelPos.y) / scaleY
     );
 }
-
