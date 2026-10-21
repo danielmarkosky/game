@@ -37,7 +37,9 @@ cmake --build --preset conan-release
 | Esc / P, or click the pause button in the top right | Pause |
 | Arrows or W/S, Enter / Space, or the mouse | Use the menus (left / right change a setting) |
 
-The crosshair shows a white dot where the rope will stick; no dot means nothing is in range.
+The crosshair shows a white dot where the rope will stick; no dot means nothing is in range, or the
+rope is cooling down. After letting go it can be shot again after 0.3 s, after jumping off it
+after 0.55 s.
 The rope wraps around corners, so swinging past an edge pivots you around it.
 
 The game also pauses by itself when its window loses focus.
@@ -50,7 +52,8 @@ has a gap in its left, right or top edge, and walking out through it slides the 
 level. Falling out of the bottom still kills you.
 
 The title screen has Continue (from the last level you reached), Levels (pick any level, with your best
-time and fewest deaths on each) and Options (window size, fullscreen, screen shake, timer). Progress and
+time and fewest deaths on each) and Options (window size, fullscreen, screen shake, timer, and the player's skin: ten to choose from,
+previewed running under the menu). Progress and
 settings are saved in `~/.celeste_like_game/save.txt`.
 
 Levels are text files in `assets/levels/`, listed in `assets/levels/levels.txt`; see
@@ -62,3 +65,7 @@ plays a single level straight away, without the title screen and without saving 
 All the pixel art is drawn as text in [tools/make_art.py](tools/make_art.py): each sprite is a grid
 of characters, one per pixel, with a palette saying which character is which colour. Edit a grid
 and run `python3 tools/make_art.py` to regenerate the PNGs in `assets/gfx/`. No drawing program needed.
+
+Player skins are drawn once, standing; the script makes the other poses (breathing, running, jumping,
+falling, swinging) from that and outlines them. To add a skin, add it to `SKINS` in the script and its
+name to `Player::SKINS` in [src/Player.h](src/Player.h), in the same order.

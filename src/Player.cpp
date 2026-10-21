@@ -17,11 +17,11 @@ namespace
         return v < 0.f ? -1.f : 1.f;
     }
 
-    // Frames in assets/gfx/player.png (9x12 each), made by tools/make_art.py.
+    // Frames in assets/gfx/player.png (12x14 each, one row per skin), made by tools/make_art.py.
     namespace frames
     {
-        constexpr int WIDTH = 9;
-        constexpr int HEIGHT = 12;
+        constexpr int WIDTH = 12;
+        constexpr int HEIGHT = 14;
         constexpr int IDLE = 0;   // 2 frames
         constexpr int RUN = 2;    // 4 frames
         constexpr int JUMP = 6;
@@ -43,15 +43,22 @@ void Player::handleInput(const PlayerInput& in)
 
     if (in.jumpPressed) jumpBufferTimer = JUMP_BUFFER_TIME;
 
-    if (in.ropePressed) {
-        if (auto hit = ropeTarget(in.aim)) {
-            rope.emplace(exactCentre(), *hit, level);
-            events.push_back({PlayerEvent::Type::RopeAttached, *hit});
+    if (!in.ropeHeld) ropeShotQueued = false;
+    if (in.ropePressed || ropeShotQueued) {
+        if (ropeCooldownTimer > 0.f) {
+            ropeShotQueued = true;
+        } else {
+            ropeShotQueued = false;
+            if (auto hit = ropeTarget(in.aim)) {
+                rope.emplace(exactCentre(), *hit, level);
+                events.push_back({PlayerEvent::Type::RopeAttached, *hit});
+            }
         }
     }
     if (rope && !in.ropeHeld) {
         rope.reset();
         ropeJumpTimer = ROPE_JUMP_GRACE;
+        ropeCooldownTimer = ROPE_COOLDOWN;
     }
 }
 
@@ -62,6 +69,7 @@ void Player::update(float dt)
     jumpBufferTimer = std::max(0.f, jumpBufferTimer - dt);
     dropThroughTimer = std::max(0.f, dropThroughTimer - dt);
     ropeJumpTimer = std::max(0.f, ropeJumpTimer - dt);
+    ropeCooldownTimer = std::max(0.f, ropeCooldownTimer - dt);
     if (grounded && !rope && input.moveY < 0.f && level->isOnPlatform(position, WIDTH)) {
         dropThroughTimer = DROP_THROUGH_TIME;
     }
@@ -124,6 +132,7 @@ void Player::update(float dt)
             jumping = true;
             jumpBufferTimer = 0.f;
             ropeJumpTimer = 0.f;
+            ropeCooldownTimer = ROPE_JUMP_COOLDOWN;
             squash = {0.75f, 1.3f};
         }
     }
@@ -262,11 +271,28 @@ void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     }
 
     sf::Sprite sprite(texture);
-    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, 0, frames::WIDTH, frames::HEIGHT));
+    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(skin) * frames::HEIGHT, frames::WIDTH, frames::HEIGHT));
     // Anchored at the middle of the feet, so squashing and flipping keep the player planted.
-    sprite.setOrigin(frames::WIDTH * 0.5f, static_cast<float>(frames::HEIGHT));
+    // The frames have a 1px outline below the feet, so they sit one pixel lower.
+    sprite.setOrigin(frames::WIDTH * 0.5f, frames::HEIGHT - 1.f);
     sprite.setScale(facingLeft ? -squash.x : squash.x, squash.y);
     sprite.setPosition(viewCoordinates(position + sf::Vector2f(WIDTH * 0.5f, 0.f), centr));
+    target.draw(sprite);
+}
+
+void Player::setSkin(size_t index)
+{
+    skin = std::min(index, SKINS.size() - 1);
+}
+
+void Player::drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scale, float time) const
+{
+    const int frame = frames::RUN + static_cast<int>(time * 12.f) % 4;
+    sf::Sprite sprite(texture);
+    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(skin) * frames::HEIGHT, frames::WIDTH, frames::HEIGHT));
+    sprite.setOrigin(frames::WIDTH * 0.5f, frames::HEIGHT - 1.f);
+    sprite.setScale(scale, scale);
+    sprite.setPosition(feet);
     target.draw(sprite);
 }
 
@@ -280,6 +306,8 @@ void Player::respawn(sf::Vector2f pos)
     jumpBufferTimer = 0.f;
     dropThroughTimer = 0.f;
     ropeJumpTimer = 0.f;
+    ropeCooldownTimer = 0.f;
+    ropeShotQueued = false;
     squash = {1.f, 1.f};
     jumping = false;
     events.clear();
@@ -328,4 +356,9 @@ std::vector<PlayerEvent> Player::takeEvents()
 std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 {
     return nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ROPE_RANGE);
+}
+
+bool Player::canShootRope() const
+{
+    return ropeCooldownTimer <= 0.f;
 }

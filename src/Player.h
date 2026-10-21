@@ -3,6 +3,7 @@
 #include "src/Level.h"
 #include "src/Rope.h"
 #include <SFML/Graphics.hpp>
+#include <array>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -33,6 +34,14 @@ class Player
 public:
     explicit Player(std::shared_ptr<const Level> lvl);
 
+    // The looks to choose from, in the order of the rows in assets/gfx/player.png (made by
+    // tools/make_art.py). Only the sprite changes: every skin has the same hitbox.
+    static constexpr std::array<const char*, 10> SKINS = {
+        "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom"};
+    void setSkin(size_t index);
+    // The skin running on the spot, standing at `feet`, for the options screen.
+    void drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scale, float time) const;
+
     // Once per rendered frame: reacts to button presses (shooting and releasing the rope, buffering jumps).
     void handleInput(const PlayerInput& input);
     // Once per fixed physics step.
@@ -51,6 +60,8 @@ public:
     const Rope* getRope() const;
     // Where a rope shot towards `aim` would attach, if anywhere.
     std::optional<sf::Vector2f> ropeTarget(sf::Vector2f aim) const;
+    // False during the cooldown after leaving the rope.
+    bool canShootRope() const;
     // Events since the last call.
     std::vector<PlayerEvent> takeEvents();
 
@@ -79,6 +90,10 @@ public:
     static constexpr float REEL_SPEED = 70.f;
     static constexpr float ROPE_JUMP_SPEED = JUMP_SPEED; // jumping off the rope is a full jump
     static constexpr float ROPE_JUMP_GRACE = 0.1f;       // ...even just after letting go of it
+    // After leaving the rope it can't be shot again for a moment. After a rope jump that's as long
+    // as the jump takes to come back down, so shooting and jumping over and over can't climb walls.
+    static constexpr float ROPE_COOLDOWN = 0.3f;
+    static constexpr float ROPE_JUMP_COOLDOWN = 0.55f;
 
     // How far the player gets nudged sideways around a corner instead of bonking into it.
     static constexpr int CORNER_CORRECTION = 4;
@@ -105,10 +120,13 @@ private:
     float jumpBufferTimer = 0.f;
     float dropThroughTimer = 0.f;
     float ropeJumpTimer = 0.f; // time left to jump off a rope that was just let go of
+    float ropeCooldownTimer = 0.f;
+    bool ropeShotQueued = false; // clicked during the cooldown: shoots when it ends, if still held
     bool jumping = false;
     bool facingLeft = false;
 
     // Looks
+    size_t skin = 0;
     std::vector<PlayerEvent> events;
     float animTime = 0.f;
     float stepTimer = 0.f;

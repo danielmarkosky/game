@@ -227,6 +227,7 @@ TEST(PlayerTest, JumpingOffTheRopeLetsGo) {
     ASSERT_NE(player.getRope(), nullptr);
     ASSERT_FALSE(player.isGrounded());
 
+    in.ropePressed = false;
     in.jumpPressed = true;
     in.jumpHeld = true;
     hold(player, in, DT);
@@ -354,4 +355,124 @@ TEST(PlayerTest, LettingGoAndJumpingInTheSameFrameStillJumps) {
 
     EXPECT_EQ(player.getRope(), nullptr);
     EXPECT_GE(player.getVelocity().y, Player::ROPE_JUMP_SPEED - 10.f);
+}
+
+namespace
+{
+    // Hangs from the ceiling of ROOM, then jumps straight off the rope.
+    void ropeJump(Player& player)
+    {
+        PlayerInput in;
+        in.ropePressed = true;
+        in.ropeHeld = true;
+        in.aim = player.centre() + sf::Vector2f(0.f, 100.f);
+        hold(player, in, DT);
+        ASSERT_NE(player.getRope(), nullptr);
+
+        in.ropePressed = false;
+        in.jumpPressed = true;
+        in.jumpHeld = true;
+        hold(player, in, DT);
+        ASSERT_EQ(player.getRope(), nullptr);
+    }
+}
+
+TEST(PlayerTest, JumpingOffTheRopeWorksRightAway) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({120.f, 50.f});
+
+    ropeJump(player);
+    EXPECT_GE(player.getVelocity().y, Player::ROPE_JUMP_SPEED - 10.f);
+}
+
+TEST(PlayerTest, RopeCantBeShotAgainRightAfterARopeJump) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({120.f, 50.f});
+    ropeJump(player);
+    EXPECT_FALSE(player.canShootRope());
+
+    PlayerInput shoot;
+    shoot.ropePressed = true;
+    shoot.ropeHeld = true;
+    shoot.aim = player.centre() + sf::Vector2f(0.f, 100.f);
+    hold(player, shoot, DT);
+    EXPECT_EQ(player.getRope(), nullptr);
+}
+
+TEST(PlayerTest, ClickDuringTheCooldownShootsWhenItEndsIfStillHeld) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({120.f, 50.f});
+    ropeJump(player);
+
+    PlayerInput shoot;
+    shoot.ropePressed = true;
+    shoot.ropeHeld = true;
+    shoot.aim = player.centre() + sf::Vector2f(0.f, 100.f);
+    hold(player, shoot, Player::ROPE_JUMP_COOLDOWN + 2.f * DT);
+    EXPECT_NE(player.getRope(), nullptr);
+}
+
+TEST(PlayerTest, ClickDuringTheCooldownIsForgottenIfLetGo) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({120.f, 50.f});
+    ropeJump(player);
+
+    PlayerInput click;
+    click.ropePressed = true;
+    click.ropeHeld = true;
+    click.aim = player.centre() + sf::Vector2f(0.f, 100.f);
+    hold(player, click, DT);
+    hold(player, PlayerInput{}, Player::ROPE_JUMP_COOLDOWN);
+    EXPECT_EQ(player.getRope(), nullptr);
+}
+
+TEST(PlayerTest, LettingGoOfTheRopeHasAShorterCooldown) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({120.f, 50.f});
+
+    PlayerInput in;
+    in.ropePressed = true;
+    in.ropeHeld = true;
+    in.aim = player.centre() + sf::Vector2f(0.f, 100.f);
+    hold(player, in, 0.3f);
+    hold(player, PlayerInput{}, DT);
+    ASSERT_EQ(player.getRope(), nullptr);
+    EXPECT_FALSE(player.canShootRope());
+
+    hold(player, PlayerInput{}, Player::ROPE_COOLDOWN);
+    EXPECT_TRUE(player.canShootRope());
+}
+
+TEST(PlayerTest, TheRopeCooldownCarriesOnAfterLanding) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({120.f, 50.f});
+    ropeJump(player);
+    player.setVelocity({0.f, -300.f}); // get back down quickly
+
+    float waited = 0.f;
+    while (!player.isGrounded() && waited < 1.f) {
+        hold(player, PlayerInput{}, DT);
+        waited += DT;
+    }
+    ASSERT_TRUE(player.isGrounded());
+    ASSERT_LT(waited + DT, Player::ROPE_JUMP_COOLDOWN);
+    hold(player, PlayerInput{}, DT);
+    EXPECT_FALSE(player.canShootRope());
+
+    hold(player, PlayerInput{}, Player::ROPE_JUMP_COOLDOWN - waited);
+    EXPECT_TRUE(player.canShootRope());
+}
+
+TEST(PlayerTest, EverySkinHasARowOfFrames) {
+    sf::Image sheet;
+    ASSERT_TRUE(sheet.loadFromFile(config::assetPath("gfx/player.png")));
+    // 9 frames of 12x14 per skin, one skin per row (see tools/make_art.py).
+    EXPECT_EQ(sheet.getSize().x, 9u * 12u);
+    EXPECT_EQ(sheet.getSize().y, Player::SKINS.size() * 14u);
 }

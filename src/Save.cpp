@@ -38,6 +38,8 @@ SaveData SaveData::parse(const std::string& text)
                        : key == "screen_shake" ? data.settings.screenShake
                        : data.settings.showTimer;
             flag = on != 0;
+        } else if (key == "skin") {
+            words >> data.settings.skin;
         } else if (key == "continue") {
             words >> data.continueLevel;
         } else if (key == "record") {
@@ -56,6 +58,7 @@ std::string SaveData::serialize() const
     out << "fullscreen " << settings.fullscreen << "\n";
     out << "screen_shake " << settings.screenShake << "\n";
     out << "show_timer " << settings.showTimer << "\n";
+    out << "skin " << settings.skin << "\n";
     if (!continueLevel.empty()) out << "continue " << continueLevel << "\n";
     for (const auto& [level, record] : records) {
         out << "record " << level << " " << record.bestTime << " " << record.fewestDeaths << "\n";

@@ -57,6 +57,7 @@ private:
     bool inGame() const; // a level is being played, possibly paused
     std::optional<size_t> continueIndex() const;
     std::string levelKey(size_t index) const;
+    size_t skinIndex() const; // of the saved skin; the first one if the name is unknown
     void writeSave();
 
     // Playing

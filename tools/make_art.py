@@ -219,10 +219,15 @@ def make_tiles():
 
 
 # ----------------------------------------------------------------------------------------------
-# Player: assets/gfx/player.png, 9x12 frames in one row. Order mirrored in src/Player.cpp.
-# Based on the original temp_player.png: spiky green/pink hair, cyan band, beak facing right.
+# Player: assets/gfx/player.png, one row per skin, 12x14 frames. The skin order and the frame
+# order are mirrored in src/Player.cpp: idle (2), run (4), jump, fall, swing.
 # ----------------------------------------------------------------------------------------------
 
+FRAME_W, FRAME_H = 12, 14
+OUTLINE = rgb('#16131f')
+
+# Classic: the original character, based on the first temp_player.png. Spiky green/pink hair,
+# cyan band, beak facing right. Drawn 9x12 without an outline, frame by frame.
 PLAYER = {'a': rgb('#d77bba'), 'b': rgb('#99e550'), 'c': rgb('#5fcde4'), 'd': rgb('#eec39a'),
           'e': rgb('#5b6ee1'), 'f': rgb('#323c39'), 'g': rgb('#fbf236'), 'G': rgb('#d9b52c'),
           'y': rgb('#fffbb0'), 'h': rgb('#000000')}
@@ -262,12 +267,208 @@ PLAYER_FRAMES = [
 ]
 
 
+def classic_frames():
+    """The 9x12 classic frames in the middle of the bigger frames, feet on the same row as the
+    other skins (which have their outline in the bottom row)."""
+    return [['.' * FRAME_W] + ['.' + r + '..' for r in f] + ['.' * FRAME_W] for f in PLAYER_FRAMES]
+
+
+# The other skins are drawn once, standing, as a 10x12 fill facing right: `head` rows on top of
+# `body` rows (10 rows together), then 2 rows of legs drawn by the code below in the skin's leg
+# (L) and foot (F) colours. Every pose is made from that, and outlined automatically.
+SKINS = [
+    dict(name='kid',  # the classic character, cleaned up
+         palette={'b': '#9be550', 'B': '#5ea83a', 'a': '#e07bbd', 'c': '#5fcde4', 'd': '#f1c9a0',
+                  'D': '#c98f72', 'e': '#16131f', 'g': '#fbe246', 'G': '#d99a2c', 'y': '#fffbd0',
+                  'h': '#5a4a6e'},
+         head=['a.b.b.ba..',
+               'abbbbbbba.',
+               'bBbbbbbbb.',
+               'cccccccc..',
+               '.ddddded..',
+               '.dddddddD.',
+               '..DdddD...'],
+         body=['.gygggGg..',
+               'dgggggggd.',
+               '.ggggggG..'],
+         legs='hh', hand='d'),
+    dict(name='climber',  # messy hair, yellow scarf, red-orange jacket
+         palette={'h': '#5a3a33', 'H': '#3d2626', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f',
+                  's': '#ffd34d', 'S': '#d99a2c', 'r': '#e8553a', 'R': '#a8352a', 'n': '#2c3a5c',
+                  'k': '#6a4434'},
+         head=['..hhhhh...',
+               '.hhhhhhhh.',
+               'Hhhhhdhhd.',
+               '.Hhddddede',
+               '..hdddddd.',
+               '...DdddD..'],
+         body=['SssssssS..',
+               '.Srrrrrr..',
+               '..rrrrrRd.',
+               '..rrrrRR..'],
+         legs='nk', hand='d'),
+    dict(name='explorer',  # pointed teal hood, face in shadow, glowing eyes
+         palette={'t': '#3fc1a5', 'T': '#23806f', 'l': '#a6f0dc', 'f': '#2a2440', 'w': '#fff6c8',
+                  'm': '#e8a33a'},
+         head=['....t.....',
+               '...tlt....',
+               '..tlttt...',
+               '.ttttttt..',
+               '.tTffffft.',
+               '.tTfwffwt.',
+               '.tTffffft.'],
+         body=['.Tttttttt.',
+               'mTttttttTm',
+               '.TttttttT.'],
+         legs='TT', hand='m'),
+    dict(name='astronaut',  # white suit, blue visor, orange badge
+         palette={'w': '#eef0f6', 'W': '#a9aec4', 'v': '#3f8fd8', 'V': '#bfe8ff', 'p': '#f08a2c',
+                  'G': '#6b6f86'},
+         head=['..wwwww...',
+               '.wwwwwwww.',
+               '.wwvvvvvw.',
+               '.wwvVvvvw.',
+               '.wwvvvvvw.',
+               '..wwwwww..'],
+         body=['.WwwwwwwW.',
+               'wWwpwwwwWw',
+               '.Wwwwwwww.',
+               '..wwwwwW..'],
+         legs='GG', hand='w'),
+    dict(name='frog',  # big eyes on top, pale belly, red neckerchief
+         palette={'g': '#5cc95a', 'G': '#2f8a45', 'w': '#ffffff', 'k': '#16131f', 'l': '#d9f2a0',
+                  'r': '#e8553a', 'm': '#1f5a33'},
+         head=['..gg..gg..',
+               '.gwkg.gwkg',
+               '.ggggggggg',
+               '.ggggggggg',
+               '.Ggmmmmmmg',
+               '..GGgggGG.'],
+         body=['..rrrrrr..',
+               '.grllllgg.',
+               'g.lllllG.g',
+               '..lllllG..'],
+         legs='gG', hand='g'),
+    dict(name='knight',  # steel helmet with a red plume, blue tabard
+         palette={'r': '#e8443a', 's': '#c8ccd8', 'S': '#7d8299', 'k': '#16131f', 'b': '#3e6fd8',
+                  'B': '#27458f', 'Y': '#ffd34d'},
+         head=['..rrr.....',
+               '.rr.rr....',
+               '..ssssss..',
+               '.ssssssss.',
+               '.sSkkkkks.',
+               '.ssssssss.',
+               '..SSSSSS..'],
+         body=['.bbbbbbb..',
+               'sbbbYbbbbs',
+               '.bbbbbbB..'],
+         legs='SS', hand='s'),
+    dict(name='fox',  # orange, white snout, belly and tail tip
+         palette={'f': '#f08a2c', 'F': '#b85a1f', 'w': '#fff3e0', 'k': '#16131f', 'p': '#f7b2a0'},
+         head=['..f...f...',
+               '..ff.fpf..',
+               '..ffffff..',
+               '.fffffkf..',
+               '..fffwwwwk',
+               '...fwwww..'],
+         body=['w..ffffff.',
+               'wF.fwwwff.',
+               '.FFfwwwf..',
+               '...ffffF..'],
+         legs='Fw', hand='F'),
+    dict(name='robot',  # orange box, screen face with cyan eyes, antenna light
+         palette={'y': '#ffe066', 'm': '#f0a03a', 'M': '#a8642a', 'k': '#1d2333', 'c': '#5ff0f0',
+                  'p': '#e8443a', 'a': '#9aa0b4'},
+         head=['....y.....',
+               '....a.....',
+               '.mmmmmmmm.',
+               '.mkkkkkkm.',
+               '.mkkckkcm.',
+               '.mkkkkkkm.'],
+         body=['.MmmmmmmM.',
+               '..MMMMMM..',
+               'aMmmpmmMa.',
+               '.MmmmmmM..'],
+         legs='aM', hand='a'),
+    dict(name='mushroom',  # red cap with white spots
+         palette={'r': '#e8443a', 'R': '#a02a2a', 'w': '#fff6e0', 'c': '#f4dcb8', 'C': '#c9a57e',
+                  'k': '#16131f', 'g': '#6fbf5a', 'b': '#6b4a3a'},
+         head=['...rrrr...',
+               '.rrwwrrrr.',
+               'rrrwwrrwwr',
+               'rrrrrrrwwr',
+               'RRRRRRRRRR',
+               '.cccccccc.',
+               '.cccccckck',
+               '.cccccccc.'],
+         body=['..CccccC..',
+               '.gcccccCg.'],
+         legs='bb', hand='g'),
+]
+
+# Legs for each pose, in leg (L) and foot (F) colours. A '-' row means the body bobs down a pixel.
+LEGS = {
+    'idle': ['..LL.LL...', '..FF.FF...'],
+    'run_a': ['.LL...LL..', 'FF.....FF.'],
+    'pass_a': ['-', '...FFF....'],
+    'run_b': ['..LL..LL..', '.FF....FF.'],
+    'pass_b': ['-', '....FFF...'],
+    'jump': ['..LL.LL...', '..........'],
+    'fall': ['..L...L...', '..F...F...'],
+    'swing': ['...LL.....', '...FF.....'],
+}
+
+
+def pose(skin, legs, breathe=False, hand_up=False):
+    head, body = list(skin['head']), list(skin['body'])
+    assert len(head) + len(body) == 10 and all(len(r) == 10 for r in head + body), skin['name']
+    if breathe:  # the head sinks a pixel into the body
+        head, body = ['.' * 10] + head, body[1:]
+    if hand_up:  # an arm up in front of the face, holding the rope
+        for row in (len(skin['head']) - 2, len(skin['head']) - 1):
+            head[row] = head[row][:9] + skin['hand']
+    rows = LEGS[legs]
+    if rows[0] == '-':
+        upper, legs_rows = ['.' * 10] + head + body, rows[1:]
+    else:
+        upper, legs_rows = head + body, rows
+    legs_rows = [r.replace('L', skin['legs'][0]).replace('F', skin['legs'][1]) for r in legs_rows]
+    return upper + legs_rows
+
+
+def outlined(fill):
+    """Puts a 10x12 fill in the middle of a frame and draws a 1px outline round it."""
+    g = ['.' * FRAME_W] + ['.' + r + '.' for r in fill] + ['.' * FRAME_W]
+    out = [list(r) for r in g]
+    for y in range(FRAME_H):
+        for x in range(FRAME_W):
+            if g[y][x] == '.' and any(0 <= x + dx < FRAME_W and 0 <= y + dy < FRAME_H and g[y + dy][x + dx] != '.'
+                                      for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                out[y][x] = '#'
+    return [''.join(r) for r in out]
+
+
+def skin_frames(skin):
+    poses = [pose(skin, 'idle'), pose(skin, 'idle', breathe=True),
+             pose(skin, 'run_a'), pose(skin, 'pass_a'), pose(skin, 'run_b'), pose(skin, 'pass_b'),
+             pose(skin, 'jump'), pose(skin, 'fall'), pose(skin, 'swing', hand_up=True)]
+    return [outlined(p) for p in poses]
+
+
 def make_player():
-    c = Canvas(9 * len(PLAYER_FRAMES), 12)
-    for i, f in enumerate(PLAYER_FRAMES):
-        assert len(f) == 12 and all(len(r) == 9 for r in f), f'player frame {i} is not 9x12'
-        c.blit(f, PLAYER, i * 9, 0)
+    rows = [('classic', PLAYER, classic_frames())]
+    for skin in SKINS:
+        palette = {k: rgb(v) for k, v in skin['palette'].items()}
+        palette['#'] = OUTLINE
+        rows.append((skin['name'], palette, skin_frames(skin)))
+    c = Canvas(FRAME_W * 9, FRAME_H * len(rows))
+    for r, (name, palette, frames) in enumerate(rows):
+        assert len(frames) == 9, name
+        for i, f in enumerate(frames):
+            assert len(f) == FRAME_H and all(len(row) == FRAME_W for row in f), f'{name} frame {i} is not {FRAME_W}x{FRAME_H}'
+            c.blit(f, palette, i * FRAME_W, r * FRAME_H)
     c.save('player.png')
+    print('  skins:', ', '.join(name for name, _, _ in rows))
 
 
 # ----------------------------------------------------------------------------------------------

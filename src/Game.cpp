@@ -34,7 +34,7 @@ namespace
     {
         CONTINUE, NEW_GAME, LEVELS, OPTIONS, QUIT,
         RESUME, RESTART, MAIN_MENU, PLAY_AGAIN, BACK,
-        WINDOW_SIZE, FULLSCREEN, SCREEN_SHAKE, TIMER,
+        WINDOW_SIZE, FULLSCREEN, SCREEN_SHAKE, TIMER, SKIN,
         FIRST_LEVEL = 1000, // + level index
     };
 
@@ -181,6 +181,7 @@ void Game::refreshMenu()
             items.push_back({FULLSCREEN, "FULLSCREEN", onOff(s.fullscreen), true});
             items.push_back({SCREEN_SHAKE, "SCREEN SHAKE", onOff(s.screenShake), true});
             items.push_back({TIMER, "TIMER", onOff(s.showTimer), true});
+            items.push_back({SKIN, "SKIN", upper(Player::SKINS[skinIndex()]), true});
             items.push_back({BACK, "BACK", " ", false});
             break;
         }
@@ -222,6 +223,7 @@ void Game::onMenuChoice(MenuChoice choice)
         case FULLSCREEN:
         case SCREEN_SHAKE:
         case TIMER:
+        case SKIN:
             // Clicking or pressing Enter on a setting steps it forwards.
             changeSetting(choice.id, choice.direction == 0 ? 1 : choice.direction);
             break;
@@ -260,6 +262,13 @@ void Game::changeSetting(int id, int direction)
             break;
         case SCREEN_SHAKE: s.screenShake = !s.screenShake; break;
         case TIMER: s.showTimer = !s.showTimer; break;
+        case SKIN: {
+            const int count = static_cast<int>(Player::SKINS.size());
+            const size_t next = static_cast<size_t>((static_cast<int>(skinIndex()) + direction + count) % count);
+            s.skin = Player::SKINS[next];
+            player->setSkin(next);
+            break;
+        }
         default: break;
     }
     writeSave();
@@ -311,6 +320,14 @@ std::optional<size_t> Game::continueIndex() const
     return std::nullopt;
 }
 
+size_t Game::skinIndex() const
+{
+    for (size_t ii = 0; ii < Player::SKINS.size(); ++ii) {
+        if (save.settings.skin == Player::SKINS[ii]) return ii;
+    }
+    return 0;
+}
+
 std::string Game::levelKey(size_t index) const
 {
     return std::filesystem::path(levels[index].path).filename().string();
@@ -344,6 +361,7 @@ void Game::loadLevel(size_t index)
     levelIndex = index;
     level = Level::loadFromFile(levels[index].path);
     player = std::make_unique<Player>(level);
+    player->setSkin(skinIndex());
     restartLevel();
     titleTimer = TITLE_TIME;
 }
@@ -764,7 +782,7 @@ void Game::drawAim()
 
     // Show where the rope would stick, so you know before you click.
     bool canHook = false;
-    if (!player->getRope()) {
+    if (!player->getRope() && player->canShootRope()) {
         if (auto target = player->ropeTarget(mouseWorld)) {
             canHook = true;
             sf::Vector2f p = viewCoordinates(*target, drawCamera());
@@ -833,6 +851,7 @@ void Game::drawMenuScreen()
         case Screen::Options:
             dimScreen(canvas, 170);
             hud::drawCentred(canvas, "OPTIONS", HALF_W, 24.f, GOLD, 2.f);
+            player->drawPreview(canvas, {HALF_W, 158.f}, 2.f, clockTime);
             hud::drawCentred(canvas, "LEFT / RIGHT - CHANGE    ESC - BACK", HALF_W, 168.f, GREY);
             break;
         case Screen::Paused:

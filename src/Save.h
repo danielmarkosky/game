@@ -10,6 +10,7 @@ struct Settings
     bool fullscreen = false;
     bool screenShake = true;
     bool showTimer = true;   // the time and death counter in the corner
+    std::string skin = "classic"; // one of Player::SKINS
 };
 
 // Best result on one level. Time and deaths are kept separately, like in Celeste:

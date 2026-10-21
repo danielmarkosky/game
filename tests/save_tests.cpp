@@ -4,7 +4,7 @@
 
 TEST(SaveData, RoundTripsThroughText) {
     SaveData data;
-    data.settings = {.windowScale = 3, .fullscreen = true, .screenShake = false, .showTimer = false};
+    data.settings = {.windowScale = 3, .fullscreen = true, .screenShake = false, .showTimer = false, .skin = "robot"};
     data.continueLevel = "level4.txt";
     data.addResult("level1.txt", 42.5f, 3);
     data.addResult("level2.txt", 61.25f, 0);
@@ -15,6 +15,7 @@ TEST(SaveData, RoundTripsThroughText) {
     EXPECT_TRUE(loaded.settings.fullscreen);
     EXPECT_FALSE(loaded.settings.screenShake);
     EXPECT_FALSE(loaded.settings.showTimer);
+    EXPECT_EQ(loaded.settings.skin, "robot");
     EXPECT_EQ(loaded.continueLevel, "level4.txt");
     ASSERT_NE(loaded.record("level1.txt"), nullptr);
     EXPECT_FLOAT_EQ(loaded.record("level1.txt")->bestTime, 42.5f);
