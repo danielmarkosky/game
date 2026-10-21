@@ -1,0 +1,6 @@
+# The levels in the order they're played: the file, then the title shown when it starts.
+level1.txt  The Cave
+level2.txt  The Well
+level3.txt  Hook Garden
+level4.txt  Curtains
+level5.txt  The Summit

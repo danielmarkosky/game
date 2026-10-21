@@ -5,8 +5,10 @@
 #include <optional>
 #include <memory>
 
+// World -> screen. `centr` is the world point shown in the middle of the screen.
 sf::Vector2f viewCoordinates(sf::Vector2f pos, sf::Vector2f centr);
 
+// Screen -> world. Exact inverse of viewCoordinates.
 sf::Vector2f worldCoordinates(sf::Vector2f screenPos, sf::Vector2f centr);
 
 std::pair<int, int> tailNumbers(sf::Vector2f pos);
@@ -15,4 +17,12 @@ void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int r
 
 float distance(sf::Vector2f p1, sf::Vector2f p2);
 
-std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level);
+float magnitude(sf::Vector2f v);
+
+float dot(sf::Vector2f a, sf::Vector2f b);
+
+// Marches from `from` towards `to` and returns the last empty point before the first solid tile,
+// i.e. a point on the surface of the wall. Nothing is returned if no wall is hit within
+// `maxDistance`, or if the wall is closer than `minDistance`.
+std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level,
+                                              float minDistance = 8.f, float maxDistance = 100.f);

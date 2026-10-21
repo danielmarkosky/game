@@ -1,203 +1,331 @@
 #include "Player.h"
+#include "src/Config.h"
 #include "src/utils.h"
-#include "src/InputManager.h"
-#include <SFML/Window/Keyboard.hpp>
-#include <SFML/Graphics.hpp>
-#include <iostream>
+#include <algorithm>
 #include <cmath>
 
-Player::Player(std::shared_ptr<Level> lvl, std::shared_ptr<InputManager> inMan)
-    : level(lvl), velocity(0.f, 0.f), inputManager(inMan)
+namespace
 {
-    position = level->getStartPos();
-    if (!texture.loadFromFile("assets/temp_player.png")) {
-        // throw std::runtime_error("No image");
+    // Turns a "multiply by this every 1/60 s" factor into one for a step of `dt` seconds.
+    float decay(float perFrame, float dt)
+    {
+        return std::pow(perFrame, dt * 60.f);
     }
-    sprite.setTexture(texture);
-    sprite.setTextureRect(sf::IntRect(0, 0, 9, 12));
-    auto p0 = viewCoordinates(position + sf::Vector2f(-1, 12), centre());
-    sprite.setPosition(p0);
+
+    float sign(float v)
+    {
+        return v < 0.f ? -1.f : 1.f;
+    }
+
+    // Frames in assets/gfx/player.png (9x12 each), made by tools/make_art.py.
+    namespace frames
+    {
+        constexpr int WIDTH = 9;
+        constexpr int HEIGHT = 12;
+        constexpr int IDLE = 0;   // 2 frames
+        constexpr int RUN = 2;    // 4 frames
+        constexpr int JUMP = 6;
+        constexpr int FALL = 7;
+        constexpr int SWING = 8;
+    }
 }
 
-void Player::draw(sf::RenderTarget& target) const
+Player::Player(std::shared_ptr<const Level> lvl)
+    : level(std::move(lvl))
 {
-    target.draw(sprite);
-    if (rope) {
-        rope->draw(target, centre());
+    respawn(level->getStartPos());
+    texture.loadFromFile(config::assetPath("gfx/player.png"));
+}
+
+void Player::handleInput(const PlayerInput& in)
+{
+    input = in;
+
+    if (in.jumpPressed) jumpBufferTimer = JUMP_BUFFER_TIME;
+
+    if (in.ropePressed) {
+        if (auto hit = ropeTarget(in.aim)) {
+            rope.emplace(exactCentre(), *hit, level);
+            events.push_back({PlayerEvent::Type::RopeAttached, *hit});
+        }
+    }
+    if (rope && !in.ropeHeld) {
+        rope.reset();
+        ropeJumpTimer = ROPE_JUMP_GRACE;
     }
 }
 
 void Player::update(float dt)
 {
-    handleShootRope();
+    const bool grounded = isGrounded();
+    coyoteTimer = grounded ? COYOTE_TIME : std::max(0.f, coyoteTimer - dt);
+    jumpBufferTimer = std::max(0.f, jumpBufferTimer - dt);
+    dropThroughTimer = std::max(0.f, dropThroughTimer - dt);
+    ropeJumpTimer = std::max(0.f, ropeJumpTimer - dt);
+    if (grounded && !rope && input.moveY < 0.f && level->isOnPlatform(position, WIDTH)) {
+        dropThroughTimer = DROP_THROUGH_TIME;
+    }
 
-    float inputX = 0.f;
-    if (inputManager->isKeyPressed(sf::Keyboard::A)) inputX = -1.f;
-    if (inputManager->isKeyPressed(sf::Keyboard::D)) inputX = 1.f;
+    const float inputX = input.moveX;
+    if (inputX != 0.f) facingLeft = inputX < 0.f;
+
+    const bool swinging = rope && !grounded;
+
+    // --- Horizontal ---
+    if (swinging) {
+        // Pumping the swing: a free push in either direction, no run-speed cap.
+        velocity.x += inputX * SWING_ACCELERATION * dt;
+    } else {
+        // Input can accelerate up to run speed, but never takes away speed you already have.
+        if (inputX != 0.f && velocity.x * inputX < MAX_RUN_SPEED) {
+            velocity.x += inputX * RUN_ACCELERATION * dt;
+            if (velocity.x * inputX > MAX_RUN_SPEED) velocity.x = inputX * MAX_RUN_SPEED;
+        }
+
+        const bool overspeed = std::abs(velocity.x) > MAX_RUN_SPEED;
+        if (grounded) {
+            if (inputX == 0.f) {
+                velocity.x *= decay(GROUND_DRAG, dt);
+            } else if (overspeed) {
+                // Landing from a fling: slide back down to run speed.
+                velocity.x = sign(velocity.x) * std::max(MAX_RUN_SPEED, std::abs(velocity.x) * decay(GROUND_DRAG, dt));
+            }
+        } else {
+            if (overspeed) velocity.x *= decay(OVERSPEED_AIR_DRAG, dt);
+            else if (inputX == 0.f) velocity.x *= decay(AIR_DRAG, dt);
+        }
+        if (inputX == 0.f && std::abs(velocity.x) < 1.f) velocity.x = 0.f;
+    }
+
+    // --- Vertical ---
+    if (velocity.y <= 0.f) jumping = false;
+    float gravity = config::GRAVITY;
+    if (jumping && !input.jumpHeld) gravity *= JUMP_RELEASE_GRAVITY;
+    velocity.y -= gravity * dt;
+    if (velocity.y < -MAX_FALL_SPEED) velocity.y = -MAX_FALL_SPEED;
+    if (grounded && velocity.y < 0.f) {
+        // Standing: don't let gravity pile up in the sub-pixel remainder.
+        velocity.y = 0.f;
+        remainder.y = 0.f;
+    }
+
+    if (jumpBufferTimer > 0.f) {
+        if (coyoteTimer > 0.f) {
+            velocity.y = JUMP_SPEED;
+            jumping = true;
+            jumpBufferTimer = 0.f;
+            coyoteTimer = 0.f;
+            squash = {0.75f, 1.3f};
+            events.push_back({PlayerEvent::Type::Jumped, position + sf::Vector2f(WIDTH * 0.5f, 0.f)});
+        } else if (rope || ropeJumpTimer > 0.f) {
+            // Jumping off the rope lets go with a full jump, e.g. to hop up onto a ledge.
+            rope.reset();
+            velocity.y = std::max(velocity.y, ROPE_JUMP_SPEED);
+            jumping = true;
+            jumpBufferTimer = 0.f;
+            ropeJumpTimer = 0.f;
+            squash = {0.75f, 1.3f};
+        }
+    }
+
+    // --- Rope ---
+    if (rope) {
+        if (input.moveY != 0.f) rope->setLength(rope->length() - input.moveY * REEL_SPEED * dt);
+
+        float speed = magnitude(velocity);
+        if (swinging && speed > MAX_SWING_SPEED) velocity *= MAX_SWING_SPEED / speed;
+        velocity = rope->constrainVelocity(exactCentre(), velocity);
+    }
+
+    const sf::Vector2f before = exactCentre();
+    const float fallSpeed = -velocity.y;
+    moveX(velocity.x * dt);
+    moveY(velocity.y * dt);
+
+    if (!grounded && isGrounded() && fallSpeed > 60.f) {
+        float amount = std::min(1.f, fallSpeed / Player::MAX_FALL_SPEED);
+        squash = {1.f + 0.4f * amount, 1.f - 0.35f * amount};
+        events.push_back({PlayerEvent::Type::Landed, position + sf::Vector2f(WIDTH * 0.5f, 0.f), fallSpeed});
+    }
+    if (grounded && std::abs(velocity.x) > 60.f) {
+        stepTimer -= dt;
+        if (stepTimer <= 0.f) {
+            stepTimer = 0.2f;
+            events.push_back({PlayerEvent::Type::Stepped, position + sf::Vector2f(facingLeft ? WIDTH : 0.f, 0.f)});
+        }
+    }
+    animTime += dt;
+    squash += (sf::Vector2f(1.f, 1.f) - squash) * (1.f - std::exp(-14.f * dt));
 
     if (rope) {
-        // --- ROPE SWING STATE ---
-
-        // Check ground friction logic
-        sf::Vector2f below = position + sf::Vector2f(0.f, -1.f);
-        bool isGrounded = !level->isEmptySpace(below, 1.f, width);
-
-        if (isGrounded) {
-             // 1. GROUNDED LOGIC: WALK NORMALLY
-             // We manipulate the rope node velocity directly to match standard walking physics
-             sf::Vector2f currentVel = rope->getNodeVelocity(0, dt);
-
-             if (inputX != 0.f) {
-                 // Accelerate
-                 currentVel.x += inputX * runAcceleration * dt;
-                 // Clamp Speed
-                 if (currentVel.x > maxRunSpeed) currentVel.x = maxRunSpeed;
-                 if (currentVel.x < -maxRunSpeed) currentVel.x = -maxRunSpeed;
-             } else {
-                 // Friction
-                 currentVel.x *= groundDrag;
-                 if (std::abs(currentVel.x) < 1.0f) currentVel.x = 0.f;
-             }
-
-             // Apply walking velocity
-             rope->setNodeVelocity(0, currentVel, dt);
-
-             if (inputManager->wasKeyJustPressed(sf::Keyboard::Space)) {
-                 // Jump
-                 currentVel = rope->getNodeVelocity(0, dt);
-                 currentVel.y = jumpSpeed;
-                 rope->setNodeVelocity(0, currentVel, dt);
-             }
-        } else {
-             // 2. AIRBORNE LOGIC: SWING
-             if (inputX != 0.f) {
-                // Apply 'soft' swing force
-                rope->applyForceToNode(0, sf::Vector2f(inputX * 150.f * dt * dt, 0.f));
-             }
-        }
-
-        // 3. Physics Update
-        rope->update(dt);
-
-        // 4. Resolve Collision (Player vs World)
-        sf::Vector2f nodePos = rope->getNodePosition(0);
-
-        // --- ANTI-SLIDE FIX ---
-        if (isGrounded && inputX == 0.f) {
-            sf::Vector2f currentCenter = centre();
-            // Stronger snap to prevent micro-sliding while idle on rope
-            nodePos.x = currentCenter.x + (nodePos.x - currentCenter.x) * 0.01f;
-        }
-
-        sf::Vector2f targetPos = nodePos - sf::Vector2f(width * 0.5f, height * 0.5f);
-
-        sf::Vector2f moveDelta = targetPos - position;
-        sf::Vector2f nextPos;
-
-        // Try X Movement
-        nextPos = position + sf::Vector2f(moveDelta.x, 0.f);
-        if (level->isEmptySpace(nextPos, height, width)) {
-            position = nextPos;
-        } else {
-            moveDelta.x = 0.f; // Wall hit
-        }
-
-        // Try Y Movement
-        nextPos = position + sf::Vector2f(0.f, moveDelta.y);
-        if (level->isEmptySpace(nextPos, height, width)) {
-            position = nextPos;
-        } else {
-            moveDelta.y = 0.f; // Ceiling/Floor hit
-        }
-
-        // 5. Feedback Collision to Rope
-        if (std::abs(moveDelta.x - (targetPos.x - position.x)) > 0.1f ||
-            std::abs(moveDelta.y - (targetPos.y - position.y)) > 0.1f)
-        {
-            rope->setNodePosition(0, centre());
-        }
-
-        // 6. Sync Velocity
-        velocity = rope->getNodeVelocity(0, dt);
-
-        if (inputManager->wasMouseReleased()) {
-             rope = nullptr;
-        }
+        const size_t pivotsBefore = rope->pivots().size();
+        rope->wrap(before, exactCentre());
+        if (rope->pivots().size() > pivotsBefore) events.push_back({PlayerEvent::Type::RopeWrapped, rope->pivot()});
+        // Moving in a straight line drifts slightly off the circle; pull back onto it.
+        sf::Vector2f current = exactCentre();
+        sf::Vector2f correction = rope->constrainPosition(current) - current;
+        moveX(correction.x);
+        moveY(correction.y);
+        rope->update(centre(), dt);
     }
-    else {
-        // --- FREE MOVEMENT STATE ---
-        velocity.x += inputX * runAcceleration * dt;
-        velocity.y -= gravity * dt;
+}
 
-        bool grounded = canJump();
+void Player::moveX(float amount)
+{
+    remainder.x += amount;
+    int move = static_cast<int>(std::round(remainder.x));
+    if (move == 0) return;
+    remainder.x -= static_cast<float>(move);
 
-        if (inputX == 0.f) {
-            float drag = grounded ? groundDrag : airDrag;
-            velocity.x *= drag;
-            if (std::abs(velocity.x) < 1.0f) velocity.x = 0.f;
-        } else {
-            if (velocity.x > maxRunSpeed) velocity.x = maxRunSpeed;
-            if (velocity.x < -maxRunSpeed) velocity.x = -maxRunSpeed;
+    const int step = move > 0 ? 1 : -1;
+    const bool airborne = !isGrounded();
+    while (move != 0) {
+        sf::Vector2f next = position + sf::Vector2f(static_cast<float>(step), 0.f);
+        if (!fits(next)) {
+            // In the air, a ledge lip just below your feet pops you up onto it instead of stopping you.
+            bool popped = false;
+            for (int up = 1; airborne && up <= CORNER_CORRECTION && !popped; ++up) {
+                sf::Vector2f lifted(0.f, static_cast<float>(up));
+                if (fits(position + lifted) && fits(next + lifted)) {
+                    next += lifted;
+                    popped = true;
+                }
+            }
+            if (!popped) {
+                velocity.x = 0.f;
+                remainder.x = 0.f;
+                return;
+            }
         }
+        position = next;
+        move -= step;
+    }
+}
 
-        if (velocity.y < maxFallSpeed) velocity.y = maxFallSpeed;
+void Player::moveY(float amount)
+{
+    remainder.y += amount;
+    int move = static_cast<int>(std::round(remainder.y));
+    if (move == 0) return;
+    remainder.y -= static_cast<float>(move);
 
-        if (inputManager->isKeyPressed(sf::Keyboard::Space) && grounded) {
-            velocity.y = jumpSpeed;
-        }
-
-        sf::Vector2f nextPos;
-
-        nextPos = position + sf::Vector2f(velocity.x, 0.f) * dt;
-        if (level->isEmptySpace(nextPos, height, width)) {
-            position = nextPos;
-        } else {
-            velocity.x = 0.f;
-        }
-
-        nextPos = position + sf::Vector2f(0.f, velocity.y) * dt;
-        if (level->isEmptySpace(nextPos, height, width)) {
-            position = nextPos;
-        } else {
+    const int step = move > 0 ? 1 : -1;
+    while (move != 0) {
+        sf::Vector2f next = position + sf::Vector2f(0.f, static_cast<float>(step));
+        if (step < 0 && dropThroughTimer <= 0.f && level->isOnPlatform(position, WIDTH)) {
             velocity.y = 0.f;
+            remainder.y = 0.f;
+            return;
         }
-    }
-
-    if (level->isDangerousSpace(position, height, width)) {
-        resetPlayer();
-        rope = nullptr;
-    }
-
-    auto p = viewCoordinates(position + sf::Vector2f(-1.f, 12.f), centre());
-    sprite.setPosition(std::floor(p.x), std::floor(p.y));
-}
-
-sf::Vector2f Player::centre() const {
-    return position + sf::Vector2f(width * .5f, height * .5f);
-}
-
-void Player::resetPlayer() {
-    position = this->level->getStartPos();
-    velocity = sf::Vector2f(0.f, 0.f);
-}
-
-bool Player::canJump() {
-    if (rope) return true;
-    sf::Vector2f belowPos = position + sf::Vector2f(0.f, -1.f);
-    return not level->isEmptySpace(belowPos, 1.f, width);
-}
-
-void Player::handleShootRope() {
-    if (inputManager->wasMouseClicked()) {
-        sf::Vector2f screenPos = inputManager->mousePosition();
-        sf::Vector2f targetWorldPos = worldCoordinates(screenPos, centre());
-        sf::Vector2f startPos = centre();
-
-        auto hitPoint = nearestSolidPoint(startPos, targetWorldPos, level);
-
-        if (hitPoint) {
-            auto mutableLevel = std::const_pointer_cast<Level>(level);
-            rope = std::make_shared<Rope>(startPos, *hitPoint, mutableLevel);
+        if (!fits(next)) {
+            // Clipping a corner with your head nudges you sideways around it instead of bonking.
+            bool nudged = false;
+            const float preferred = velocity.x < 0.f ? -1.f : 1.f;
+            for (int side = 1; step > 0 && side <= CORNER_CORRECTION && !nudged; ++side) {
+                for (float dir : {preferred, -preferred}) {
+                    sf::Vector2f shift(dir * static_cast<float>(side), 0.f);
+                    if (fits(position + shift) && fits(next + shift)) {
+                        next += shift;
+                        nudged = true;
+                        break;
+                    }
+                }
+            }
+            if (!nudged) {
+                velocity.y = 0.f;
+                remainder.y = 0.f;
+                jumping = false;
+                return;
+            }
         }
+        position = next;
+        move -= step;
     }
+}
+
+bool Player::fits(sf::Vector2f pos) const
+{
+    return level->isEmptySpace(pos, HEIGHT, WIDTH);
+}
+
+void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
+{
+    if (rope) rope->draw(target, centr);
+
+    int frame;
+    if (!isGrounded()) {
+        frame = rope ? frames::SWING : velocity.y > 0.f ? frames::JUMP : frames::FALL;
+    } else if (std::abs(velocity.x) > 5.f) {
+        frame = frames::RUN + static_cast<int>(animTime * 12.f) % 4;
+    } else {
+        frame = frames::IDLE + static_cast<int>(animTime * 2.f) % 2;
+    }
+
+    sf::Sprite sprite(texture);
+    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, 0, frames::WIDTH, frames::HEIGHT));
+    // Anchored at the middle of the feet, so squashing and flipping keep the player planted.
+    sprite.setOrigin(frames::WIDTH * 0.5f, static_cast<float>(frames::HEIGHT));
+    sprite.setScale(facingLeft ? -squash.x : squash.x, squash.y);
+    sprite.setPosition(viewCoordinates(position + sf::Vector2f(WIDTH * 0.5f, 0.f), centr));
+    target.draw(sprite);
+}
+
+void Player::respawn(sf::Vector2f pos)
+{
+    position = {std::round(pos.x), std::round(pos.y)};
+    remainder = {0.f, 0.f};
+    velocity = {0.f, 0.f};
+    rope.reset();
+    coyoteTimer = 0.f;
+    jumpBufferTimer = 0.f;
+    dropThroughTimer = 0.f;
+    ropeJumpTimer = 0.f;
+    squash = {1.f, 1.f};
+    jumping = false;
+    events.clear();
+}
+
+sf::Vector2f Player::centre() const
+{
+    return position + sf::Vector2f(WIDTH * .5f, HEIGHT * .5f);
+}
+
+sf::Vector2f Player::exactCentre() const
+{
+    return centre() + remainder;
+}
+
+sf::Vector2f Player::getPosition() const { return position; }
+
+sf::Vector2f Player::getVelocity() const { return velocity; }
+
+void Player::setVelocity(sf::Vector2f v) { velocity = v; }
+
+bool Player::isGrounded() const
+{
+    if (!level->isEmptySpace(position + sf::Vector2f(0.f, -1.f), 1.f, WIDTH)) return true;
+    return dropThroughTimer <= 0.f && level->isOnPlatform(position, WIDTH);
+}
+
+bool Player::isTouchingDanger() const
+{
+    // A pixel of leeway on every side, so grazing a hazard doesn't kill.
+    return level->isDangerousSpace(position + sf::Vector2f(1.f, 1.f), HEIGHT - 2.f, WIDTH - 2.f);
+}
+
+const Rope* Player::getRope() const
+{
+    return rope ? &*rope : nullptr;
+}
+
+std::vector<PlayerEvent> Player::takeEvents()
+{
+    std::vector<PlayerEvent> taken;
+    taken.swap(events);
+    return taken;
+}
+
+std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
+{
+    return nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ROPE_RANGE);
 }

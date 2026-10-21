@@ -7,7 +7,7 @@ TEST(Utils_ViewCoordinates, ZeroPositionAndCenter) {
     sf::Vector2f center{0.f, 0.f};
     sf::Vector2f out = viewCoordinates(pos, center);
     EXPECT_FLOAT_EQ(out.x, 160.f);
-    EXPECT_FLOAT_EQ(out.y, 110.f);
+    EXPECT_FLOAT_EQ(out.y, 90.f);
 }
 
 TEST(Utils_ViewCoordinates, NonZeroValues) {
@@ -15,7 +15,7 @@ TEST(Utils_ViewCoordinates, NonZeroValues) {
     sf::Vector2f center{2.f, 3.f};
     sf::Vector2f out = viewCoordinates(pos, center);
     EXPECT_FLOAT_EQ(out.x, 168.f);
-    EXPECT_FLOAT_EQ(out.y, 108.f);
+    EXPECT_FLOAT_EQ(out.y, 88.f);
 }
 
 TEST(Utils_TailNumbers, PositiveAndBoundary) {
@@ -72,17 +72,20 @@ namespace
     }
 }
 
-TEST(nearestSolidPoint, FindsSolidPoint) {
+TEST(nearestSolidPoint, StopsJustOutsideTheWall) {
     auto level = std::make_shared<Level>(makeTiles());
 
-    sf::Vector2f from{0.f, -20.f};
-    sf::Vector2f to{0.f, 100.f};
+    // Shooting up at tile (0, -2), whose bottom edge is at y = -16.
+    sf::Vector2f from{4.f, -40.f};
+    sf::Vector2f to{4.f, 100.f};
 
     auto result = nearestSolidPoint(from, to, level);
     ASSERT_TRUE(result.has_value());
 
-    EXPECT_EQ(tailNumbers(*result).first, 0);
-    EXPECT_EQ(tailNumbers(*result).second, -2);
+    auto [tx, ty] = tailNumbers(*result);
+    EXPECT_FALSE(level->isSolid(tx, ty));
+    EXPECT_NEAR(result->y, -16.f, 0.5f);
+    EXPECT_FLOAT_EQ(result->x, 4.f);
 }
 
 TEST(nearestSolidPoint, NoSolidPoint) {
@@ -95,6 +98,15 @@ TEST(nearestSolidPoint, NoSolidPoint) {
     EXPECT_FALSE(result.has_value());
 }
 
+TEST(nearestSolidPoint, WallTooCloseOrTooFar) {
+    auto level = std::make_shared<Level>(makeTiles());
+
+    // Wall 4px away: closer than the minimum.
+    EXPECT_FALSE(nearestSolidPoint({4.f, -20.f}, {4.f, 100.f}, level).has_value());
+    // Wall 24px away, but the range is only 20.
+    EXPECT_FALSE(nearestSolidPoint({4.f, -40.f}, {4.f, 100.f}, level, 8.f, 20.f).has_value());
+}
+
 TEST(nearestSolidPoint, FindsSolidPointAlongDiagonal) {
     auto level = std::make_shared<Level>(makeTiles());
 
@@ -104,12 +116,14 @@ TEST(nearestSolidPoint, FindsSolidPointAlongDiagonal) {
     auto result = nearestSolidPoint(from, to, level);
     ASSERT_TRUE(result.has_value());
 
-    auto [tx, ty] = tailNumbers(*result);
+    // The point itself is empty, but one more small step along the ray is inside a wall.
+    sf::Vector2f dir = (to - from) / distance(from, to);
+    auto [tx, ty] = tailNumbers(*result + dir * 0.5f);
     EXPECT_TRUE(level->isSolid(tx, ty));
 }
 
 TEST(Utils_WorldCoordinates, ZeroPositionAndCenter) {
-    sf::Vector2f screenPos{160.f, 110.f};
+    sf::Vector2f screenPos{160.f, 90.f};
     sf::Vector2f center{0.f, 0.f};
     sf::Vector2f out = worldCoordinates(screenPos, center);
 
@@ -130,7 +144,7 @@ TEST(Utils_WorldCoordinates, InverseOfViewCoordinates) {
 }
 
 TEST(Utils_WorldCoordinates, SpecificValues) {
-    sf::Vector2f screenPos{170.f, 100.f};
+    sf::Vector2f screenPos{170.f, 80.f};
     sf::Vector2f center{0.f, 0.f};
 
     sf::Vector2f out = worldCoordinates(screenPos, center);

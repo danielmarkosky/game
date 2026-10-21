@@ -1,24 +1,30 @@
 #include "utils.h"
+#include "Config.h"
 #include <SFML/Graphics.hpp>
 #include <cmath>
 
+namespace
+{
+    constexpr float HALF_W = config::GAME_WIDTH * 0.5f;
+    constexpr float HALF_H = config::GAME_HEIGHT * 0.5f;
+}
+
 sf::Vector2f viewCoordinates(sf::Vector2f pos , sf::Vector2f centr)
 {
-    return {pos.x + 160.f - centr.x, -pos.y + 110.f + centr.y};
+    return {pos.x + HALF_W - centr.x, -pos.y + HALF_H + centr.y};
 }
 
 sf::Vector2f worldCoordinates(sf::Vector2f screenPos, sf::Vector2f centr)
 {
-    float wx = screenPos.x - 160.f + centr.x;
-    float wy = centr.y + 110.f - screenPos.y;
+    float wx = screenPos.x - HALF_W + centr.x;
+    float wy = centr.y + HALF_H - screenPos.y;
     return {wx, wy};
 }
 
 std::pair<int, int> tailNumbers(sf::Vector2f pos)
 {
-    constexpr float TILE_SIZE = 8.f;
-    int x = static_cast<int>(std::floor(pos.x / TILE_SIZE));
-    int y = static_cast<int>(std::floor(pos.y / TILE_SIZE));
+    int x = static_cast<int>(std::floor(pos.x / config::TILE_SIZE));
+    int y = static_cast<int>(std::floor(pos.y / config::TILE_SIZE));
     return {x, y};
 }
 
@@ -57,35 +63,37 @@ void drawDebugGrid(sf::RenderTarget& target, sf::Vector2f centr, int cols, int r
 
 float distance(sf::Vector2f p1, sf::Vector2f p2)
 {
-    return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
+    return magnitude(p1 - p2);
 }
 
-std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level)
+float magnitude(sf::Vector2f v)
 {
-    float minDistance = 8.f;
-    float maxDistance = 100.f;
+    return std::sqrt(v.x * v.x + v.y * v.y);
+}
 
-    float length = distance(from, to);
-    if (length <= minDistance) return std::nullopt;
+float dot(sf::Vector2f a, sf::Vector2f b)
+{
+    return a.x * b.x + a.y * b.y;
+}
 
-    sf::Vector2f dirNorm = (to - from) / length;
+std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level,
+                                              float minDistance, float maxDistance)
+{
+    float dist = distance(from, to);
+    if (dist < 0.001f) return std::nullopt;
 
-    float searchLimit = maxDistance;
+    sf::Vector2f dirNorm = (to - from) / dist;
+    const float step = 0.25f;
 
-    float currentDist = minDistance;
-    const float step = 1.0f;
-
-    while (currentDist <= searchLimit) {
+    sf::Vector2f lastEmpty = from;
+    for (float currentDist = 0.f; currentDist <= maxDistance; currentDist += step) {
         sf::Vector2f currentPos = from + dirNorm * currentDist;
-
         auto [tileX, tileY] = tailNumbers(currentPos);
         if (level->isSolid(tileX, tileY)) {
-            return sf::Vector2f(std::floor(currentPos.x), std::floor(currentPos.y));
+            if (currentDist < minDistance) return std::nullopt;
+            return lastEmpty;
         }
-
-        currentDist += step;
+        lastEmpty = currentPos;
     }
-
     return std::nullopt;
 }
-
