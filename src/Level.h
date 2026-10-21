@@ -12,6 +12,10 @@ class Level
 public:
     static constexpr float TILE_SIZE = 8; // 8x8 tiles
 
+    // Walking out through a gap in the left, right or top edge of a level takes you to the next one.
+    // There's no bottom exit: falling out of the bottom kills you.
+    enum class Side { Left, Right, Top };
+
     // A small bordered test room.
     Level();
     Level(const std::unordered_map<int, std::unordered_map<int, int>>& tiles);
@@ -38,6 +42,8 @@ public:
     // Respawn position of the checkpoint the box touches, if any.
     std::optional<sf::Vector2f> checkpointAt(sf::Vector2f pos, float height, float width) const;
     bool isGoal(sf::Vector2f pos, float height, float width) const;
+    // Which edge of the level `point` has gone past, if any.
+    std::optional<Side> exitThrough(sf::Vector2f point) const;
 
     sf::Vector2f getStartPos() const;
     // World-space rectangle covering every tile. `left`/`top` hold the minimum x/y, and since

@@ -12,8 +12,12 @@ the level. Lines don't need to be the same length.
 | `x`  | Crystal spikes, same as `^` but pink |
 | `S`  | Start position (required, exactly one) |
 | `C`  | Checkpoint. Put it in the empty tile right above the ground |
-| `G`  | Goal flag. Touching it finishes the level |
+| `G`  | Goal flag (optional). Touching it also finishes the level, with a fade instead of a slide |
 | anything else | Empty |
+
+**Exits.** Like in Celeste, a level is finished by walking off the screen: leave a gap in the
+outside wall on the left, the right or the top, and going through it slides the screen over to the
+next level. The bottom is never an exit, falling out of it kills.
 
 Spikes point away from the rock they're next to (rock below: up, rock above: down, rock on a
 side: sideways), and only that pointy half of the tile hurts. Grass, edges and decorations are
@@ -31,8 +35,12 @@ Things to keep in mind when designing:
 - The rope wraps around outside corners of rock (and slides along flat walls), so a rope that
   swings past a pit's lip or a block's edge will catch on it. Platforms and hazards don't catch it.
 - A swing under a ceiling 9–10 tiles above the floor comfortably crosses 8–10 tiles.
-- Keep the walls closed: falling more than 8 tiles below the level kills the player, but walking
-  out of a gap in a side wall just lets them wander off.
+- Keep the walls closed except for the exit: any gap in the left, right or top edge that the player
+  can reach is a way out to the next level. Falling more than 8 tiles below the level kills.
+  `game_tests` checks that every level in `levels.txt` has an exit the start is connected to
+  (it doesn't check the jumps, so play it).
+- For an exit at the top, put something to stand on 2-3 tiles below the gap, so a jump carries
+  the player out.
 
 Play a single level with `./game path/to/level.txt`. With no argument the game plays every level
 in `levels.txt`.

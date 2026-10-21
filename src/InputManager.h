@@ -3,14 +3,19 @@
 #include <SFML/Graphics.hpp>
 #include <array>
 #include <memory>
+#include <optional>
 
-// Polls keyboard and mouse once per frame and remembers the previous frame, so callers can ask
-// for "just pressed" / "just released". Reports nothing while the window isn't focused.
+// Tracks keyboard and mouse buttons, so callers can ask for "held" and "just pressed" / "just
+// released". Keys come from the window's events: unlike sf::Keyboard::isKeyPressed they don't need
+// macOS's Input Monitoring permission. The left mouse button is also polled while the window is
+// focused, so a press counts if either way sees it.
 class InputManager
 {
 public:
     InputManager(std::shared_ptr<sf::RenderWindow> window);
-    void update();
+    // Call once per frame before polling the frame's events: forgets last frame's presses.
+    void newFrame();
+    void handleEvent(const sf::Event& event);
     bool isKeyPressed(sf::Keyboard::Key key) const;
     bool wasKeyJustPressed(sf::Keyboard::Key key) const;
     bool isMousePressed() const;
@@ -21,10 +26,15 @@ public:
     sf::Vector2f scaleMouseInput(sf::Vector2i pixelPos) const;
 
 private:
+    void releaseAll();
+
     std::shared_ptr<sf::RenderWindow> window;
-    std::array<bool, sf::Keyboard::KeyCount> m_currentKeys{};
-    std::array<bool, sf::Keyboard::KeyCount> m_previousKeys{};
-    bool m_isMousePressed = false;
-    bool m_wasMousePressed = false;
-    sf::Vector2f m_mousePosition;
+    std::array<bool, sf::Keyboard::KeyCount> m_heldKeys{};
+    // Pressed this frame, even if already let go again: a quick tap between frames still counts.
+    std::array<bool, sf::Keyboard::KeyCount> m_pressedKeys{};
+    bool m_mouseFromEvents = false;
+    bool m_mouseFromPolling = false;
+    std::optional<bool> m_focused; // unknown until the first frame
+    bool m_mouseClicked = false;
+    bool m_mouseReleased = false;
 };

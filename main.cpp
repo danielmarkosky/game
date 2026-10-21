@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
         std::vector<LevelInfo> levels = argc > 1
             ? std::vector<LevelInfo>{{argv[1], "CUSTOM LEVEL"}}
             : loadLevelList(config::assetPath("levels/levels.txt"));
-        Game game(levels);
+        Game game(levels, argc > 1);
         game.run();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

@@ -347,6 +347,14 @@ bool Level::isGoal(sf::Vector2f pos, float height, float width) const
     return m_goal && overlaps(pos, height, width, markerArea(*m_goal));
 }
 
+std::optional<Level::Side> Level::exitThrough(sf::Vector2f point) const
+{
+    if (point.x < m_bounds.left) return Side::Left;
+    if (point.x > m_bounds.left + m_bounds.width) return Side::Right;
+    if (point.y > m_bounds.top + m_bounds.height) return Side::Top;
+    return std::nullopt;
+}
+
 sf::Vector2f Level::getStartPos() const
 {
     return m_startPos;

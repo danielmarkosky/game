@@ -6,7 +6,9 @@
 #include <fstream>
 #include "src/Game.h"
 #include <SFML/System.hpp>
+#include <set>
 #include <unordered_map>
+#include <vector>
 
 static constexpr float TILE_SIZE = 8.0f;
 
@@ -108,7 +110,7 @@ TEST(Level_IsEmptySpace, BoxEndingOnTileEdgeDoesNotTouchIt) {
 
 TEST(Level_LoadFromFile, AllShippedLevelsLoad) {
     auto levels = loadLevelList(config::assetPath("levels/levels.txt"));
-    EXPECT_GE(levels.size(), 5u);
+    EXPECT_GE(levels.size(), 10u);
     for (const auto& info : levels) {
         SCOPED_TRACE(info.path);
         EXPECT_FALSE(info.title.empty());
@@ -146,4 +148,51 @@ TEST(Level_IsDangerousSpace, OnlyThePointyHalfOfASpikeHurts) {
     // Down spike: tile y 16..24, only y 20..24 hurts.
     EXPECT_FALSE(lvl->isDangerousSpace({24.f, 9.f}, 11.f, 7.f));
     EXPECT_TRUE(lvl->isDangerousSpace({24.f, 10.f}, 11.f, 7.f));
+}
+
+TEST(Level_ExitThrough, LeftRightAndTopButNotBottom) {
+    // 5 x 3 tiles: x 0..40, y 0..24.
+    auto lvl = Level::loadFromString(
+        "#####\n"
+        "#S...\n"
+        "#####\n");
+
+    EXPECT_EQ(lvl->exitThrough({41.f, 12.f}), Level::Side::Right);
+    EXPECT_EQ(lvl->exitThrough({-1.f, 12.f}), Level::Side::Left);
+    EXPECT_EQ(lvl->exitThrough({20.f, 25.f}), Level::Side::Top);
+    EXPECT_FALSE(lvl->exitThrough({20.f, 12.f}).has_value());
+    EXPECT_FALSE(lvl->exitThrough({40.f, 12.f}).has_value()); // exactly on the edge is still inside
+    EXPECT_FALSE(lvl->exitThrough({20.f, -30.f}).has_value()); // falling out isn't leaving
+}
+
+TEST(Level_ExitThrough, EveryShippedLevelHasAWayOut) {
+    // Flood fills the empty tiles from the start. Some must lead out through the left, right or
+    // top edge, or the level could never be finished. (This doesn't check the jumps are possible.)
+    for (const auto& info : loadLevelList(config::assetPath("levels/levels.txt"))) {
+        SCOPED_TRACE(info.path);
+        auto lvl = Level::loadFromFile(info.path);
+        const sf::FloatRect b = lvl->bounds();
+        const int minX = static_cast<int>(b.left / TILE_SIZE), maxX = static_cast<int>((b.left + b.width) / TILE_SIZE) - 1;
+        const int minY = static_cast<int>(b.top / TILE_SIZE), maxY = static_cast<int>((b.top + b.height) / TILE_SIZE) - 1;
+        const sf::Vector2f start = lvl->getStartPos();
+
+        std::vector<std::pair<int, int>> todo = {{static_cast<int>(start.x / TILE_SIZE), static_cast<int>(start.y / TILE_SIZE)}};
+        std::set<std::pair<int, int>> seen(todo.begin(), todo.end());
+        bool foundExit = false;
+        while (!todo.empty() && !foundExit) {
+            auto [x, y] = todo.back();
+            todo.pop_back();
+            if (x < minX || x > maxX || y > maxY) {
+                foundExit = true;
+                break;
+            }
+            if (y < minY) continue; // fell out of the bottom
+            for (auto [dx, dy] : {std::pair{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+                std::pair<int, int> next{x + dx, y + dy};
+                if (lvl->isSolid(next.first, next.second) || !seen.insert(next).second) continue;
+                todo.push_back(next);
+            }
+        }
+        EXPECT_TRUE(foundExit);
+    }
 }

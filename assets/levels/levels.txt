@@ -1,6 +1,12 @@
 # The levels in the order they're played: the file, then the title shown when it starts.
+# Walking out through a gap in a level's left, right or top edge takes you to the next one.
 level1.txt  The Cave
 level2.txt  The Well
 level3.txt  Hook Garden
 level4.txt  Curtains
 level5.txt  The Summit
+level6.txt  Stepping Stones
+level7.txt  The Chimney
+level8.txt  Pendulums
+level9.txt  Backtrack
+level10.txt Daylight

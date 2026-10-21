@@ -152,3 +152,25 @@ TEST(Utils_WorldCoordinates, SpecificValues) {
     EXPECT_FLOAT_EQ(out.x, 10.f);
     EXPECT_FLOAT_EQ(out.y, 10.f);
 }
+
+TEST(Utils_CanvasRect, WholeScaleCentredInTheWindow) {
+    sf::FloatRect exact = canvasRect({1280, 720});
+    EXPECT_FLOAT_EQ(exact.left, 0.f);
+    EXPECT_FLOAT_EQ(exact.top, 0.f);
+    EXPECT_FLOAT_EQ(exact.width, 1280.f);
+    EXPECT_FLOAT_EQ(exact.height, 720.f);
+
+    // 1440 x 900 fits 4.5x across and 5x down: use 4x, centred with bars.
+    sf::FloatRect bars = canvasRect({1440, 900});
+    EXPECT_FLOAT_EQ(bars.width, 1280.f);
+    EXPECT_FLOAT_EQ(bars.height, 720.f);
+    EXPECT_FLOAT_EQ(bars.left, 80.f);
+    EXPECT_FLOAT_EQ(bars.top, 90.f);
+}
+
+TEST(Utils_CanvasRect, ShrinksBelowOneWhenTheWindowIsTiny) {
+    sf::FloatRect tiny = canvasRect({160, 180});
+    EXPECT_FLOAT_EQ(tiny.width, 160.f);
+    EXPECT_FLOAT_EQ(tiny.height, 90.f);
+    EXPECT_FLOAT_EQ(tiny.top, 45.f);
+}

@@ -1,6 +1,7 @@
 #include "utils.h"
 #include "Config.h"
 #include <SFML/Graphics.hpp>
+#include <algorithm>
 #include <cmath>
 
 namespace
@@ -19,6 +20,15 @@ sf::Vector2f worldCoordinates(sf::Vector2f screenPos, sf::Vector2f centr)
     float wx = screenPos.x - HALF_W + centr.x;
     float wy = centr.y + HALF_H - screenPos.y;
     return {wx, wy};
+}
+
+sf::FloatRect canvasRect(sf::Vector2u windowSize)
+{
+    float scale = std::min(static_cast<float>(windowSize.x) / config::GAME_WIDTH,
+                           static_cast<float>(windowSize.y) / config::GAME_HEIGHT);
+    if (scale >= 1.f) scale = std::floor(scale);
+    const float w = config::GAME_WIDTH * scale, h = config::GAME_HEIGHT * scale;
+    return {std::floor((windowSize.x - w) * 0.5f), std::floor((windowSize.y - h) * 0.5f), w, h};
 }
 
 std::pair<int, int> tailNumbers(sf::Vector2f pos)

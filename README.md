@@ -30,22 +30,32 @@ cmake --build --preset conan-release
 |-------|--------|
 | A / D (or arrows) | Run |
 | Space | Jump (hold for a higher jump). On the rope: jump off it |
-| Left mouse | Shoot the rope at the crosshair, hold to keep it, release to let go |
+| Left mouse or Shift | Shoot the rope at the crosshair, hold to keep it, release to let go |
 | W / S (on the rope) | Reel in / let out |
 | S (on a platform) | Drop through it |
-| Space / Enter (level complete) | Next level |
 | R | Restart the level |
-| Esc | Quit |
+| Esc / P, or click the pause button in the top right | Pause |
+| Arrows or W/S, Enter / Space, or the mouse | Use the menus (left / right change a setting) |
 
 The crosshair shows a white dot where the rope will stick; no dot means nothing is in range.
 The rope wraps around corners, so swinging past an edge pivots you around it.
 
+The game also pauses by itself when its window loses focus.
+
 ## Levels
 
-There are five, played in order: The Cave, The Well, Hook Garden, Curtains and The Summit.
+There are ten, played in order: The Cave, The Well, Hook Garden, Curtains, The Summit, Stepping Stones,
+The Chimney, Pendulums, Backtrack and Daylight. Like the screens in Celeste, they're joined up: each one
+has a gap in its left, right or top edge, and walking out through it slides the screen over to the next
+level. Falling out of the bottom still kills you.
+
+The title screen has Continue (from the last level you reached), Levels (pick any level, with your best
+time and fewest deaths on each) and Options (window size, fullscreen, screen shake, timer). Progress and
+settings are saved in `~/.celeste_like_game/save.txt`.
+
 Levels are text files in `assets/levels/`, listed in `assets/levels/levels.txt`; see
 [assets/levels/README.md](assets/levels/README.md) to make your own. `./build/Release/game some_level.txt`
-plays a single level.
+plays a single level straight away, without the title screen and without saving results.
 
 ## Art
 
