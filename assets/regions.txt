@@ -1,0 +1,14 @@
+# The regions of the world, as the map names them. Each room's `region` field (set by
+# tools/make_world.py) is one of these ids; see docs/world.md.
+#
+#   region <id> | <name on the map>
+
+region crevasse   | THE CREVASSE
+region hollows    | THE HOLLOWS
+region crossroads | THE CROSSROADS
+region ruins      | THE SUNKEN RUINS
+region garden     | THE HOOK GARDEN
+region summit     | THE SUMMIT
+region frost      | THE FROST CAVES
+region ember      | THE EMBER CHIMNEY
+region sky        | THE SKY

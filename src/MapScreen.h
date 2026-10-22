@@ -21,6 +21,10 @@ public:
         size_t currentRoom = 0;
         sf::Vector2f player;
         std::vector<sf::Vector2f> pickups; // still to pick up, in explored rooms
+        std::vector<sf::Vector2f> items;   // things to find for people, still lying there
+        std::vector<sf::Vector2f> people;  // someone to talk to
+        std::vector<sf::Vector2f> notes;   // Ash's notes, not read yet
+        std::vector<std::string> regions;  // per room, the name of its region
         std::vector<sf::Vector2f> benches; // sat on, in the order travel goes through them
         std::vector<size_t> benchRooms;    // the room of each
         size_t benchHere = 0;              // in `benches`: the one sat on now

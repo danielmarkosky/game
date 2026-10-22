@@ -149,6 +149,10 @@ private:
     void step(float dt);
     void killPlayer();
     void showEffects(const std::vector<PlayerEvent>& events);
+    // The room's own sounds, louder the nearer they are: cracking stone, icicles.
+    void playLevelSounds();
+    // The wind and the heat of updrafts, by where you are.
+    void updateLoops();
     void updateCamera(float dt, bool snap = false);
     sf::Vector2f clampToLevel(sf::Vector2f cam) const;
     sf::Vector2f drawCamera() const;
@@ -246,7 +250,10 @@ private:
     std::string notice;      // see showNotice
     float noticeTimer = 0.f;
     float fade = 0.f;        // > 0 while fading in after travelling
-    std::vector<std::string> ending; // what the end screen says, picked by how the story went
+    // What the end screen rolls up: how the story went (assets/dialogue/endings.txt), what became of
+    // the people you helped (epilogue.txt), then how the climb went. A colour for each line, "" a gap.
+    std::vector<std::pair<std::string, sf::Color>> credits;
+    float creditsTime = 0.f; // seconds the end screen's been up
     bool ignoreInputThisFrame = false;   // right after a (re)start, so the key that started it doesn't jump
     bool ignorePressesThisFrame = false; // right after unpausing: held buttons count, new presses don't
 };

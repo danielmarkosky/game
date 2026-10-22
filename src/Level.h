@@ -70,6 +70,14 @@ struct Icicle
     float timer = 0.f;
 };
 
+// Something that happened in the room this step that can be heard: where, and what.
+struct LevelSound
+{
+    enum class Kind { Crack, Crumble, CloudFade, IcicleShake, IcicleShatter };
+    Kind kind;
+    sf::Vector2f position;
+};
+
 // What a rope thrown along a line meets first: rock it bites (or a hook block), slick stone it
 // bounces off, a moving ring it catches, or a lever or lamp it tugs and comes back from.
 struct RopeHit
@@ -139,6 +147,8 @@ public:
     void update(float dt, sf::FloatRect player);
     void reset();
     float time() const;
+    // What's happened since the last call that can be heard (see LevelSound).
+    std::vector<LevelSound> takeSounds();
 
     const std::vector<Ring>& rings() const;
     sf::Vector2f ringPosition(size_t ring) const; // now
@@ -243,6 +253,7 @@ private:
     std::vector<QuestItem> m_questItems;
     std::vector<Finish> m_finishes;
     std::vector<Icicle> m_icicles;
+    std::vector<LevelSound> m_sounds;
     std::vector<sf::FloatRect> m_updrafts;
     std::vector<sf::Vector2i> m_updraftTiles; // where they start: their tops are found once all the tiles are in
     float m_wind = 0.f;

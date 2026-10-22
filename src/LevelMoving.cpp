@@ -7,6 +7,7 @@
 #include "src/utils.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 
 namespace
 {
@@ -180,7 +181,11 @@ void Level::update(float dt, sf::FloatRect player)
             const int tile = tileAt(x, y);
             if (tile != TILE_CRUMBLE && tile != TILE_CLOUD) continue;
             Crumbling& state = m_crumbling[tileKey(x, y)];
-            if (state.gone <= 0.f && state.stood <= 0.f) state.stood = 0.001f;
+            if (state.gone <= 0.f && state.stood <= 0.f) {
+                state.stood = 0.001f;
+                const sf::Vector2f middle((x + 0.5f) * TILE_SIZE, (y + 0.5f) * TILE_SIZE);
+                m_sounds.push_back({tile == TILE_CLOUD ? LevelSound::Kind::CloudFade : LevelSound::Kind::Crack, middle});
+            }
         }
     }
     for (auto& [key, state] : m_crumbling) {
@@ -196,6 +201,7 @@ void Level::update(float dt, sf::FloatRect player)
             if (state.stood >= (cloud ? CLOUD_DELAY : CRUMBLE_DELAY)) {
                 state.stood = 0.f;
                 state.gone = cloud ? CLOUD_BACK : CRUMBLE_BACK;
+                if (!cloud) m_sounds.push_back({LevelSound::Kind::Crumble, {(x + 0.5f) * TILE_SIZE, (y + 0.5f) * TILE_SIZE}});
             }
         }
     }
@@ -214,6 +220,7 @@ void Level::update(float dt, sf::FloatRect player)
                 if (clear) {
                     icicle.state = Icicle::State::Shaking;
                     icicle.timer = ICICLE_SHAKE;
+                    m_sounds.push_back({LevelSound::Kind::IcicleShake, icicle.tip});
                 }
                 break;
             }
@@ -231,6 +238,7 @@ void Level::update(float dt, sf::FloatRect player)
                 if (isSolid(tx, ty) || icicle.tip.y < m_bounds.top - 2.f * TILE_SIZE) {
                     icicle.state = Icicle::State::Gone;
                     icicle.timer = ICICLE_BACK;
+                    m_sounds.push_back({LevelSound::Kind::IcicleShatter, icicle.tip});
                 }
                 break;
             }
@@ -245,10 +253,16 @@ void Level::update(float dt, sf::FloatRect player)
     }
 }
 
+std::vector<LevelSound> Level::takeSounds()
+{
+    return std::exchange(m_sounds, {});
+}
+
 void Level::reset()
 {
     m_time = 0.f;
     m_crumbling.clear();
+    m_sounds.clear();
     for (Icicle& icicle : m_icicles) {
         icicle.state = Icicle::State::Hanging;
         icicle.tip = icicle.home;

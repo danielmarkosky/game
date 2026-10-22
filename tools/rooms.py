@@ -58,9 +58,9 @@ CHAR_OF_ENTITY = {ident: char for ident, char, *_ in ENTITIES}
 DEFAULT_FIELDS = {'Pickup': {'ability': 'rope'}}
 
 # Fixed uids, so the definitions are the same in every project this makes.
-UID = {'Tiles': 1, 'Entities': 2, 'Theme': 3, 'Ability': 4, 'title': 5, 'theme': 6, 'wind': 7, 'dark': 8}
+UID = {'Tiles': 1, 'Entities': 2, 'Theme': 3, 'Ability': 4, 'title': 5, 'theme': 6, 'wind': 7, 'dark': 8, 'region': 9}
 # A room's own settings besides its title and theme: in rooms.txt as "room <name> wind=40 dark=1".
-ROOM_FIELDS = ['wind', 'dark']
+ROOM_FIELDS = ['wind', 'dark', 'region']
 for n, (ident, *_rest) in enumerate(ENTITIES):
     UID[ident] = 10 + n
 FIELD_UID = {}

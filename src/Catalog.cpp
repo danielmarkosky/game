@@ -36,6 +36,7 @@ namespace catalog
             std::vector<Quest> quests;
             std::vector<Race> races;
             std::vector<Outfit> outfits;
+            std::vector<Region> regions;
         };
 
         const All& all()
@@ -54,6 +55,9 @@ namespace catalog
                 for (const auto& p : lines("outfits.txt", "outfit")) {
                     if (p.size() >= 3) a.outfits.push_back({p[0], std::atoi(p[1].c_str()), p[2]});
                 }
+                for (const auto& p : lines("regions.txt", "region")) {
+                    if (p.size() >= 2) a.regions.push_back({p[0], p[1]});
+                }
                 return a;
             }();
             return loaded;
@@ -64,6 +68,15 @@ namespace catalog
     const std::vector<Quest>& quests() { return all().quests; }
     const std::vector<Race>& races() { return all().races; }
     const std::vector<Outfit>& outfits() { return all().outfits; }
+    const std::vector<Region>& regions() { return all().regions; }
+
+    std::string regionName(const std::string& id)
+    {
+        for (const Region& r : regions()) {
+            if (r.id == id) return r.name;
+        }
+        return "";
+    }
 
     const Item* item(const std::string& id)
     {

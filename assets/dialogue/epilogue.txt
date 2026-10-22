@@ -1,0 +1,21 @@
+# After the ending, on the end screen: a line for each of these whose flags fit, all of them, in
+# this order. What became of the people you helped on the way up.
+# (Not a character: read the same way as conversations, but only the lines are used.)
+
+--- gave_lantern
+Wren's lantern hangs by the bench in the Cave again, lit for whoever climbs out of the crevasse next.
+
+--- gave_page
+Moss finished her oldest book at last, and started it again the very next morning.
+
+--- won_garden
+Bramble trains every morning now, for the rematch.
+
+--- gave_lure
+Pell caught a fish. Just the one. Nobody at the Frost Camp has stopped talking about it.
+
+--- won_chimney
+Cinder chalked your time on the Forge wall, right under Ash's.
+
+--- read_all_notes
+You keep Ash's notes in a tin, every one of them.

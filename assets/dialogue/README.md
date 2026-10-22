@@ -50,7 +50,9 @@ Wren: Up the well, climber.
 - **Notes.** An Npc whose `look` is `note` is one of Ash's notes, lying on the ground. A line's
   speaker who has a look of their own (`Ash:`) shows their own face.
 - **The ending.** `endings.txt` is read the same way: the end screen shows the lines of the first
-  conversation whose facts hold. Keep the last one without any, for when none fit.
+  conversation whose facts hold. Keep the last one without any, for when none fit. Then
+  `epilogue.txt`: the lines of every one of its conversations whose facts hold, in order, each about
+  someone you helped.
 - Stick to plain ASCII: letters, digits and the usual punctuation. That's what the font has.
   `game_tests` checks it, that every character's file is there, and that every label a choice or a
   jump goes to exists.

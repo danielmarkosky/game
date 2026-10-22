@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include "src/Catalog.h"
 #include "src/Config.h"
 #include "src/World.h"
 #include <nlohmann/json.hpp>
@@ -286,5 +287,12 @@ TEST(World, EveryPropIsInTheSheet) {
     for (const PropInfo& p : props::all()) {
         EXPECT_LE(static_cast<unsigned>(p.rect.left + p.rect.width * p.frames), sheet.getSize().x) << p.name;
         EXPECT_LE(static_cast<unsigned>(p.rect.top + p.rect.height), sheet.getSize().y) << p.name;
+    }
+}
+
+TEST(World, EveryRoomIsInANamedRegion) {
+    // The map writes the regions' names over them (assets/regions.txt).
+    for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
+        EXPECT_FALSE(catalog::regionName(room.region).empty()) << room.name << " is in region \"" << room.region << "\"";
     }
 }

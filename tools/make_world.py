@@ -787,6 +787,24 @@ JOINS = [
     ('last_ledge', 'R', 0, 'level10', 'L', 0),
 ]
 # The project's order: a new game starts in the first room, and the last one has the way out.
+# The regions, as the map names them (assets/regions.txt) and docs/world.md has them.
+REGIONS = {
+    'crevasse': ['crevasse_wake', 'crevasse_steps', 'crevasse_gaps', 'crevasse_camp', 'crevasse_dips', 'crevasse_chasm'],
+    'hollows': ['level1', 'level2', 'the_deep'],
+    'crossroads': ['crossroads', 'market'],
+    'ruins': ['ruins_gate', 'lever_works', 'the_vault', 'ruins_hollow', 'dark_stair', 'ruins_archive'],
+    'garden': ['level3', 'garden_rings', 'greenhouse', 'thorn_walk', 'trellis', 'level4'],
+    'summit': ['tall_hall', 'level5', 'the_drop'],
+    'frost': ['icefall', 'frozen_lake', 'frost_camp', 'hall_of_icicles', 'icicle_gallery', 'frozen_camp'],
+    'ember': ['level6', 'forge', 'level7', 'level8', 'crumbling_halls', 'furnace', 'the_updraft'],
+    'sky': ['level9', 'windy_ledge', 'cloud_steps', 'gusts', 'last_ledge', 'eye_of_storm', 'level10'],
+}
+for region, names in REGIONS.items():
+    for name in names:
+        assert 'region' not in ROOMS[name].settings, (name, 'in two regions')
+        ROOMS[name].settings['region'] = region
+assert all('region' in r.settings for r in ROOMS.values()), [n for n, r in ROOMS.items() if 'region' not in r.settings]
+
 ORDER = [name for name in ROOMS if name != 'level10'] + ['level10']
 
 pos = {'crevasse_wake': (0, 0)}

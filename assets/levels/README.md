@@ -96,7 +96,9 @@ Each character of a text room is one tile, and the first line is the top of the 
 
 Rooms can be windy (`wind`, pixels a second each second, + to the right, on anything in the air)
 and dark (`dark` 1: nothing to see but what's lit, the player's own little light and lamps).
-rooms.txt gives them as `room <name> wind=-70 dark=1`; in LDtk they're the room's fields.
+A room's `region` (one of [`assets/regions.txt`](../regions.txt)) is the name the map writes over
+it. rooms.txt gives them as `room <name> wind=-70 dark=1 region=frost`; in LDtk they're the room's
+fields.
 
 `rooms.txt` lists the rooms in order: a `theme <name>` line sets the theme of the rooms below it,
 then each room is its file name, its position on the map (in tiles, of its bottom-left tile, x to

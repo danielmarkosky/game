@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <algorithm>
 #include "src/Config.h"
 #include "src/Level.h"
 #include "src/Physics.h"
@@ -71,6 +72,31 @@ TEST(Mechanics, CrumblingBlocksGiveWayAndComeBack) {
     EXPECT_LT(player.getPosition().y, 32.f); // fallen through
     run(*level, player, {}, 2.5f);
     EXPECT_TRUE(level->isSolid(3, 3));        // back
+}
+
+TEST(Mechanics, CrumblingCanBeHeard) {
+    auto level = Level::loadFromString(
+        "########\n"
+        "#......#\n"
+        "#..S...#\n"
+        "#.&&&..#\n"
+        "#......#\n"
+        "#......#\n"
+        "########\n");
+    Player player(level);
+    player.respawn({24.f, 32.f});
+    std::vector<LevelSound::Kind> heard;
+    for (int i = 0; i < 60; ++i) {
+        level->update(1.f / 60.f, player.hitbox());
+        player.update(1.f / 60.f);
+        for (const LevelSound& sound : level->takeSounds()) heard.push_back(sound.kind);
+    }
+    // A crack when it's stood on, then the crumbling: once each per block, nothing more.
+    ASSERT_FALSE(heard.empty());
+    EXPECT_EQ(heard.front(), LevelSound::Kind::Crack);
+    EXPECT_TRUE(std::count(heard.begin(), heard.end(), LevelSound::Kind::Crumble) >= 1);
+    EXPECT_LE(heard.size(), 6u);
+    EXPECT_TRUE(level->takeSounds().empty());
 }
 
 TEST(Mechanics, CloudsFadeFromUnderYou) {

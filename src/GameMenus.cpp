@@ -214,7 +214,7 @@ void Game::onMenuChoice(MenuChoice choice)
                     if (!owned) {
                         progress.spent += o.price;
                         progress.outfits.insert(o.look);
-                        audio.play(Audio::Sfx::Pickup);
+                        audio.play(Audio::Sfx::Buy);
                     }
                     wear(o.look);
                 }
@@ -432,17 +432,30 @@ void Game::drawMenuScreen()
         case Screen::Complete: {
             hud::dim(canvas, 170);
             hud::drawCentred(canvas, "THE END", HALF_W, 12.f, hud::GOLD, 3.f);
-            // How the story ended, then the numbers.
-            float y = 36.f;
-            for (const std::string& paragraph : ending) {
-                for (const std::string& line : text::wrap(paragraph, 280.f)) {
-                    text::draw(canvas, line, {std::floor(HALF_W - text::width(line) * 0.5f), y}, hud::WHITE);
-                    y += text::LINE_HEIGHT;
-                }
-                y += 3.f;
+            // How the story ended, what became of everyone, then the numbers: rolling up slowly once
+            // the first lines have been read, if there's more than fits, until the last is in view.
+            const sf::FloatRect area(0.f, 36.f, config::GAME_WIDTH, 90.f);
+            std::vector<std::pair<std::string, sf::Color>> lines;
+            for (const auto& [paragraph, color] : credits) {
+                if (paragraph.empty()) lines.emplace_back("", color);
+                for (const std::string& line : text::wrap(paragraph, 280.f)) lines.emplace_back(line, color);
             }
-            const std::string stats = hud::formatTime(progress.playTime) + "   x" + std::to_string(progress.deaths) + (gemCount() > 0 ? "   " + gemTotal() : "");
-            hud::drawCentred(canvas, stats, HALF_W, 112.f, hud::GREY);
+            const float height = static_cast<float>(lines.size()) * text::LINE_HEIGHT;
+            const float scroll = std::clamp((creditsTime - 6.f) * 7.f, 0.f, std::max(0.f, height - area.height));
+            sf::View clip(area);
+            clip.setViewport({0.f, area.top / config::GAME_HEIGHT, 1.f, area.height / config::GAME_HEIGHT});
+            canvas.setView(clip);
+            float y = area.top - scroll;
+            for (size_t ii = 0; ii < lines.size(); ++ii, y += text::LINE_HEIGHT) {
+                // Each line fades in in turn, and out at the edges as it rolls past them.
+                const float bottom = area.top + area.height - y - text::LINE_HEIGHT, top = y - area.top;
+                const float edges = std::clamp(std::min(bottom, scroll > 0.f ? top : 0.f) / 6.f + 1.f, 0.f, 1.f);
+                const float shown = edges * std::clamp((creditsTime - static_cast<float>(ii) * 0.25f) * 2.f, 0.f, 1.f);
+                if (lines[ii].first.empty() || shown <= 0.f) continue;
+                const std::string& line = lines[ii].first;
+                text::draw(canvas, line, {std::floor(HALF_W - text::width(line) * 0.5f), y}, hud::withAlpha(lines[ii].second, static_cast<sf::Uint8>(255.f * shown)));
+            }
+            canvas.setView(canvas.getDefaultView());
             particles.draw(canvas, drawCamera());
             break;
         }

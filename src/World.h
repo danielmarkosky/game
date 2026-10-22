@@ -13,6 +13,7 @@ struct LevelInfo
     std::string name;  // its identifier in the LDtk project, also its key in the save
     std::string title; // shown the first time you go in
     std::string theme = Theme::DEFAULT;
+    std::string region; // one of assets/regions.txt, for the map
     sf::Vector2i position{}; // on the world map, in tiles: where the room's bottom-left tile is
     std::shared_ptr<Level> level;
 };

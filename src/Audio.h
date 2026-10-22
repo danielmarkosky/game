@@ -20,6 +20,13 @@ public:
     {
         Jump, AirJump, Land, RopeClink, Death, Respawn, Gem, Pickup, Checkpoint,
         Bench, Travel, MenuMove, MenuPick, Talk, Door, Throw, Hooked, Grab,
+        Crack, Crumble, CloudPuff, IcicleShake, Shatter, LampLit, Buy, RaceGo, RaceTick, RaceLost,
+        Count // not a sound
+    };
+    // Sounds that go on, louder or quieter: the wind, the heat of an updraft.
+    enum class Loop
+    {
+        Wind, Heat,
         Count // not a sound
     };
 
@@ -28,8 +35,10 @@ public:
     Audio(const Audio&) = delete;
     Audio& operator=(const Audio&) = delete;
 
-    // `pitch` 1 is as made; 2 an octave up.
-    void play(Sfx sound, float pitch = 1.f);
+    // `pitch` 1 is as made; 2 an octave up. `volume` 0 to 1, of the sound volume.
+    void play(Sfx sound, float pitch = 1.f, float volume = 1.f);
+    // How loud a loop should be, 0 (silent) to 1: it gets there smoothly.
+    void setLoop(Loop loop, float level);
     // Fades over to a song, by its file name without ".txt". Empty for none.
     void playMusic(const std::string& name);
     // Each frame: fades the music, and starts songs once they're made.
@@ -44,6 +53,13 @@ private:
     std::map<Sfx, sf::SoundBuffer> effects;
     std::array<sf::Sound, 12> voices;
     size_t nextVoice = 0;
+    struct Looping
+    {
+        sf::SoundBuffer buffer;
+        sf::Sound sound;
+        float level = 0.f, wanted = 0.f;
+    };
+    std::array<Looping, static_cast<size_t>(Loop::Count)> loops;
     float soundVolume = 80.f;
     float musicVolume = 60.f;
 

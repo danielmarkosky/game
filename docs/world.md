@@ -47,7 +47,9 @@ this first when the plan changes.
    THE CREVASSE (where a new game starts)
 ```
 
-The rooms, region by region (their identifiers in the LDtk project):
+The rooms, region by region (their identifiers in the LDtk project; `REGIONS` in the world script
+gives each room its region, and [`assets/regions.txt`](../assets/regions.txt) their names on the
+map):
 
 - **The Crevasse**: crevasse_wake, crevasse_steps, crevasse_gaps, crevasse_camp, crevasse_dips, crevasse_chasm
 - **The Hollows**: level1 (The Cave), level2 (The Well), the_deep

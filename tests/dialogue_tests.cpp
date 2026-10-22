@@ -6,6 +6,7 @@
 #include "src/World.h"
 #include <filesystem>
 #include <fstream>
+#include <iterator>
 #include <set>
 
 namespace
@@ -167,4 +168,24 @@ TEST(Dialogue, CommandsGiveTakeShopAndRace) {
     while (!run.finished()) run.next();
     EXPECT_EQ(done, (std::vector<std::string>{"shop", "give gems 2"}));
     EXPECT_EQ(flags, std::set<std::string>{"met_tuck"});
+}
+
+TEST(Dialogue, TheEpilogueOnlySaysWhatYouDid) {
+    // Every line of the epilogue is about something that happened: none is said whatever you did,
+    // and each flag it needs is set by somebody somewhere.
+    const Dialogue epilogue = Dialogue::load("epilogue");
+    ASSERT_FALSE(epilogue.conversations().empty());
+    std::string everything;
+    for (const auto& entry : std::filesystem::directory_iterator(config::assetPath("dialogue"))) {
+        std::ifstream file(entry.path());
+        everything += std::string(std::istreambuf_iterator<char>(file), {});
+    }
+    for (const auto& c : epilogue.conversations()) {
+        ASSERT_FALSE(c.needs.empty());
+        for (const std::string& need : c.needs) {
+            const bool setByTalk = everything.find("set " + need) != std::string::npos;
+            const bool setByWinning = need.rfind("won_", 0) == 0; // a race, won
+            EXPECT_TRUE(setByTalk || setByWinning) << need;
+        }
+    }
 }

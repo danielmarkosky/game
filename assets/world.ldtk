@@ -1250,6 +1250,43 @@
 				"allowedRefsEntityUid": null,
 				"allowedRefTags": [],
 				"tilesetUid": null
+			},
+			{
+				"identifier": "region",
+				"doc": null,
+				"__type": "String",
+				"uid": 9,
+				"type": "F_String",
+				"isArray": false,
+				"canBeNull": false,
+				"arrayMinLength": null,
+				"arrayMaxLength": null,
+				"editorDisplayMode": "NameAndValue",
+				"editorDisplayScale": 1,
+				"editorDisplayPos": "Above",
+				"editorLinkStyle": "StraightArrow",
+				"editorDisplayColor": null,
+				"editorAlwaysShow": false,
+				"editorShowInWorld": true,
+				"editorCutLongValues": true,
+				"editorTextSuffix": null,
+				"editorTextPrefix": null,
+				"useForSmartColor": false,
+				"exportToToc": false,
+				"searchable": false,
+				"min": null,
+				"max": null,
+				"regex": null,
+				"acceptFileTypes": null,
+				"defaultOverride": null,
+				"textLanguageMode": null,
+				"symmetricalRef": false,
+				"autoChainRef": false,
+				"allowOutOfLevelRef": true,
+				"allowedRefs": "OnlySame",
+				"allowedRefsEntityUid": null,
+				"allowedRefTags": [],
+				"tilesetUid": null
 			}
 		]
 	},
@@ -1323,6 +1360,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crevasse",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crevasse"]
 						}
 					]
 				}
@@ -1642,6 +1692,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crevasse",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crevasse"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -1927,6 +1990,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crevasse",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crevasse"]
 						}
 					]
 				}
@@ -2230,6 +2306,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crevasse",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crevasse"]
 						}
 					]
 				}
@@ -2684,6 +2773,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crevasse",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crevasse"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -2955,6 +3057,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crevasse",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crevasse"]
 						}
 					]
 				}
@@ -3260,6 +3375,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "hollows",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["hollows"]
 						}
 					]
 				}
@@ -3682,6 +3810,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "hollows",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["hollows"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -3999,6 +4140,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crossroads",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crossroads"]
 						}
 					]
 				}
@@ -4509,6 +4663,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ruins",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ruins"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -4842,6 +5009,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ruins",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ruins"]
 						}
 					]
 				}
@@ -5187,6 +5367,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ruins",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ruins"]
 						}
 					]
 				}
@@ -5720,6 +5913,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "garden",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["garden"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -6129,6 +6335,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "garden",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["garden"]
 						}
 					]
 				}
@@ -6560,6 +6779,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "summit",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["summit"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -6906,6 +7138,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "summit",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["summit"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -7084,6 +7329,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "summit",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["summit"]
 						}
 					]
 				}
@@ -7552,6 +7810,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ember",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ember"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -7889,6 +8160,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ember",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ember"]
 						}
 					]
 				}
@@ -8248,6 +8532,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ember",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ember"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -8601,6 +8898,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "sky",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["sky"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -8928,6 +9238,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "sky",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["sky"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -9209,6 +9532,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "hollows",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["hollows"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -9462,6 +9798,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "crossroads",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["crossroads"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -9704,6 +10053,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ruins",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ruins"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -9905,6 +10267,19 @@
 						{
 							"id": "V_String",
 							"params": ["1"]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ruins",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ruins"]
 						}
 					]
 				}
@@ -10182,6 +10557,19 @@
 							"params": ["1"]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ruins",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ruins"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -10445,6 +10833,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "garden",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["garden"]
 						}
 					]
 				}
@@ -10720,6 +11121,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "garden",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["garden"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -10989,6 +11403,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "garden",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["garden"]
 						}
 					]
 				}
@@ -11262,6 +11689,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "garden",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["garden"]
 						}
 					]
 				}
@@ -11612,6 +12052,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "frost",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["frost"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -11833,6 +12286,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "frost",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["frost"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -12016,6 +12482,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "frost",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["frost"]
 						}
 					]
 				}
@@ -12244,6 +12723,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "frost",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["frost"]
 						}
 					]
 				}
@@ -12557,6 +13049,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "frost",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["frost"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -12795,6 +13300,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "frost",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["frost"]
 						}
 					]
 				}
@@ -13062,6 +13580,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ember",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ember"]
 						}
 					]
 				}
@@ -13351,6 +13882,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ember",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ember"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -13536,6 +14080,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ember",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ember"]
 						}
 					]
 				}
@@ -13831,6 +14388,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "ember",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["ember"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -14082,6 +14652,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "sky",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["sky"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -14271,6 +14854,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "sky",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["sky"]
 						}
 					]
 				}
@@ -14507,6 +15103,19 @@
 							"params": [""]
 						}
 					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "sky",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["sky"]
+						}
+					]
 				}
 			],
 			"layerInstances": [
@@ -14735,6 +15344,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "sky",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["sky"]
 						}
 					]
 				}
@@ -14997,6 +15619,19 @@
 						{
 							"id": "V_String",
 							"params": [""]
+						}
+					]
+				},
+				{
+					"__identifier": "region",
+					"__type": "String",
+					"__value": "sky",
+					"__tile": null,
+					"defUid": 9,
+					"realEditorValues": [
+						{
+							"id": "V_String",
+							"params": ["sky"]
 						}
 					]
 				}

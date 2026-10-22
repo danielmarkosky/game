@@ -2,6 +2,7 @@
 #include "Config.h"
 #include "Synth.h"
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -41,9 +42,53 @@ namespace
             case Audio::Sfx::Throw: return tone(Wave::Noise, 900.f, 2600.f, 0.14f, 0.03f, 0.08f, 0.12f);  // a whoosh
             case Audio::Sfx::Hooked: return tone(Wave::Square, 1500.f, 700.f, 0.06f, 0.001f, 0.05f, 0.14f, 0.3f); // a bite into the wall
             case Audio::Sfx::Grab: return tone(Wave::Noise, 500.f, 250.f, 0.06f, 0.002f, 0.05f, 0.18f);    // a hand slapping rock
+            case Audio::Sfx::Crack: return tone(Wave::Noise, 2400.f, 900.f, 0.1f, 0.001f, 0.08f, 0.22f);  // stone starting to give
+            case Audio::Sfx::Crumble: return tone(Wave::Noise, 260.f, 60.f, 0.45f, 0.005f, 0.35f, 0.3f);  // and going
+            case Audio::Sfx::CloudPuff: return tone(Wave::Noise, 700.f, 300.f, 0.35f, 0.08f, 0.25f, 0.1f); // a cloud thinning
+            case Audio::Sfx::IcicleShake: return tone(Wave::Sine, 2600.f, 2500.f, 0.3f, 0.002f, 0.2f, 0.12f, 0.f, {0, 3, 0, 3, 0, 3});
+            case Audio::Sfx::Shatter: return tone(Wave::Noise, 5000.f, 1800.f, 0.3f, 0.001f, 0.25f, 0.24f, 0.f, {0, 7, 0, 5});
+            case Audio::Sfx::LampLit: return tone(Wave::Triangle, 330.f, 660.f, 0.5f, 0.01f, 0.35f, 0.26f, 0.25f, {0, 7, 12});
+            case Audio::Sfx::Buy: return tone(Wave::Square, 1318.f, 1318.f, 0.3f, 0.002f, 0.15f, 0.18f, 0.f, {0, 5, 12});
+            case Audio::Sfx::RaceGo: return tone(Wave::Square, 523.f, 523.f, 0.35f, 0.002f, 0.12f, 0.22f, 0.f, {0, 0, 12});
+            case Audio::Sfx::RaceTick: return tone(Wave::Square, 1046.f, 1046.f, 0.05f, 0.001f, 0.03f, 0.12f);
+            case Audio::Sfx::RaceLost: return tone(Wave::Saw, 330.f, 160.f, 0.6f, 0.005f, 0.3f, 0.22f, 0.f, {0, -1, -3, -5});
             case Audio::Sfx::Count: break;
         }
         return {};
+    }
+
+    // A loop that goes on: noise, smoothed until it's the wind or the roar of heat, its loudness
+    // swelling and falling, so the end runs back into the start without a seam.
+    std::vector<sf::Int16> loopSamples(Audio::Loop loop)
+    {
+        const bool wind = loop == Audio::Loop::Wind;
+        const float seconds = wind ? 6.f : 3.f;
+        const size_t count = static_cast<size_t>(seconds * synth::RATE);
+        std::vector<sf::Int16> out(count);
+        unsigned seed = wind ? 12345u : 777u;
+        float low = 0.f, lower = 0.f;
+        for (size_t i = 0; i < count; ++i) {
+            seed = seed * 1664525u + 1013904223u;
+            const float white = static_cast<float>(seed >> 8) / 8388608.f - 1.f;
+            const float t = static_cast<float>(i) / count;  // 0 to 1, round the loop
+            const float pi2 = 6.2831853f;
+            float v;
+            if (wind) {
+                // How bright the wind is rises and falls with its gusts.
+                const float gust = 0.55f + 0.3f * std::sin(pi2 * t) + 0.15f * std::sin(pi2 * 3.f * t + 1.f);
+                low += (white - low) * (0.02f + 0.05f * gust);
+                lower += (low - lower) * 0.3f;
+                v = lower * 1.1f * gust;
+            } else {
+                low += (white - low) * 0.012f;
+                lower += (low - lower) * 0.05f;
+                // A low roar, and now and then a crackle.
+                v = lower * 2.2f * (0.8f + 0.2f * std::sin(pi2 * 2.f * t));
+                if ((seed & 0xfff) < 3) v += white * 0.25f;
+            }
+            out[i] = static_cast<sf::Int16>(std::clamp(v, -1.f, 1.f) * 20000.f);
+        }
+        return out;
     }
 
     sf::SoundBuffer buffer(const std::vector<sf::Int16>& samples)
@@ -68,6 +113,12 @@ std::vector<std::string> Audio::songNames()
 Audio::Audio()
 {
     for (int s = 0; s < static_cast<int>(Sfx::Count); ++s) effects[static_cast<Sfx>(s)] = buffer(synth::render(effect(static_cast<Sfx>(s))));
+    for (size_t l = 0; l < loops.size(); ++l) {
+        loops[l].buffer = buffer(loopSamples(static_cast<Loop>(l)));
+        loops[l].sound.setBuffer(loops[l].buffer);
+        loops[l].sound.setLoop(true);
+        loops[l].sound.setVolume(0.f);
+    }
     music.setLoop(true);
     // The songs: a few seconds of work, so not holding up the start.
     maker = std::thread([this] {
@@ -94,6 +145,7 @@ Audio::~Audio()
     music.stop();
     fadingOut.stop();
     for (auto& voice : voices) voice.stop();
+    for (auto& loop : loops) loop.sound.stop();
 }
 
 void Audio::setVolumes(int musicLevel, int soundLevel)
@@ -102,15 +154,20 @@ void Audio::setVolumes(int musicLevel, int soundLevel)
     soundVolume = 10.f * static_cast<float>(std::clamp(soundLevel, 0, 10));
 }
 
-void Audio::play(Sfx sound, float pitch)
+void Audio::play(Sfx sound, float pitch, float volume)
 {
-    if (soundVolume <= 0.f) return;
+    if (soundVolume <= 0.f || volume <= 0.01f) return;
     sf::Sound& voice = voices[nextVoice];
     nextVoice = (nextVoice + 1) % voices.size();
     voice.setBuffer(effects[sound]);
     voice.setPitch(pitch);
-    voice.setVolume(soundVolume);
+    voice.setVolume(soundVolume * std::min(volume, 1.f));
     voice.play();
+}
+
+void Audio::setLoop(Loop loop, float level)
+{
+    loops[static_cast<size_t>(loop)].wanted = std::clamp(level, 0.f, 1.f);
 }
 
 void Audio::playMusic(const std::string& name)
@@ -147,4 +204,12 @@ void Audio::update(float dt)
     music.setVolume(musicVolume * fade);
     fadingOut.setVolume(musicVolume * (1.f - fade) * (fadingOut.getStatus() == sf::Sound::Playing ? 1.f : 0.f));
     if (fade >= 1.f) fadingOut.stop();
+    // The loops ease towards how loud they're wanted, and only play while they can be heard.
+    for (Looping& loop : loops) {
+        loop.level += (loop.wanted - loop.level) * std::min(1.f, dt * 3.f);
+        const float volume = soundVolume * loop.level * 0.6f;
+        if (volume > 0.5f && loop.sound.getStatus() != sf::Sound::Playing) loop.sound.play();
+        if (volume <= 0.5f && loop.sound.getStatus() == sf::Sound::Playing) loop.sound.pause();
+        loop.sound.setVolume(volume);
+    }
 }

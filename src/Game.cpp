@@ -165,20 +165,55 @@ void Game::enterRoom(size_t index, Level::Side side)
 
 void Game::finishGame()
 {
-    // The ending that fits the story so far: assets/dialogue/endings.txt.
-    ending.clear();
+    credits.clear();
+    creditsTime = 0.f;
+    const auto facts = [this](const std::string& f) { return hasFact(f); };
+    auto say = [&](const Conversation& c, sf::Color color) {
+        for (const DialogueStep& step : c.steps) {
+            if (step.kind == DialogueStep::Kind::Line) credits.emplace_back(step.text, color);
+        }
+    };
     try {
-        const Dialogue endings = Dialogue::load("endings");
+        // The ending that fits the story so far: the first one.
+        const Dialogue endings = Dialogue::load("endings"), epilogue = Dialogue::load("epilogue");
         for (const Conversation& c : endings.conversations()) {
-            if (!Dialogue::allowed(c, [this](const std::string& f) { return hasFact(f); })) continue;
-            for (const DialogueStep& step : c.steps) {
-                if (step.kind == DialogueStep::Kind::Line) ending.push_back(step.text);
-            }
+            if (!Dialogue::allowed(c, facts)) continue;
+            say(c, hud::WHITE);
             break;
         }
+        // And everyone you helped: all of them.
+        bool first = true;
+        for (const Conversation& c : epilogue.conversations()) {
+            if (!Dialogue::allowed(c, facts)) continue;
+            if (first) credits.emplace_back("", hud::WHITE);
+            first = false;
+            say(c, sf::Color(200, 205, 225));
+        }
     } catch (const std::exception&) {
-        // No endings: just the time.
+        // No endings: just the numbers.
     }
+    // How the climb went.
+    int questsDone = 0;
+    for (const catalog::Quest& q : catalog::quests()) questsDone += progress.flags.count(q.done) ? 1 : 0;
+    int notes = 0, notesRead = 0;
+    for (const auto& room : rooms) {
+        for (const Npc& npc : room->npcs()) {
+            if (npc.look != "note") continue;
+            ++notes;
+            notesRead += progress.conversations.count(npc.dialogue + " 0") ? 1 : 0;
+        }
+    }
+    const auto count = [](int n, size_t of) { return std::to_string(n) + "/" + std::to_string(of); };
+    credits.emplace_back("", hud::WHITE);
+    credits.emplace_back(hud::formatTime(progress.playTime) + "   x" + std::to_string(progress.deaths), hud::GREY);
+    if (gemCount() > 0) credits.emplace_back(gemTotal(), hud::GREY);
+    credits.emplace_back("QUESTS " + count(questsDone, catalog::quests().size()) + "   NOTES " + count(notesRead, static_cast<size_t>(notes)) +
+                             "   OUTFITS " + count(static_cast<int>(ownedOutfits().size()), catalog::outfits().size()),
+                         hud::GREY);
+    credits.emplace_back("", hud::WHITE);
+    credits.emplace_back("", hud::WHITE);
+    credits.emplace_back("TETHER", hud::GOLD);
+    credits.emplace_back("THANK YOU FOR CLIMBING", hud::WHITE);
     // The slot carries on from its last bench afterwards, for whatever's left to find.
     progress.finished = true;
     saveProgress();
@@ -419,7 +454,7 @@ void Game::startRace(const std::string& id)
     if (!info) return;
     race = Race{id, info->seconds};
     showMessage("GO!", "GET TO THE FINISH IN " + std::to_string(static_cast<int>(info->seconds)) + " SECONDS");
-    audio.play(Audio::Sfx::Checkpoint);
+    audio.play(Audio::Sfx::RaceGo);
 }
 
 void Game::checkQuestItemsAndRaces(float dt)
@@ -437,7 +472,10 @@ void Game::checkQuestItemsAndRaces(float dt)
         }
     }
     if (!race) return;
+    const float before = race->left;
     race->left -= dt;
+    // The last five seconds tick away.
+    if (race->left > 0.f && race->left <= 5.f && std::ceil(race->left) != std::ceil(before)) audio.play(Audio::Sfx::RaceTick);
     if (auto finish = level->finishAt(box); finish && level->finishes()[*finish].race == race->id) {
         progress.flags.insert("won_" + race->id);
         showMessage("YOU WON!", "WITH " + std::to_string(static_cast<int>(std::ceil(race->left))) + " SECONDS TO SPARE");
@@ -446,7 +484,7 @@ void Game::checkQuestItemsAndRaces(float dt)
         saveProgress();
     } else if (race->left <= 0.f) {
         showMessage("TOO SLOW!", "TALK TO THEM AGAIN TO HAVE ANOTHER GO");
-        audio.play(Audio::Sfx::Death);
+        audio.play(Audio::Sfx::RaceLost);
         race.reset();
     }
 }
@@ -587,10 +625,20 @@ MapScreen::Marks Game::mapMarks() const
     for (size_t room = 0; room < levels.size(); ++room) {
         marks.explored[room] = room == levelIndex || progress.explored.count(levelKey(room)) > 0;
         if (!marks.explored[room]) continue;
+        const sf::Vector2f origin(levels[room].position);
         for (const Pickup& pickup : rooms[room]->pickups()) {
-            if (!hasAbility(pickup.ability)) marks.pickups.push_back(sf::Vector2f(levels[room].position) + pickup.position / Level::TILE_SIZE + sf::Vector2f(0.5f, 0.5f));
+            if (!hasAbility(pickup.ability)) marks.pickups.push_back(origin + pickup.position / Level::TILE_SIZE + sf::Vector2f(0.5f, 0.5f));
+        }
+        for (const QuestItem& item : rooms[room]->questItems()) {
+            if (!progress.flags.count("got_" + item.item)) marks.items.push_back(origin + item.position / Level::TILE_SIZE + sf::Vector2f(0.5f, 0.5f));
+        }
+        for (const Npc& npc : rooms[room]->npcs()) {
+            const sf::Vector2f where = origin + npc.position / Level::TILE_SIZE + sf::Vector2f(0.5f, 0.5f);
+            if (npc.look != "note") marks.people.push_back(where);
+            else if (!progress.conversations.count(npc.dialogue + " 0")) marks.notes.push_back(where);
         }
     }
+    for (const LevelInfo& info : levels) marks.regions.push_back(catalog::regionName(info.region));
     for (const std::string& key : travelDestinations()) {
         const auto [room, bench] = *findBench(key);
         if (key == progress.bench) marks.benchHere = marks.benches.size();
@@ -599,7 +647,9 @@ MapScreen::Marks Game::mapMarks() const
     }
     marks.describe = [this](size_t room) {
         const std::string tally = gemTally(room);
-        return hud::upper(levels[room].title) + (tally.empty() ? "" : "  GEMS " + tally);
+        const std::string region = catalog::regionName(levels[room].region);
+        const std::string title = hud::upper(levels[room].title);
+        return (region.empty() || region == title ? "" : region + ": ") + title + (tally.empty() ? "" : "  GEMS " + tally);
     };
     using A = controls::Action;
     const bool pad = input.usingPad();
@@ -640,6 +690,7 @@ void Game::run()
 void Game::frame(float frameTime, std::optional<PlayerInput> scripted)
 {
     audio.playMusic(songNow());
+    updateLoops();
     audio.update(frameTime);
     // The air: what drifts in it moves along with the camera, at its own depth.
     ambience.setTheme(levels[levelIndex].theme);
@@ -905,6 +956,7 @@ void Game::step(float dt)
 {
     clockTime += dt;
     if (screen == Screen::Complete) {
+        creditsTime += dt;
         // Confetti rains down while the results are up, about 40 bits a second.
         std::uniform_real_distribution<float> unit(0.f, 1.f);
         if (unit(rng) < dt * 40.f) {
@@ -956,6 +1008,7 @@ void Game::step(float dt)
     }
 
     level->update(dt, player->hitbox());
+    playLevelSounds();
     player->update(dt);
     showEffects(player->takeEvents());
 
@@ -1022,6 +1075,49 @@ void Game::killPlayer()
                                        .colors = {sf::Color(251, 242, 54), sf::Color(153, 229, 80), sf::Color(215, 123, 186)}});
 }
 
+void Game::playLevelSounds()
+{
+    constexpr float HEARING = 24.f * Level::TILE_SIZE; // further than this, nothing
+    for (const LevelSound& sound : level->takeSounds()) {
+        const float volume = 1.f - distance(sound.position, player->centre()) / HEARING;
+        if (volume <= 0.f) continue;
+        const float pitch = 0.9f + 0.2f * static_cast<float>(std::rand() % 100) / 100.f;
+        switch (sound.kind) {
+            case LevelSound::Kind::Crack: audio.play(Audio::Sfx::Crack, pitch, volume); break;
+            case LevelSound::Kind::Crumble:
+                audio.play(Audio::Sfx::Crumble, pitch, volume);
+                particles.spawn(sound.position, {.count = 8, .speed = 25.f, .life = 0.6f, .gravity = 200.f,
+                                                 .colors = {sf::Color(120, 100, 90), sf::Color(80, 70, 65)}});
+                break;
+            case LevelSound::Kind::CloudFade: audio.play(Audio::Sfx::CloudPuff, pitch, volume); break;
+            case LevelSound::Kind::IcicleShake: audio.play(Audio::Sfx::IcicleShake, pitch, volume); break;
+            case LevelSound::Kind::IcicleShatter:
+                audio.play(Audio::Sfx::Shatter, pitch, volume);
+                particles.spawn(sound.position, {.count = 10, .speed = 50.f, .life = 0.4f, .gravity = 250.f,
+                                                 .colors = {sf::Color(220, 240, 255), sf::Color(160, 200, 240)}});
+                break;
+        }
+    }
+}
+
+void Game::updateLoops()
+{
+    const bool playing = screen == Screen::Playing || screen == Screen::Talking;
+    // The wind: as strong as the room's, and a breeze anywhere up in the sky.
+    float wind = std::min(1.f, std::abs(level->wind()) / 100.f);
+    if (levels[levelIndex].theme == "sky") wind = std::max(wind, 0.2f);
+    audio.setLoop(Audio::Loop::Wind, playing ? wind : 0.f);
+    // The heat: loud in an updraft, fading over a few tiles away from one.
+    float heat = 0.f;
+    const sf::Vector2f you = player->centre();
+    for (const sf::FloatRect& area : level->updrafts()) {
+        const float dx = std::max({0.f, area.left - you.x, you.x - (area.left + area.width)});
+        const float dy = std::max({0.f, area.top - you.y, you.y - (area.top + area.height)});
+        heat = std::max(heat, 1.f - std::hypot(dx, dy) / (8.f * Level::TILE_SIZE));
+    }
+    audio.setLoop(Audio::Loop::Heat, playing ? heat * 0.8f : 0.f);
+}
+
 void Game::showEffects(const std::vector<PlayerEvent>& events)
 {
     const std::vector<sf::Color> dust = {sf::Color(210, 200, 185, 220), sf::Color(160, 150, 140, 200)};
@@ -1076,7 +1172,7 @@ void Game::showEffects(const std::vector<PlayerEvent>& events)
                     level->setLampLit(static_cast<size_t>(e.index), true);
                     progress.flags.insert(lampKey(levelIndex, static_cast<size_t>(e.index)));
                     saveProgress();
-                    audio.play(Audio::Sfx::Checkpoint);
+                    audio.play(Audio::Sfx::LampLit);
                     particles.spawn(e.position, {.count = 14, .speed = 40.f, .life = 0.5f, .gravity = -20.f, .colors = sparks});
                 }
                 break;

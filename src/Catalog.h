@@ -3,8 +3,9 @@
 #include <string>
 #include <vector>
 
-// What the world holds besides its rooms: things to find for people, quests, races and outfits.
-// Read from assets/quests.txt and assets/outfits.txt (see the notes at the top of each).
+// What the world holds besides its rooms: things to find for people, quests, races, outfits and
+// the regions' names. Read from assets/quests.txt, outfits.txt and regions.txt (see the notes at
+// the top of each).
 namespace catalog
 {
     struct Item
@@ -34,6 +35,12 @@ namespace catalog
         std::string name;
     };
 
+    struct Region
+    {
+        std::string id;    // a room's `region`
+        std::string name;  // "THE SUNKEN RUINS"
+    };
+
     const std::vector<Item>& items();
     const std::vector<Quest>& quests();
     const std::vector<Race>& races();
@@ -41,4 +48,7 @@ namespace catalog
     const Item* item(const std::string& id);
     const Race* race(const std::string& id);
     const Outfit* outfit(const std::string& look);
+    const std::vector<Region>& regions();
+    // The name of a region, or "" if there's no such region.
+    std::string regionName(const std::string& id);
 }

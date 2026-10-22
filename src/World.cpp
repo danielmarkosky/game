@@ -117,6 +117,7 @@ std::vector<LevelInfo> loadWorld(const std::string& ldtkPath)
             info.name = level.at("identifier");
             info.title = field(level.at("fieldInstances"), "title", info.name);
             info.theme = field(level.at("fieldInstances"), "theme", Theme::DEFAULT);
+            info.region = field(level.at("fieldInstances"), "region");
             const int tile = static_cast<int>(Level::TILE_SIZE);
             info.position = {level.at("worldX").get<int>() / tile, (bottom - level.at("worldY").get<int>() - level.at("pxHei").get<int>()) / tile};
             info.level = loadRoom(level);

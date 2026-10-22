@@ -3,10 +3,13 @@
 #include "Hud.h"
 #include <algorithm>
 #include <cmath>
+#include <map>
 
 namespace
 {
     const sf::FloatRect AREA(8.f, 20.f, 304.f, 138.f);
+    const sf::Color PINK(240, 120, 200);  // things to find for people
+    const sf::Color GREEN(150, 230, 120); // people
     constexpr float PAN_SPEED = 120.f; // screen pixels a second, with the arrow keys
     constexpr float HALF_W = config::GAME_WIDTH * 0.5f;
 
@@ -116,6 +119,16 @@ void MapScreen::draw(sf::RenderTarget& target, const Marks& marks, sf::Vector2f 
 {
     hud::dim(target, 215);
     hud::drawCentred(target, travel ? "TRAVEL" : "MAP", HALF_W, 4.f, hud::GOLD, 2.f);
+    // What the marks mean, either side of the title.
+    auto key = [&](float x, sf::Color color, sf::Vector2f size, const std::string& what) {
+        hud::fillRect(target, {x, 11.f - size.y * 0.5f, size.x, size.y}, color);
+        hud::drawText(target, what, {x + size.x + 3.f, 8.f}, hud::GREY);
+    };
+    key(10.f, hud::GOLD, {3.f, 3.f}, "TO PICK UP");
+    key(66.f, PINK, {3.f, 3.f}, "TO FIND");
+    key(207.f, GREEN, {1.f, 2.f}, "SOMEONE");
+    key(244.f, hud::WHITE, {3.f, 2.f}, "NOTE");
+    key(272.f, sf::Color(220, 170, 108), {4.f, 2.f}, "BENCH");
     const WorldMap::View v = view();
     hud::frame(target, AREA, hud::withAlpha(hud::GREY, 90));
     map.draw(target, v);
@@ -125,10 +138,55 @@ void MapScreen::draw(sf::RenderTarget& target, const Marks& marks, sf::Vector2f 
         const sf::Vector2f p = map.toScreen(tile, v);
         return sf::Vector2f(std::round(p.x), std::round(p.y));
     };
-    // Things still to pick up in the rooms you've seen, glinting.
+    // The regions' names, over the part of each you've seen, when the map's far enough out.
+    if (zoomLevel > 1) {
+        std::map<std::string, sf::FloatRect> regions;
+        for (size_t room = 0; room < marks.explored.size() && room < marks.regions.size(); ++room) {
+            if (!marks.explored[room] || marks.regions[room].empty()) continue;
+            const sf::FloatRect r = map.roomRect(room);
+            auto [it, fresh] = regions.try_emplace(marks.regions[room], r);
+            if (!fresh) {
+                sf::FloatRect& all = it->second;
+                const float right = std::max(all.left + all.width, r.left + r.width), top = std::max(all.top + all.height, r.top + r.height);
+                all.left = std::min(all.left, r.left);
+                all.top = std::min(all.top, r.top);
+                all.width = right - all.left;
+                all.height = top - all.top;
+            }
+        }
+        // The biggest first; each over the middle of its region, or nudged up or down out of the
+        // way of the ones already written, or left out if there's no room.
+        std::vector<std::pair<std::string, sf::FloatRect>> order(regions.begin(), regions.end());
+        std::sort(order.begin(), order.end(), [](const auto& a, const auto& b) { return a.second.width * a.second.height > b.second.width * b.second.height; });
+        std::vector<sf::FloatRect> written;
+        for (const auto& [name, area] : order) {
+            const sf::Vector2f middle = at({area.left + area.width * 0.5f, area.top + area.height * 0.5f});
+            const float width = hud::textWidth(name);
+            for (float nudge : {0.f, -8.f, 8.f, -16.f, 16.f}) {
+                const sf::FloatRect label(middle.x - width * 0.5f - 2.f, middle.y - 4.f + nudge, width + 4.f, 8.f);
+                if (std::any_of(written.begin(), written.end(), [&](const sf::FloatRect& w) { return w.intersects(label); })) continue;
+                written.push_back(label);
+                hud::drawCentred(target, name, middle.x + 1.f, label.top + 2.f, sf::Color(0, 0, 0, 220));
+                hud::drawCentred(target, name, middle.x, label.top + 1.f, hud::withAlpha(hud::WHITE, 190));
+                break;
+            }
+        }
+    }
+    // Things still to pick up in the rooms you've seen, glinting; things to find for people; people
+    // and Ash's notes.
     const bool bright = std::fmod(time, 0.8f) < 0.4f;
     for (const sf::Vector2f& pickup : marks.pickups) {
         hud::fillRect(target, {at(pickup).x - 1.f, at(pickup).y - 1.f, 3.f, 3.f}, bright ? sf::Color(255, 246, 200) : hud::GOLD);
+    }
+    for (const sf::Vector2f& item : marks.items) {
+        hud::fillRect(target, {at(item).x - 1.f, at(item).y - 1.f, 3.f, 3.f}, bright ? sf::Color(255, 200, 240) : PINK);
+    }
+    for (const sf::Vector2f& person : marks.people) {
+        hud::fillRect(target, {at(person).x - 1.f, at(person).y - 2.f, 3.f, 4.f}, sf::Color(0, 0, 0, 160));
+        hud::fillRect(target, {at(person).x, at(person).y - 1.f, 1.f, 2.f}, GREEN);
+    }
+    for (const sf::Vector2f& note : marks.notes) {
+        hud::fillRect(target, {at(note).x - 1.f, at(note).y - 1.f, 3.f, 2.f}, hud::WHITE);
     }
     // The benches you've sat on, and in travel mode the one you'd go to, framed.
     for (size_t ii = 0; ii < marks.benches.size(); ++ii) {

@@ -116,20 +116,29 @@ Each part of the world has its own look and its own music: the cave, the garden,
 snowy mountains, the frost caves, the ember chimney, the sky and the daylight. Coming into a room, the first place you land
 is your checkpoint, until you reach a flag.
 
-**People.** Wren at the top of the crevasse, by The Cave's bench, Pip the mapmaker in the Crossroads, Moss in the Archive,
-Juniper at The Summit's camp, and at the very top, Ash. A bubble over someone means you're close
+**People.** Wren at the top of the crevasse, by The Cave's bench, Pip the mapmaker in the Crossroads,
+Tuck at the Market, Moss in the Archive, Bramble in the Greenhouse, Juniper at The Summit's camp,
+Pell at the Frost Camp, Cinder at the Forge, and at the very top, Ash. A bubble over someone means you're close
 enough to talk. Some conversations let you choose what to say, and what you choose, like what you've
 found, changes what people say later, and how the story ends. Their lines are text files in
 `assets/dialogue/`, see [its README](assets/dialogue/README.md).
 
-**Gems.** 26 of them, two in most rooms: high under ceilings, beside spikes, low in a pit you can only
+**Gems.** 49 of them, one or two in most rooms and three in each challenge room: high under ceilings, beside spikes, low in a pit you can only
 touch with a swing, tucked into the walls. Some are in sight long before you can reach them. Gems
 you've found stay behind as faint ghosts; the count shows when you find one and while paused, and
 the map shows each room's.
 
 **The map** shows every room you've been in, in its own colours, with you blinking on it: spikes
-red, platforms brown, hook blocks steel, flags green, what's still to pick up glinting gold, and the
-benches you've sat on.
+red, platforms brown, hook blocks steel, flags green, what's still to pick up glinting gold, things
+to find for people in pink, people, Ash's notes you haven't read, and the benches you've sat on.
+Zoomed out, each region's name is written over it.
+
+**Sounds** warn you before the danger: stone cracks before it crumbles, an icicle rattles before it
+falls. You hear the wind where it blows and the roar of heat near an updraft, and the last five
+seconds of a race tick away.
+
+**The end.** What you say to Ash decides how the story ends; then the end screen rolls up what
+became of everyone you helped on the way, and how your climb went.
 
 **Benches**, like in Hollow Knight, are where the game is saved: sit on one and it glows, and choosing
 your slot again puts you back on it. Sitting on a bench, M opens the map to travel to any other bench

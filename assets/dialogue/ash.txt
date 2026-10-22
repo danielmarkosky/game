@@ -31,6 +31,24 @@ set ash_letgo
 set ash_answered
 -> end
 
+# Once you've answered: what she says about the people you met on the way, once each.
+
+--- ash_answered gave_lantern
+Ash: That's Wren's lantern on your belt? She dropped it down the Deep, the day she pulled me out of it.
+Ash: She never once mentioned it. That's Wren.
+
+--- ash_answered gave_page
+Ash: You found Moss's last page? She read me that book a hundred times, hoping it would end some other way.
+
+--- ash_answered won_garden
+Ash: You beat Bramble to Curtains? I tried for a week. Don't tell her I said so.
+
+--- ash_answered gave_lure
+Ash: Pell's lure! Was it the crow? It's always the crow.
+
+--- ash_answered won_chimney
+Ash: Cinder told me nobody would ever beat my time up the Chimney. Ha!
+
 --- ash_home
 Ash: Come on. The way out is just above us.
 
