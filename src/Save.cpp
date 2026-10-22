@@ -148,6 +148,13 @@ Progress Progress::parse(const std::string& text)
         } else if (key == "flag") {
             std::string flag;
             if (words >> flag) p.flags.insert(flag);
+        } else if (key == "item" || key == "outfit") {
+            std::string name;
+            if (words >> name) (key == "item" ? p.items : p.outfits).insert(name);
+        } else if (key == "wearing") {
+            words >> p.wearing;
+        } else if (key == "spent") {
+            words >> p.spent;
         } else if (key == "play_time") {
             words >> p.playTime;
         } else if (key == "deaths") {
@@ -172,6 +179,10 @@ std::string Progress::serialize() const
     for (const auto& gem : gems) out << "gem " << gem << "\n";
     for (const auto& conversation : conversations) out << "talked " << conversation << "\n";
     for (const auto& flag : flags) out << "flag " << flag << "\n";
+    for (const auto& item : items) out << "item " << item << "\n";
+    for (const auto& outfit : outfits) out << "outfit " << outfit << "\n";
+    out << "wearing " << wearing << "\n";
+    out << "spent " << spent << "\n";
     out << "play_time " << playTime << "\n";
     out << "deaths " << deaths << "\n";
     out << "finished " << finished << "\n";

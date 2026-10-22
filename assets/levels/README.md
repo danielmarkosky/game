@@ -23,6 +23,9 @@ Each room has two layers, 8 px to a tile:
 | `crystal` | Crystal spikes, same as spikes but pink. The rope goes through them to whatever's behind |
 | `gate` | Solid, until a lever in the same room is pulled: then every gate in the room opens for good |
 | `slick` | Slick, wind-polished stone: solid, but the rope slides off it. For places that mustn't be swung across |
+| `ice` | Solid, and the rope bites it, but you slide on it (slow to start, slower to stop) and hands can't hold it |
+| `crumble` | Cracked stone: it gives way half a second after you stand on it, and comes back a moment later. A rope hooked in it comes loose |
+| `cloud` | A one-way platform that fades from under you after a moment, and comes back |
 
 | Entity | |
 |--------|---|
@@ -31,7 +34,13 @@ Each room has two layers, 8 px to a tile:
 | `Goal` | Touching it finishes the game (optional) |
 | `Pickup` | Gives an ability: its `ability` field says which: `rope` (Ash's rope), `long_rope`, `wall_climb` (the chalk bag), `air_throw` (the throwing hand) or `double_jump` (the updraft feather). Abilities only come from these |
 | `Gem` | A gem, to collect. It can float in the air: touching it is enough |
-| `Lever` | Pulling it (W next to it) opens the room's gates, and the save remembers |
+| `Lever` | Pulling it (W next to it, or a rope thrown at it) opens the room's gates, and the save remembers |
+| `Lamp` | A lantern hanging from the top of its tile, unlit: a rope thrown at it lights it, for good. For dark rooms |
+| `Icicle` | Hangs from the top of its tile; shakes when you go under it, falls, grows back |
+| `Updraft` | Heat rising from its tile, two tiles wide, up to the first rock: it lifts you |
+| `Ring` | A hook ring sliding to and fro: `to` is where its track ends, "dx,dy" in tiles right and up; `period` the seconds there and back. The rope catches it and goes where it goes |
+| `Item` | Something to find for someone: `item` is one in [`assets/quests.txt`](../quests.txt) |
+| `Finish` | Where a race ends: `race` is one in `assets/quests.txt` |
 | `Bench` | Two tiles wide: sitting on it saves, and from it you can travel to any other bench sat on. Both tiles need ground under them |
 | `Npc` | Someone to talk to, standing on the bottom of the tile. `dialogue` names their file in [`assets/dialogue/`](../dialogue/README.md), `look` the player skin they wear |
 | `Prop` | Scenery: its `kind` is a prop in [`assets/gfx/props.txt`](../gfx/props.txt) (a cold fire, a tent, bookshelves, braziers, a signal fire...). It stands on the bottom of its tile, or hangs from its top (banners, vines, chains, lanterns, icicles). Some glow, some flicker. `light_shaft` is a shaft of light falling from its tile to the ground below. Nothing to touch: it's only looks |
@@ -77,9 +86,17 @@ Each character of a text room is one tile, and the first line is the top of the 
 | `^` | spikes | `P` | Pickup (`rope` unless rooms.txt says otherwise) |
 | `x` | crystal spikes | `*` | Gem |
 | `=` | gate | `L` | Lever |
-| `o` | slick stone | | |
+| `o` | slick stone | `Q` | Lamp |
+| `~` | ice | `Y` | Icicle |
+| `&` | crumbling stone | `U` | Updraft |
+| `_` | cloud | `R` | Ring (6 tiles right, 4 s, unless rooms.txt says otherwise) |
 | `.` | empty | `N` | Npc (its fields in rooms.txt) |
 | | | `B` | Bench |
+| | | `D` | Prop, `I` Item, `F` Finish (their fields in rooms.txt) |
+
+Rooms can be windy (`wind`, pixels a second each second, + to the right, on anything in the air)
+and dark (`dark` 1: nothing to see but what's lit, the player's own little light and lamps).
+rooms.txt gives them as `room <name> wind=-70 dark=1`; in LDtk they're the room's fields.
 
 `rooms.txt` lists the rooms in order: a `theme <name>` line sets the theme of the rooms below it,
 then each room is its file name, its position on the map (in tiles, of its bottom-left tile, x to

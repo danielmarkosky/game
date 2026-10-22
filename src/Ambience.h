@@ -32,6 +32,9 @@ public:
     void drawNear(sf::RenderTarget& target) const;
     // Darkens the edges by how dark the place is, then lets the lights shine through.
     void drawLight(sf::RenderTarget& target, const std::vector<Light>& lights) const;
+    // A dark room: nothing to see but what's lit.
+    void setDark(bool dark);
+    bool isDark() const;
     // How dark the theme is: 0 bright daylight, 1 pitch black.
     float darkness() const;
 
@@ -64,4 +67,6 @@ private:
     std::mt19937 rng{11};
     sf::Texture vignette; // black, see-through in the middle
     sf::Texture glow;     // a soft white spot
+    bool dark = false;
+    mutable sf::RenderTexture lightMap; // in a dark room: the dark, with the lights cut out of it
 };

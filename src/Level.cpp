@@ -11,14 +11,8 @@
 
 namespace
 {
-    // Tile ids in the tile map.
-    constexpr int TILE_METAL = 1;    // '%'
-    constexpr int TILE_ROCK = 2;     // '#'
-    constexpr int TILE_CRYSTAL = 3;  // 'x'
-    constexpr int TILE_SPIKES = 4;   // '^'
-    constexpr int TILE_PLATFORM = 5; // '-'
-    constexpr int TILE_GATE = 6;     // '='
-    constexpr int TILE_SLICK = 7;    // 'o'
+    // The tiles in text: '%' metal, '#' rock, 'x' crystal, '^' spikes, '-' platform, '=' gate,
+    // 'o' slick, '~' ice, '&' crumbling, '_' cloud (see Level::TILE_ROCK and the rest).
 
     // Where things are in the sprite sheets made by tools/make_art.py.
     namespace sheet
@@ -42,6 +36,9 @@ namespace
         constexpr int HOOK_BLOCK = 23;
         constexpr int GATE = 24;
         constexpr int SLICK = 25;
+        constexpr int ICE = 26;
+        constexpr int CRUMBLE = 27;
+        constexpr int CLOUD = 28;
 
         // assets/gfx/objects.png, 8x24 frames.
         constexpr int OBJECT_WIDTH = 8;
@@ -196,6 +193,15 @@ std::shared_ptr<Level> Level::fromRows(const std::vector<std::string>& rows)
                 case '-': level->m_tileMap[x][y] = TILE_PLATFORM; break;
                 case '=': level->m_tileMap[x][y] = TILE_GATE; break;
                 case 'o': level->m_tileMap[x][y] = TILE_SLICK; break;
+                case '~': level->m_tileMap[x][y] = TILE_ICE; break;
+                case '&': level->m_tileMap[x][y] = TILE_CRUMBLE; break;
+                case '_': level->m_tileMap[x][y] = TILE_CLOUD; break;
+                case 'Y': level->addIcicle({x, y}); break;
+                case 'U': level->addUpdraft({x, y}); break;
+                case 'Q': level->addLamp({x, y}); break;
+                case 'R': level->addRing({x, y}, {x + 6, y}, 4.f); break;
+                case 'I': level->addQuestItem("", {x, y}); break;
+                case 'F': level->addFinish("", {x, y}); break;
                 case 'L': level->addLever({x, y}); break;
                 case 'S': level->setStart({x, y}); break;
                 case 'C': level->addCheckpoint({x, y}); break;
@@ -392,6 +398,20 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
                 drawTile(first + static_cast<int>(spikeDir(*this, x, y)), x, y);
             } else if (tile == TILE_SLICK) {
                 drawTile(sheet::SLICK, x, y);
+            } else if (tile == TILE_ICE) {
+                drawTile(sheet::ICE, x, y);
+            } else if (tile == TILE_CRUMBLE || tile == TILE_CLOUD) {
+                // Shaking as it goes, gone for a while, then back.
+                const Crumbling* state = crumbling(x, y);
+                if (state && state->gone > 0.f) continue;
+                const float shake = state && state->stood > 0.f ? std::round(std::sin(state->stood * 60.f)) : 0.f;
+                auto pos = viewCoordinates(sf::Vector2f(x * TILE_SIZE + shake, (y + 1) * TILE_SIZE), centr);
+                const int index = tile == TILE_CRUMBLE ? sheet::CRUMBLE : sheet::CLOUD;
+                sprite.setTextureRect(sf::IntRect((index % sheet::COLUMNS) * size, (index / sheet::COLUMNS) * size, size, size));
+                sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
+                if (tile == TILE_CLOUD && state && state->stood > 0.f) sprite.setColor(sf::Color(255, 255, 255, 150));
+                target.draw(sprite);
+                sprite.setColor(sf::Color::White);
             } else if (tile == TILE_GATE) {
                 if (!m_gatesOpen) drawTile(sheet::GATE, x, y);
             } else if (tile == TILE_PLATFORM) {
@@ -500,7 +520,11 @@ bool Level::isHookBlock(int x, int y) const
 bool Level::isSolid(int x, int y) const
 {
     int tile = this->tileAt(x, y);
-    return tile == TILE_ROCK || tile == TILE_METAL || tile == TILE_SLICK || (tile == TILE_GATE && !m_gatesOpen);
+    if (tile == TILE_CRUMBLE) {
+        const Crumbling* state = crumbling(x, y);
+        return !state || state->gone <= 0.f;
+    }
+    return tile == TILE_ROCK || tile == TILE_METAL || tile == TILE_SLICK || tile == TILE_ICE || (tile == TILE_GATE && !m_gatesOpen);
 }
 
 bool Level::isDangerous(int x, int y) const
@@ -511,7 +535,12 @@ bool Level::isDangerous(int x, int y) const
 
 bool Level::isPlatform(int x, int y) const
 {
-    return tileAt(x, y) == TILE_PLATFORM;
+    const int tile = tileAt(x, y);
+    if (tile == TILE_CLOUD) {
+        const Crumbling* state = crumbling(x, y);
+        return !state || state->gone <= 0.f;
+    }
+    return tile == TILE_PLATFORM;
 }
 
 bool Level::isOnPlatform(sf::Vector2f feet, float width) const
@@ -528,6 +557,11 @@ bool Level::isEmptySpace(sf::Vector2f pos, float height, float width) const
 
 bool Level::isDangerousSpace(sf::Vector2f pos, float height, float width) const
 {
+    // Icicles, hanging or falling: their sharp end.
+    for (const Icicle& icicle : m_icicles) {
+        if (icicle.state == Icicle::State::Gone) continue;
+        if (overlaps(pos, height, width, {icicle.tip.x - 2.f, icicle.tip.y, 4.f, 8.f})) return true;
+    }
     // Only the spikes themselves hurt, not the empty part of their tile.
     return anyTileIn(pos, height, width, [&](int x, int y) {
         return isDangerous(x, y) && overlaps(pos, height, width, spikeArea(x, y, spikeDir(*this, x, y)));

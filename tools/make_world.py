@@ -25,6 +25,7 @@ class Room:
         self.g = [['.'] * w for _ in range(h)]
         self.doors = {}   # side -> [(start, length)]
         self.fields = {}  # (x, y) -> {field: value}
+        self.settings = {}  # wind, dark: see tools/rooms.py
         self.fill(0, w - 1, 0, 0, '#')
         self.fill(0, w - 1, h - 1, h - 1, '#')
         self.fill(0, 0, 0, h - 1, '#')
@@ -125,6 +126,7 @@ d = room('crevasse_camp', 'The Crevasse', 'cave', 48, 24)
 ground(d, 4)
 d.fill(0, 13, 13, 23, '#').fill(14, 47, 19, 23, '#')
 d.put(9, 5, 'P', ability='rope')                          # Ash's rope, in her old camp
+d.put(15, 5, 'N', dialogue='note_crevasse', look='note')  # and a note, the first of hers
 pit(d, 17, 23, 1, 4, spikes=False)
 d.fill(17, 17, 1, 2, '#')                                  # a step back out
 d.fill(24, 47, 5, 5, '#')                                  # the far side, a tile higher
@@ -180,6 +182,7 @@ for x, y in hooks:
     well.put(x, y, '%')
 well.put(20, 22, '*')
 well.door('T', 3)
+well.fill(20, 23, 1, 4, '.').fill(20, 23, 1, 1, '-').door('B', 20)  # down into The Deep, and a step to come back up onto
 well.put(3, 5, 'S')
 
 # ----------------------------------------------------------------------------------------------
@@ -241,6 +244,7 @@ for x0, x1, top in [(22, 34, 9), (4, 16, 14), (22, 34, 19), (6, 14, 23)]:
 for x, y in [(20, 12), (19, 17), (20, 22), (17, 26)]:
     archive.put(x, y, '%')
 archive.put(9, 24, 'P', ability='wall_climb')
+archive.put(28, 10, 'N', dialogue='note_ruins', look='note')
 archive.put(30, 21, '*')
 
 # ----------------------------------------------------------------------------------------------
@@ -273,6 +277,7 @@ curtains.fill(42, 55, 0, 4, '#')
 curtains.fill(42, 43, 5, 10, 'o').fill(54, 54, 1, 27, 'o')
 curtains.fill(44, 53, 1, 4, '#')
 curtains.put(50, 5, 'P', ability='long_rope')
+curtains.put(47, 5, 'F', race='garden')                       # where Bramble's race ends
 curtains.fill(42, 55, 20, 27, 'o').fill(48, 48, 18, 19, 'o').put(48, 17, '%')
 curtains.put(28, 13, '*')
 curtains.put(3, 5, 'S')
@@ -307,17 +312,19 @@ summit.put(20, 5, 'N', dialogue='juniper', look='juniper')
 summit.put(24, 5, 'L')
 summit.fill(27, 30, 1, 3, '.').fill(27, 30, 4, 4, '=').door('B', 27)  # the gate over the Drop
 # A narrow chimney up to the throwing hand: climb it, throw from the wall.
-# A chimney, rock inside and slick outside, up to the glove: leap from wall to wall.
+# A chimney, rock inside and slick outside, to a gem at the top: leap from wall to wall.
 summit.fill(34, 34, 8, 21, 'o').fill(35, 35, 8, 21, '#').fill(39, 39, 8, 21, '#').fill(40, 40, 8, 21, 'o')
 summit.fill(34, 40, 22, 33, '#')
-summit.put(37, 19, 'P', ability='air_throw')
+summit.put(37, 19, '*')
+# West, the Frost Caves: up a short wall only hands can climb (its top is slick), to a door.
+summit.fill(1, 10, 13, 13, 'o').fill(10, 10, 8, 12, '#').door('L', 14)
 # The way on: up a slick cliff, by a hook too high to throw to from the ground, but not from the top
 # of a jump.
 summit.fill(50, 62, 1, 15, 'o')
 summit.put(47, 19, '%').put(48, 19, '%')
 summit.fill(42, 62, 24, 32, 'o')
 summit.door('R', 16)
-summit.put(36, 5, '*')
+summit.put(30, 9, '*')
 
 stones = room('level6', 'Stepping Stones', 'snow', 60, 28)
 ground(stones, 4)
@@ -341,6 +348,7 @@ chimney.fill(1, 6, 9, 44, '#').fill(11, 16, 5, 44, '#')      # rock walls, a nar
 for x0, x1, y in [(4, 6, 13), (11, 13, 21), (4, 6, 29), (11, 13, 37)]:
     chimney.fill(x0, x1, y, y + 3, '.')
 chimney.put(12, 22, '*')
+chimney.put(13, 37, 'F', race='chimney')                      # where Cinder's race ends
 chimney.door('T', 7)
 chimney.put(3, 5, 'S')
 
@@ -359,18 +367,19 @@ pendulums.fill(54, 59, 0, 4, '#')
 pendulums.put(35, 9, '*')
 pendulums.door('R', 5)
 
-backtrack = room('level9', 'Backtrack', 'daylight', 52, 30)
+backtrack = room('level9', 'Backtrack', 'sky', 52, 30)
+backtrack.settings['wind'] = '40'                             # out in the wind now, at your back
 ground(backtrack, 4)
 backtrack.door('L', 5)
 backtrack.fill(30, 50, 5, 14, '#')
 backtrack.fill(30, 30, 5, 14, '#')
 backtrack.fill(22, 22, 18, 29, '#').put(22, 17, '%')
-backtrack.put(44, 15, 'P', ability='double_jump')
+backtrack.put(44, 15, '*')
 backtrack.door('R', 15)
 backtrack.put(22, 12, '*')
 backtrack.put(4, 5, 'S')
 
-windy = room('windy_ledge', 'The Windy Ledge', 'daylight', 56, 30)
+windy = room('windy_ledge', 'The Windy Ledge', 'sky', 56, 30)
 windy.fill(0, 55, 0, 14, 'o')
 windy.door('L', 15)
 pit(windy, 12, 17, 1, 14)
@@ -391,6 +400,284 @@ for x, y in [(27, 13), (27, 19), (27, 25), (27, 31)]:
     daylight.put(x, y, '%')
 daylight.door('T', 18)
 daylight.put(6, 15, 'S')
+
+
+# ----------------------------------------------------------------------------------------------
+# The Deep, below the Well: a challenge. Crumbling stones over spikes to Wren's lost lantern, and a
+# ladder of shelves back up.
+# ----------------------------------------------------------------------------------------------
+
+deep = room('the_deep', 'The Deep', 'cave', 40, 30)
+ground(deep, 4)
+deep.door('T', 2)
+for x0, x1, top in [(12, 18, 9), (1, 8, 14), (12, 18, 19), (1, 8, 25)]:
+    deep.fill(x0, x1, top - 1, top, '#')
+for x, y in [(10, 12), (10, 17), (10, 22), (10, 28)]:
+    deep.put(x, y, '%')
+pit(deep, 21, 32)
+for x0, y in [(21, 10), (25, 11), (29, 12)]:
+    deep.fill(x0, x0 + 1, y, y, '&')
+deep.fill(33, 38, 1, 12, '#')
+deep.put(36, 13, 'I', item='wren_lantern')
+deep.put(28, 16, '%')
+deep.put(23, 14, '*').put(31, 16, '*').put(34, 13, '*')
+deep.put(4, 5, 'S')
+
+# ----------------------------------------------------------------------------------------------
+# The Market, between the Crossroads and the garden: Tuck's stall.
+# ----------------------------------------------------------------------------------------------
+
+market = room('market', 'The Market', 'garden', 40, 22)
+ground(market, 4)
+market.door('L', 5).door('R', 5)
+market.put(14, 5, 'B').put(24, 5, 'N', dialogue='tuck', look='tuck')
+market.fill(28, 33, 5, 7, '#')
+market.put(31, 8, '*')
+market.put(3, 5, 'S')
+
+# ----------------------------------------------------------------------------------------------
+# More of the ruins: the Lever Works (a gate the rope opens, through a slit), the Dark Stair (lamps
+# the rope lights), and the Vault, up a chimney only hands can climb.
+# ----------------------------------------------------------------------------------------------
+
+works = room('lever_works', 'The Lever Works', 'ruins', 48, 26)
+ground(works, 4); roof(works, 18)
+works.door('L', 5).door('R', 5)
+works.fill(20, 21, 5, 17, '=').put(20, 6, '.').put(21, 6, '.')  # a gate with a slit the rope fits through, you don't
+works.fill(17, 18, 5, 5, '#').put(18, 6, 'L')                    # the lever behind it, on a step
+works.fill(23, 27, 5, 5, '#')                                     # a step to throw from, on this side
+works.fill(40, 40, 8, 25, '#').fill(44, 44, 8, 25, '#').fill(41, 43, 18, 25, '.').door('T', 41, 3)  # the chimney up to the Vault
+works.fill(41, 43, 13, 13, '-').fill(41, 43, 19, 19, '-')  # ledges to rest on: the grip only lasts so long
+works.put(8, 8, '*')
+works.put(44, 5, 'S')
+
+stair = room('dark_stair', 'The Dark Stair', 'ruins', 40, 34)
+stair.settings['dark'] = '1'
+ground(stair, 4)
+stair.fill(28, 38, 1, 24, '#').door('R', 25).door('L', 5)
+for x0, x1, top in [(15, 24, 9), (1, 10, 14), (15, 24, 19)]:
+    stair.fill(x0, x1, top - 1, top, '#')
+pit(stair, 25, 27)
+for x, y in [(13, 12), (12, 17), (13, 22), (26, 27)]:
+    stair.put(x, y, '%')
+for x, y in [(5, 12), (20, 13), (5, 22), (20, 25), (33, 30)]:
+    stair.put(x, y, 'Q')
+stair.put(8, 18, '*')
+stair.put(34, 25, 'S')
+
+vault = room('the_vault', 'The Vault', 'ruins', 36, 24)
+vault.settings['dark'] = '1'
+ground(vault, 4)
+vault.door('B', 1, 3).fill(1, 3, 1, 4, '.').fill(1, 3, 1, 1, '-')
+pit(vault, 11, 30)
+for x0, y in [(13, 5), (18, 6), (23, 7)]:
+    vault.fill(x0, x0 + 1, 1, y, '&')
+vault.fill(28, 34, 1, 7, '#')
+vault.put(20, 15, '%')
+for x, y in [(16, 14), (26, 14), (6, 12)]:
+    vault.put(x, y, 'Q')
+vault.put(31, 8, '*').put(20, 11, '*').put(33, 8, '*')
+vault.put(7, 5, 'S')
+
+# ----------------------------------------------------------------------------------------------
+# More of the garden: rings moving on tracks, the Greenhouse (Bramble, a bench, a race), the
+# Trellis (a ring that lifts you), and the Thorn Walk above, a challenge.
+# ----------------------------------------------------------------------------------------------
+
+rings = room('garden_rings', 'The Ring Garden', 'garden', 48, 26)
+ground(rings, 4); roof(rings, 20)
+rings.door('L', 5).door('R', 5)
+pit(rings, 8, 38)
+rings.fill(21, 24, 1, 5, '#')
+rings.put(12, 11, 'R', to='6,0', period='4').put(28, 11, 'R', to='6,0', period='5')
+rings.put(23, 10, '*')
+rings.put(3, 5, 'S')
+
+green = room('greenhouse', 'The Greenhouse', 'garden', 40, 24)
+ground(green, 4)
+green.door('L', 5).door('R', 5)
+green.put(8, 5, 'B').put(14, 5, 'N', dialogue='bramble', look='bramble')
+green.put(20, 5, 'N', dialogue='note_garden', look='note')
+for x0, x1, top in [(24, 30, 9), (32, 38, 14), (24, 30, 19)]:
+    green.fill(x0, x1, top - 1, top, '#')
+for x, y in [(22, 12), (30, 17), (32, 22)]:
+    green.put(x, y, '%')
+green.door('T', 25)
+green.put(3, 5, 'S')
+
+trellis = room('trellis', 'The Trellis', 'garden', 48, 26)
+ground(trellis, 4)
+trellis.door('L', 5).door('R', 5)
+trellis.fill(22, 25, 5, 11, 'o')                              # too high to jump, and the rope slides off it
+trellis.put(18, 7, 'R', to='0,12', period='5').put(29, 7, 'R', to='0,12', period='5')  # rings that lift you
+trellis.put(23, 14, '*')
+trellis.put(3, 5, 'S')
+
+thorn = room('thorn_walk', 'The Thorn Walk', 'garden', 40, 26)
+ground(thorn, 4)
+thorn.door('B', 25).fill(25, 28, 1, 4, '.').fill(25, 28, 1, 1, '-')
+pit(thorn, 4, 22)
+thorn.fill(1, 3, 1, 8, '#')
+thorn.put(19, 10, 'R', to='-4,0', period='3').put(12, 11, 'R', to='0,4', period='3.5').put(6, 12, 'R', to='-3,0', period='3')
+thorn.put(17, 8, '*').put(11, 13, '*').put(2, 9, '*')
+thorn.put(34, 5, 'S')
+
+# ----------------------------------------------------------------------------------------------
+# The Frost Caves, west of the Summit: ice to slide on, icicles that fall. Pell's camp, and at
+# the end Ash's frozen camp, with her throwing glove.
+# ----------------------------------------------------------------------------------------------
+
+icefall = room('icefall', 'The Icefall', 'ice', 44, 28)
+ground(icefall, 4); roof(icefall, 22)
+icefall.fill(34, 43, 1, 13, '#').door('R', 14).door('L', 5)
+for i, x0 in enumerate((30, 26, 22, 18)):
+    icefall.fill(x0, x0 + 3, 1, 12 - 2 * i, '~')
+icefall.fill(1, 17, 4, 4, '~')
+icefall.put(16, 21, 'Y').put(24, 21, 'Y')
+icefall.put(6, 8, '*')
+icefall.put(40, 14, 'S')
+
+lake = room('frozen_lake', 'The Frozen Lake', 'ice', 56, 24)
+ground(lake, 4); roof(lake, 18)
+lake.door('R', 5).door('L', 5)
+pit(lake, 9, 46)
+lake.fill(1, 8, 4, 4, '~').fill(47, 54, 4, 4, '~')
+for x0, x1 in [(13, 17), (22, 26), (31, 35), (40, 43)]:
+    lake.fill(x0, x1, 1, 3, '#').fill(x0, x1, 4, 4, '~')
+for x in (15, 24, 33, 42):
+    lake.put(x, 17, '%')
+lake.put(29, 10, '*')
+lake.put(52, 5, 'S')
+
+fcamp = room('frost_camp', 'The Frost Camp', 'ice', 40, 24)
+ground(fcamp, 4); roof(fcamp, 18)
+fcamp.door('R', 5).door('L', 5)
+fcamp.put(8, 5, 'B').put(16, 5, 'N', dialogue='pell', look='pell')
+fcamp.fill(30, 30, 8, 23, '#').fill(34, 34, 8, 23, '#').fill(31, 33, 18, 23, '.').door('T', 31, 3)  # a chimney up
+fcamp.fill(31, 33, 13, 13, '-').fill(31, 33, 18, 18, '-')
+fcamp.put(36, 5, 'S')
+
+gallery = room('icicle_gallery', 'The Icicle Gallery', 'ice', 52, 24)
+ground(gallery, 4); roof(gallery, 16)
+gallery.door('R', 5).door('L', 5)
+for x in (10, 16, 22, 28, 34, 40):
+    gallery.put(x, 15, 'Y')
+for x0 in (13, 25, 37):
+    pit(gallery, x0, x0 + 2)
+gallery.fill(40, 46, 10, 11, '#').put(43, 15, '%')         # a shelf over the way, Moss's page on it
+gallery.put(43, 12, 'I', item='moss_page')
+gallery.put(30, 9, '*')
+gallery.put(4, 5, 'S')
+
+frozen = room('frozen_camp', "Ash's Frozen Camp", 'ice', 32, 22)
+ground(frozen, 4); roof(frozen, 16)
+frozen.door('R', 5)
+frozen.put(10, 5, 'P', ability='air_throw')
+frozen.put(16, 5, 'N', dialogue='note_frost', look='note')
+frozen.put(28, 5, 'S')
+
+icehall = room('hall_of_icicles', 'The Hall of Icicles', 'ice', 36, 26)
+ground(icehall, 4); roof(icehall, 20)
+icehall.door('B', 3, 3).fill(3, 5, 1, 4, '.').fill(3, 5, 1, 1, '-')
+pit(icehall, 10, 30)
+for x0, top in [(12, 6), (19, 7), (26, 8)]:
+    icehall.fill(x0, x0 + 1, 1, top, '#').put(x0, 19, 'Y')
+icehall.fill(31, 34, 1, 9, '#')
+icehall.put(13, 12, '*').put(20, 13, '*').put(33, 10, '*')
+icehall.put(8, 5, 'S')
+
+# ----------------------------------------------------------------------------------------------
+# The Ember Chimney, on from the Summit: the Forge (Cinder, a bench, a race up the Chimney), the
+# Crumbling Halls, the Updraft (heat to ride, and the feather at the top), and the Furnace below.
+# ----------------------------------------------------------------------------------------------
+
+forge = room('forge', 'The Forge', 'ember', 40, 24)
+ground(forge, 4); roof(forge, 18)
+forge.door('L', 5).door('R', 5)
+forge.put(8, 5, 'B').put(14, 5, 'N', dialogue='cinder', look='cinder')
+forge.put(28, 5, 'N', dialogue='note_ember', look='note')
+forge.fill(31, 37, 9, 10, '#').put(29, 13, '%').put(34, 11, '*')
+forge.put(36, 5, 'S')
+
+halls = room('crumbling_halls', 'The Crumbling Halls', 'ember', 56, 26)
+ground(halls, 4); roof(halls, 20)
+halls.door('L', 5).door('R', 5)
+halls.door('B', 1).fill(1, 4, 1, 4, '.').fill(1, 4, 1, 1, '-')
+pit(halls, 9, 46)
+for x0, top in [(12, 5), (17, 6), (22, 7), (27, 7), (32, 6), (37, 5), (42, 5)]:
+    halls.fill(x0, x0 + 1, 1, top - 1, '#').fill(x0, x0 + 1, top, top, '&')
+halls.put(20, 13, '%').put(35, 13, '%')
+halls.put(30, 12, '*')
+halls.put(7, 5, 'S')
+
+updraft = room('the_updraft', 'The Updraft', 'ember', 40, 40)
+ground(updraft, 4)
+updraft.door('L', 5).door('R', 30)
+updraft.fill(30, 39, 1, 29, '#')
+updraft.put(10, 5, 'U').put(20, 5, 'U')
+updraft.fill(14, 18, 24, 25, '#').put(16, 26, 'P', ability='double_jump')
+updraft.fill(1, 5, 32, 33, '#').put(3, 34, 'I', item='lucky_lure')
+updraft.put(25, 20, '*')
+updraft.put(4, 5, 'S')
+
+furnace = room('furnace', 'The Furnace', 'ember', 40, 26)
+ground(furnace, 4)
+furnace.door('T', 1)
+furnace.fill(1, 8, 1, 15, '#')
+pit(furnace, 9, 37)
+furnace.put(12, 5, 'U').put(26, 5, 'U')
+for x0, top in [(17, 9), (22, 11), (31, 9)]:
+    furnace.fill(x0, x0 + 1, top, top, '&')
+furnace.fill(35, 38, 1, 10, '#')
+furnace.put(13, 20, '*').put(27, 21, '*').put(37, 11, '*')
+furnace.put(5, 16, 'S')
+
+# ----------------------------------------------------------------------------------------------
+# The Sky: clouds that fade, wind to fight, and the Last Ledge before the top. The Eye of the Storm
+# above it, a challenge.
+# ----------------------------------------------------------------------------------------------
+
+clouds = room('cloud_steps', 'Cloud Steps', 'sky', 52, 30)
+clouds.door('L', 15).door('R', 15)
+clouds.fill(0, 7, 0, 14, '#').fill(44, 51, 0, 14, '#')
+pit(clouds, 8, 43, 1, 1)
+for x0, top in [(10, 14), (16, 16), (22, 18), (28, 16), (34, 14), (39, 15)]:
+    clouds.fill(x0, x0 + 2, top, top, '_')
+clouds.put(26, 26, '%').put(26, 22, '*')
+clouds.put(3, 15, 'S')
+
+gusts = room('gusts', 'The Gusts', 'sky', 56, 30)
+gusts.settings['wind'] = '-70'
+gusts.door('L', 15).door('R', 15)
+gusts.fill(0, 7, 0, 14, '#').fill(48, 55, 0, 14, '#')
+pit(gusts, 8, 47, 1, 1)
+gusts.fill(24, 27, 10, 12, '#').fill(36, 39, 11, 13, '#')
+gusts.put(14, 19, 'R', to='6,0', period='4')
+gusts.put(31, 20, '%').put(43, 20, '%')
+gusts.put(37, 19, '*')
+gusts.put(3, 15, 'S')
+
+ledge = room('last_ledge', 'The Last Ledge', 'sky', 36, 26)
+ground(ledge, 14)
+ledge.door('L', 15).door('R', 15)
+ledge.put(10, 15, 'B').put(5, 15, 'N', dialogue='note_sky', look='note')
+ledge.fill(20, 27, 18, 19, '#').put(18, 22, '%')
+ledge.door('T', 22)
+ledge.put(3, 15, 'S')
+
+eye = room('eye_of_storm', 'The Eye of the Storm', 'sky', 36, 26)
+eye.settings['wind'] = '110'
+ground(eye, 4)
+eye.door('B', 22).fill(22, 25, 1, 4, '.').fill(22, 25, 1, 1, '-')
+pit(eye, 2, 17, 1, 4)
+pit(eye, 28, 34, 1, 4)
+for x0, top in [(4, 8), (9, 10), (14, 12)]:
+    eye.fill(x0, x0 + 2, top, top, '_')
+eye.fill(1, 3, 1, 14, '#')
+eye.put(8, 16, 'R', to='6,0', period='4')
+eye.put(6, 12, '*').put(2, 15, '*').put(31, 12, '*')
+eye.fill(31, 31, 15, 25, '#').put(31, 14, '%')
+eye.put(20, 5, 'S')
 
 # ----------------------------------------------------------------------------------------------
 # Scenery
@@ -445,6 +732,7 @@ daylight.props((40, 23, 'signal_fire'), (3, 15, 'flags'), (20, 17, 'cairn'))
 # ----------------------------------------------------------------------------------------------
 
 JOINS = [
+    # The Crevasse, up to The Cave and The Well, and The Deep below the Well
     ('crevasse_wake', 'R', 0, 'crevasse_steps', 'L', 0),
     ('crevasse_steps', 'R', 0, 'crevasse_gaps', 'L', 0),
     ('crevasse_gaps', 'R', 0, 'crevasse_camp', 'L', 0),
@@ -452,24 +740,54 @@ JOINS = [
     ('crevasse_dips', 'R', 0, 'crevasse_chasm', 'L', 0),
     ('crevasse_chasm', 'R', 0, 'level1', 'L', 0),
     ('level1', 'R', 0, 'level2', 'L', 0),
+    ('level2', 'B', 0, 'the_deep', 'T', 0),
     ('level2', 'T', 0, 'crossroads', 'B', 0),
+    # West: the ruins
     ('ruins_gate', 'R', 0, 'crossroads', 'L', 0),
-    ('ruins_hollow', 'R', 0, 'ruins_gate', 'L', 0),
-    ('ruins_archive', 'R', 0, 'ruins_hollow', 'L', 0),
-    ('crossroads', 'R', 0, 'level3', 'L', 0),
-    ('level3', 'R', 0, 'level4', 'L', 0),
+    ('lever_works', 'R', 0, 'ruins_gate', 'L', 0),
+    ('lever_works', 'T', 0, 'the_vault', 'B', 0),
+    ('ruins_hollow', 'R', 0, 'lever_works', 'L', 0),
+    ('dark_stair', 'R', 0, 'ruins_hollow', 'L', 0),
+    ('ruins_archive', 'R', 0, 'dark_stair', 'L', 0),
+    # East: the Market and the garden
+    ('crossroads', 'R', 0, 'market', 'L', 0),
+    ('market', 'R', 0, 'level3', 'L', 0),
+    ('level3', 'R', 0, 'garden_rings', 'L', 0),
+    ('garden_rings', 'R', 0, 'greenhouse', 'L', 0),
+    ('greenhouse', 'T', 0, 'thorn_walk', 'B', 0),
+    ('greenhouse', 'R', 0, 'trellis', 'L', 0),
+    ('trellis', 'R', 0, 'level4', 'L', 0),
+    # Up: the Tall Hall, the Summit and the Drop back down
     ('crossroads', 'T', 0, 'tall_hall', 'B', 0),
     ('crossroads', 'T', 1, 'the_drop', 'B', 0),
     ('tall_hall', 'T', 0, 'level5', 'B', 0),
     ('the_drop', 'T', 0, 'level5', 'B', 1),
+    # The Frost Caves, west of the Summit
+    ('icefall', 'R', 0, 'level5', 'L', 0),
+    ('frozen_lake', 'R', 0, 'icefall', 'L', 0),
+    ('frost_camp', 'R', 0, 'frozen_lake', 'L', 0),
+    ('frost_camp', 'T', 0, 'hall_of_icicles', 'B', 0),
+    ('icicle_gallery', 'R', 0, 'frost_camp', 'L', 0),
+    ('frozen_camp', 'R', 0, 'icicle_gallery', 'L', 0),
+    # The Ember Chimney, east of the Summit
     ('level5', 'R', 0, 'level6', 'L', 0),
-    ('level6', 'R', 0, 'level7', 'L', 0),
+    ('level6', 'R', 0, 'forge', 'L', 0),
+    ('forge', 'R', 0, 'level7', 'L', 0),
     ('level7', 'T', 0, 'level8', 'B', 0),
-    ('level8', 'R', 0, 'level9', 'L', 0),
+    ('level8', 'R', 0, 'crumbling_halls', 'L', 0),
+    ('crumbling_halls', 'B', 0, 'furnace', 'T', 0),
+    ('crumbling_halls', 'R', 0, 'the_updraft', 'L', 0),
+    # The Sky
+    ('the_updraft', 'R', 0, 'level9', 'L', 0),
     ('level9', 'R', 0, 'windy_ledge', 'L', 0),
-    ('windy_ledge', 'R', 0, 'level10', 'L', 0),
+    ('windy_ledge', 'R', 0, 'cloud_steps', 'L', 0),
+    ('cloud_steps', 'R', 0, 'gusts', 'L', 0),
+    ('gusts', 'R', 0, 'last_ledge', 'L', 0),
+    ('last_ledge', 'T', 0, 'eye_of_storm', 'B', 0),
+    ('last_ledge', 'R', 0, 'level10', 'L', 0),
 ]
-ORDER = list(ROOMS)  # the project's order: a new game starts in the first room
+# The project's order: a new game starts in the first room, and the last one has the way out.
+ORDER = [name for name in ROOMS if name != 'level10'] + ['level10']
 
 pos = {'crevasse_wake': (0, 0)}
 changed = True
@@ -528,6 +846,9 @@ for name in ORDER:
     lines.append(f'{name:<16} {x - minx:4d} {y - miny:4d}  {r.title}')
     with open(os.path.join(OUT, name + '.txt'), 'w') as f:
         f.write(r.text())
+for name in ORDER:
+    if ROOMS[name].settings:
+        lines.append(f'room {name} ' + ' '.join(f'{k}={v}' for k, v in ROOMS[name].settings.items()))
 for name in ORDER:
     r = ROOMS[name]
     for (x, y), fields in sorted(r.fields.items()):

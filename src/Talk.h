@@ -15,8 +15,9 @@ class Talk
 {
 public:
     // Has conversation number `index` of `dialogue` with `npc`. `setFlag` is called for the story
-    // flags it sets as it goes.
-    Talk(const Npc& npc, Dialogue dialogue, size_t index, std::function<void(const std::string&)> setFlag);
+    // flags it sets as it goes, `act` for the commands (see Dialogue::isCommand).
+    Talk(const Npc& npc, Dialogue dialogue, size_t index, std::function<void(const std::string&)> setFlag,
+         std::function<void(const std::string&)> act = {});
     Talk(const Talk&) = delete;
     Talk& operator=(const Talk&) = delete;
 

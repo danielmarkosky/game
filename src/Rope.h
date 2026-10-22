@@ -35,6 +35,8 @@ public:
 
     // Where the rope is stuck in the wall.
     sf::Vector2f anchor() const;
+    // Moves where it's stuck: on a ring sliding along its track.
+    void moveAnchor(sf::Vector2f anchor);
     // The point the player swings around: the anchor, or the last corner the rope wrapped around.
     sf::Vector2f pivot() const;
     // The anchor followed by every corner the rope is wrapped around, in order.

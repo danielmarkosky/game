@@ -67,7 +67,9 @@ void Game::drawAir(sf::Vector2f cam)
 {
     ambience.drawNear(canvas);
     // In dark places the player carries a little light.
-    if (deathTimer <= 0.f && ambience.darkness() > 0.f) {
+    if (deathTimer <= 0.f && ambience.isDark()) {
+        lights.push_back({viewCoordinates(player->centre(), cam), 34.f, sf::Color(150, 140, 170, 255)});
+    } else if (deathTimer <= 0.f && ambience.darkness() > 0.f) {
         lights.push_back({viewCoordinates(player->centre(), cam), 46.f, sf::Color(90, 85, 110, static_cast<sf::Uint8>(160.f * ambience.darkness()))});
     }
     ambience.drawLight(canvas, lights);
@@ -145,6 +147,7 @@ void Game::drawRooms(sf::Vector2f cam)
         else if (transition && v.index == transition->from) flag = transition->fromCheckpoint;
         rooms[v.index]->draw(canvas, v.cam);
         rooms[v.index]->drawProps(canvas, v.cam, clockTime);
+        rooms[v.index]->drawMoving(canvas, v.cam, clockTime);
         rooms[v.index]->drawMarkers(canvas, v.cam, flag, clockTime);
         std::optional<size_t> saved;
         for (size_t bench = 0; bench < rooms[v.index]->benches().size(); ++bench) {
@@ -168,6 +171,7 @@ void Game::drawRooms(sf::Vector2f cam)
             }
             const PropInfo* info = props::find(prop.kind);
             if (!info || info->lightRadius <= 0.f) continue;
+            if (room.isDark() && prop.kind == "lantern_post") continue; // a dark room's lamps are lit with the rope
             const float h = static_cast<float>(info->rect.height);
             const sf::Vector2f middle = prop.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, info->hangs ? Level::TILE_SIZE - h * 0.6f : h * 0.5f);
             const float flicker = info->fps > 0.f ? 1.f + 0.07f * std::sin(clockTime * 11.f + prop.position.x) : 1.f;
@@ -178,6 +182,11 @@ void Game::drawRooms(sf::Vector2f cam)
         for (size_t gem = 0; gem < room.gems().size(); ++gem) {
             if (!gemFound(v.index, gem)) lights.push_back({viewCoordinates(room.gems()[gem] + sf::Vector2f(4.f, 4.f), v.cam), 16.f, sf::Color(60, 150, 170, 150)});
         }
+        for (const Lamp& lamp : room.lamps()) {
+            const sf::Vector2f middle = lamp.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, Level::TILE_SIZE * 0.4f);
+            if (lamp.lit) lights.push_back({viewCoordinates(middle, v.cam), 64.f * (1.f + 0.04f * std::sin(clockTime * 9.f + middle.x)), sf::Color(255, 200, 120, 170)});
+            else lights.push_back({viewCoordinates(middle, v.cam), 7.f, sf::Color(120, 120, 150, 120)}); // a glint, to find it by
+        }
         for (const Pickup& pickup : room.pickups()) {
             if (!hasAbility(pickup.ability)) lights.push_back({viewCoordinates(pickup.position + sf::Vector2f(4.f, 6.f), v.cam), 30.f, sf::Color(170, 140, 60, 170)});
         }
@@ -185,10 +194,26 @@ void Game::drawRooms(sf::Vector2f cam)
             lights.push_back({viewCoordinates(bench + sf::Vector2f(Level::BENCH_WIDTH * 0.5f, 6.f), v.cam), 34.f, sf::Color(150, 110, 60, 140)});
         }
         for (const Npc& npc : rooms[v.index]->npcs()) {
-            // Turned towards the player, and not all breathing in step.
             const sf::Vector2f feet = npc.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, 0.f);
+            if (npc.look == "note") {
+                // One of Ash's notes: a page weighed down with a stone, glinting until it's read.
+                const PropInfo* note = props::find("note");
+                if (note) {
+                    sf::Sprite sprite(props::texture(), note->rect);
+                    sprite.setOrigin(std::floor(note->rect.width * 0.5f), note->rect.height - 1.f);
+                    const sf::Vector2f at = viewCoordinates(feet, v.cam);
+                    sprite.setPosition(std::floor(at.x), std::floor(at.y));
+                    canvas.draw(sprite);
+                }
+                continue;
+            }
+            // Turned towards the player, and not all breathing in step.
             const bool facingLeft = v.index == levelIndex && player->centre().x < feet.x;
             player->drawFigure(canvas, Player::lookNamed(npc.look), viewCoordinates(feet, v.cam), facingLeft, clockTime + feet.x * 0.37f);
+        }
+        rooms[v.index]->drawQuestItems(canvas, v.cam, clockTime, [&](size_t item) { return progress.flags.count("got_" + room.questItems()[item].item) > 0; });
+        for (const QuestItem& item : room.questItems()) {
+            if (!progress.flags.count("got_" + item.item)) lights.push_back({viewCoordinates(item.position + sf::Vector2f(4.f, 5.f), v.cam), 22.f, sf::Color(230, 200, 110, 150)});
         }
     }
 }
@@ -235,6 +260,10 @@ void Game::drawAim()
         if ((hook = player->ropeTarget(aim))) {
             sf::Vector2f p = viewCoordinates(*hook, drawCamera());
             hud::fillRect(canvas, {std::floor(p.x) - 1.f, std::floor(p.y) - 1.f, 2.f, 2.f}, sf::Color(255, 255, 255, 200));
+        } else if (auto hit = player->aimHit(aim); hit && (hit->kind == RopeHit::Kind::Lever || hit->kind == RopeHit::Kind::Lamp)) {
+            // Something it tugs: a lever, a lamp.
+            sf::Vector2f p = viewCoordinates(hit->point, drawCamera());
+            hud::fillRect(canvas, {std::floor(p.x) - 1.f, std::floor(p.y) - 1.f, 2.f, 2.f}, hud::GOLD);
         } else if (auto bounce = player->ropeBounce(aim)) {
             // Rock in range, but no pick yet: a dim red dot where the rope would bounce off.
             sf::Vector2f p = viewCoordinates(*bounce, drawCamera());
@@ -268,6 +297,12 @@ void Game::drawHud()
     if (settings.showTimer) {
         hud::drawText(canvas, hud::formatTime(progress.playTime), {4.f, 4.f}, hud::WHITE);
         hud::drawText(canvas, "x" + std::to_string(progress.deaths), {4.f, 11.f}, hud::RED);
+    }
+    // A race: the time left, big, red at the end.
+    if (race && screen == Screen::Playing) {
+        const int left = static_cast<int>(std::ceil(race->left));
+        const bool hurry = race->left < 10.f;
+        hud::drawCentred(canvas, std::to_string(left), HALF_W, 4.f, hurry && std::fmod(race->left, 0.5f) < 0.25f ? hud::RED : hud::WHITE, 2.f);
     }
 
     // Holding on to a wall: how much strength is left, a bar over your head that goes red at the end.

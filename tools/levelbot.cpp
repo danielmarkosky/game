@@ -9,7 +9,8 @@
 //   <room>       a room's identifier in assets/world.ldtk, or a text room file
 //   --start      where to start: the tile to stand in, column and row from the top-left
 //                (default: the room's Start)
-//   --goal       which way out counts (default: any), or touching a pickup, or gem N
+//   --goal       which way out counts (default: any), or touching a pickup, or gem N, or "tug": the
+//                rope tugging a lever or a lamp, or "item": touching a quest item
 //   --abilities  the ones the player has (default: all). "none" for none.
 //   --explore    don't stop at the goal: list every spot that can be stood on
 //   --open       with the room's gates open, as if its lever had been pulled
@@ -28,6 +29,7 @@
 #include <map>
 #include <queue>
 #include <set>
+#include <tuple>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -48,6 +50,8 @@ namespace
         std::optional<Level::Side> side; // none and no pickup or gem: any way out
         bool pickup = false;
         int gem = -1;
+        bool tug = false; // the rope tugging a lever or a lamp
+        bool item = false; // touching a quest item
     };
 
     // A run, then maybe a jump, held for a while, steering in the air, maybe jumping again.
@@ -71,6 +75,9 @@ namespace
         bool airJump;
         float again = -1.f; // with the throwing hand: thrown again at this angle as soon as it's back, < 0 not
         float holdAgain = 0.f;
+        float wait = 0.f;   // standing first: in a room with moving rings, for one to come round
+        int ring = -1;      // thrown straight at this ring, wherever it is by then, not at `angle`
+        std::optional<sf::Vector2f> at = std::nullopt; // or straight at this point: a lever or a lamp
     };
 
     // Up against a wall (with the chalk bag): run and jump at it holding towards it until it's
@@ -98,7 +105,7 @@ namespace
 
         Result jump(sf::Vector2f spot, const Jump& j)
         {
-            player.respawn(spot);
+            start(spot);
             PlayerInput in;
             in.moveX = j.run;
             if (j.drop) in.moveY = -1.f;
@@ -137,7 +144,10 @@ namespace
 
         Result swing(sf::Vector2f spot, const Swing& s)
         {
-            player.respawn(spot);
+            start(spot);
+            for (int i = 0; i < int(s.wait / DT); ++i) {
+                if (auto o = step({})) return {*o, player.getPosition()};
+            }
             PlayerInput in;
             in.moveX = s.push;
             if (s.jumpFirst) {
@@ -151,6 +161,17 @@ namespace
             rope.ropePressed = rope.ropeHeld = true;
             rope.jumpHeld = s.jumpFirst;
             rope.aim = player.centre() + sf::Vector2f(std::cos(s.angle), std::sin(s.angle)) * 200.f;
+            if (s.ring >= 0) rope.aim = level->ringPosition(static_cast<size_t>(s.ring));
+            if (s.at) rope.aim = *s.at;
+            if (goal.tug && player.canShootRope()) {
+                // Thrown at a lever or a lamp, all there is to it is the tug.
+                if (const auto hit = player.aimHit(rope.aim); hit && (hit->kind == RopeHit::Kind::Lever || hit->kind == RopeHit::Kind::Lamp)) {
+                    for (int i = 0; i < int(THROW_WAIT / DT); ++i) {
+                        if (auto o = step(rope)) return {*o, player.getPosition()};
+                        rope.ropePressed = false;
+                    }
+                }
+            }
             if (!player.canShootRope() || !player.ropeTarget(rope.aim)) return {Out::Missed, {}};
             // Thrown (swung round first, early on), and flying there. Standing still meanwhile, or
             // in the air steering on.
@@ -204,7 +225,7 @@ namespace
 
         Result climb(sf::Vector2f spot, const Climb& c)
         {
-            player.respawn(spot);
+            start(spot);
             PlayerInput at;
             at.moveX = c.dir;
             at.moveY = 1.f; // grabs it from the ground too
@@ -250,18 +271,31 @@ namespace
             return settle(c.steer, true);
         }
 
+        // Every try from a spot starts with the room as it was: icicles up, blocks whole, rings at the start.
+        void start(sf::Vector2f spot)
+        {
+            level->reset();
+            player.respawn(spot);
+        }
+
     private:
         std::optional<Out> step(const PlayerInput& in)
         {
             player.handleInput(in);
+            level->update(DT, player.hitbox());
             player.update(DT);
-            player.takeEvents();
+            bool tugged = false;
+            for (const PlayerEvent& e : player.takeEvents()) {
+                tugged |= e.type == PlayerEvent::Type::LeverTugged || e.type == PlayerEvent::Type::LampTugged;
+            }
             ++steps;
+            if (goal.tug && tugged) return Out::Reached;
+            if (goal.item && level->questItemAt(player.hitbox())) return Out::Reached;
             if (goal.pickup && level->pickupAt(player.getPosition(), Player::HEIGHT, Player::WIDTH)) return Out::Reached;
             if (goal.gem >= 0 && level->gemAt(player.getPosition(), Player::HEIGHT, Player::WIDTH) == size_t(goal.gem)) return Out::Reached;
             if (player.isTouchingDanger() || player.getPosition().y < level->bounds().top - 64.f) return Out::Died;
             if (auto side = level->exitThrough(player.centre())) {
-                const bool wanted = !goal.pickup && goal.gem < 0 && (!goal.side || *side == *goal.side);
+                const bool wanted = !goal.pickup && !goal.tug && !goal.item && goal.gem < 0 && (!goal.side || *side == *goal.side);
                 return wanted ? Out::Reached : Out::Died;
             }
             return std::nullopt;
@@ -307,6 +341,12 @@ namespace
     std::string describe(const Swing& s)
     {
         char b[160];
+        if (s.at) return "rope straight at the lever or lamp at " + std::to_string(int(s.at->x)) + "," + std::to_string(int(s.at->y));
+        if (s.ring >= 0) {
+            std::snprintf(b, sizeof b, "after %.1fs, rope at ring %d, push %+.0f%s for %.2fs once it catches, let go steering %+.0f", s.wait, s.ring,
+                          s.push, s.reel ? " reeling in" : "", s.hold, s.steer);
+            return b;
+        }
         std::snprintf(b, sizeof b, "rope%s at %.0f deg, push %+.0f%s for %.2fs once it catches, %s steering %+.0f%s", s.jumpFirst ? " mid-jump" : "",
                       s.angle * 57.2958f, s.push, s.reel ? " reeling in" : "", s.hold, s.jumpOff ? "jump off" : "let go", s.steer,
                       s.airJump ? ", jump again" : "");
@@ -479,6 +519,8 @@ int main(int argc, char** argv)
         } else if (a == "--goal" && i + 1 < argc) {
             const std::string g = argv[++i];
             if (g == "pickup") goal.pickup = true;
+            else if (g == "tug") goal.tug = true;
+            else if (g == "item") goal.item = true;
             else if (g == "gem" && i + 1 < argc) goal.gem = std::atoi(argv[++i]);
             else goal.side = g == "L" ? Level::Side::Left : g == "R" ? Level::Side::Right : g == "T" ? Level::Side::Top : Level::Side::Bottom;
         } else if (a == "--abilities" && i + 1 < argc) {
@@ -573,6 +615,46 @@ int main(int argc, char** argv)
         }
     }
 
+    // When it's a tug that's wanted: straight at each lever and lamp.
+    if (goal.tug) {
+        std::vector<sf::Vector2f> targets;
+        for (const sf::Vector2f& lever : level->levers()) targets.push_back(lever + sf::Vector2f(4.f, 4.f));
+        for (const Lamp& lamp : level->lamps()) targets.push_back(lamp.position + sf::Vector2f(4.f, 4.f));
+        for (const sf::Vector2f& target : targets) {
+            Swing tug{false, 0.f, 1.f, false, 0.2f, false, 0.f, false};
+            tug.at = target;
+            swings.push_back(tug);
+        }
+    }
+    // Straight at each ring, at moments as it goes round.
+    for (int ring = 0; ring < static_cast<int>(level->rings().size()); ++ring) {
+        for (float wait : {0.f, 0.5f, 1.f, 1.5f, 2.f, 2.5f, 3.f}) {
+            for (float push : {-1.f, 1.f}) {
+                for (bool reel : {false, true}) {
+                    for (float hold : {0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 2.f, 2.5f}) {
+                        for (float steer : {push, 0.f}) {
+                            Swing atRing{false, 0.f, push, reel, hold, false, steer, false};
+                            atRing.wait = wait;
+                            atRing.ring = ring;
+                            swings.push_back(atRing);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // With rings going round, the same swing a moment later is another swing.
+    if (!level->rings().empty()) {
+        const size_t count = swings.size();
+        for (float wait : {0.5f, 1.0f, 1.5f, 2.0f}) {
+            for (size_t i = 0; i < count; ++i) {
+                if (swings[i].jumpFirst || swings[i].again >= 0.f) continue;
+                Swing later = swings[i];
+                later.wait = wait;
+                swings.push_back(later);
+            }
+        }
+    }
     std::vector<Climb> climbing;
     for (float dir : {-1.f, 1.f}) {
         if (!climbs) continue;
@@ -644,9 +726,13 @@ int main(int argc, char** argv)
         }
         if (done) break;
         // Once the rope misses at an angle from here, it'll miss whatever else is tried with it.
-        std::set<std::pair<bool, int>> misses;
+        std::set<std::tuple<bool, int, int>> misses;
         for (const Swing& s : swings) {
-            const auto aim = std::make_pair(s.jumpFirst, int(std::round(s.angle * 57.2958f)));
+            if (s.at) {
+                if ((done = handle(bot.swing(spot, s), describe(s)))) break;
+                continue;
+            }
+            const auto aim = std::make_tuple(s.jumpFirst, s.ring >= 0 ? 1000 + s.ring : int(std::round(s.angle * 57.2958f)), int(s.wait * 10.f));
             if (misses.count(aim)) continue;
             const Result r = bot.swing(spot, s);
             if (r.out == Out::Missed) {

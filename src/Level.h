@@ -31,10 +31,63 @@ struct Prop
     sf::Vector2f position; // bottom-left of its tile
 };
 
+// Something to find for someone, lying in a room (see assets/quests.txt).
+struct QuestItem
+{
+    std::string item;
+    sf::Vector2f position; // bottom-left of its tile
+};
+
+// Where a race ends (see assets/quests.txt).
+struct Finish
+{
+    std::string race;
+    sf::Vector2f position; // bottom-left of its tile: the flag stands on its bottom
+};
+
+// A hook ring sliding to and fro along a track: the rope catches it, and it carries the rope along.
+struct Ring
+{
+    sf::Vector2f from, to; // its middle at each end, world pixels
+    float period;          // seconds there and back
+};
+
+// A lantern hanging in the dark: the rope lights it.
+struct Lamp
+{
+    sf::Vector2f position; // bottom-left of its tile; it hangs from the tile's top
+    bool lit = false;
+};
+
+// An icicle over a drop: it shakes when you go under it, then falls, then grows back.
+struct Icicle
+{
+    enum class State { Hanging, Shaking, Falling, Gone };
+    sf::Vector2f home;     // its tip when hanging: the top of its tile, middle
+    sf::Vector2f tip;
+    float speed = 0.f;     // falling, px/s
+    State state = State::Hanging;
+    float timer = 0.f;
+};
+
+// What a rope thrown along a line meets first: rock it bites (or a hook block), slick stone it
+// bounces off, a moving ring it catches, or a lever or lamp it tugs and comes back from.
+struct RopeHit
+{
+    enum class Kind { Rock, Slick, Ring, Lever, Lamp };
+    Kind kind;
+    sf::Vector2f point;
+    int index = -1;        // of the ring, lever or lamp
+    float distance = 0.f;
+};
+
 class Level
 {
 public:
     static constexpr float TILE_SIZE = 8; // 8x8 tiles
+    // Tile values, as in the LDtk project's Tiles layer (see tools/rooms.py).
+    static constexpr int TILE_METAL = 1, TILE_ROCK = 2, TILE_CRYSTAL = 3, TILE_SPIKES = 4, TILE_PLATFORM = 5,
+                         TILE_GATE = 6, TILE_SLICK = 7, TILE_ICE = 8, TILE_CRUMBLE = 9, TILE_CLOUD = 10;
 
     // The edges of a level. Going through a gap in one takes you into the room on the other side,
     // if there is one. Falling out of the bottom with no room below kills you.
@@ -61,6 +114,47 @@ public:
     void addBench(sf::Vector2i tile);
     void addLever(sf::Vector2i tile);
     void addProp(const std::string& kind, sf::Vector2i tile);
+    void addIcicle(sf::Vector2i tile);  // hanging from the top of the tile
+    void addUpdraft(sf::Vector2i tile); // rising from the tile, two tiles wide, up to the first rock
+    void addRing(sf::Vector2i tile, sf::Vector2i to, float period); // from the tile's middle to `to`'s
+    void addLamp(sf::Vector2i tile);
+    void addQuestItem(const std::string& item, sf::Vector2i tile);
+    void addFinish(const std::string& race, sf::Vector2i tile);
+    const std::vector<QuestItem>& questItems() const;
+    const std::vector<Finish>& finishes() const;
+    // The one the box touches, if any: an index into the lists above.
+    std::optional<size_t> questItemAt(sf::FloatRect box) const;
+    std::optional<size_t> finishAt(sf::FloatRect box) const;
+    // Items not found yet (`found` says which are), bobbing; the races' finishing flags.
+    void drawQuestItems(sf::RenderTarget& target, sf::Vector2f centr, float time, const std::function<bool(size_t)>& found) const;
+    // The whole room: wind blowing (px/s each second, + to the right) on anything in the air; and
+    // dark, lit only by what glows in it.
+    void setWind(float wind);
+    void setDark(bool dark);
+    float wind() const;
+    bool isDark() const;
+
+    // What moves or changes: icicles, crumbling blocks and clouds (by where the player is), rings
+    // (by the time). Once a physics step, for the room the player is in. reset() puts it all back.
+    void update(float dt, sf::FloatRect player);
+    void reset();
+    float time() const;
+
+    const std::vector<Ring>& rings() const;
+    sf::Vector2f ringPosition(size_t ring) const; // now
+    const std::vector<Lamp>& lamps() const;
+    void setLampLit(size_t lamp, bool lit);
+    const std::vector<Icicle>& icicles() const;
+    // How hard an updraft lifts a point: 0 outside them, 1 inside.
+    float updraftAt(sf::Vector2f point) const;
+    const std::vector<sf::FloatRect>& updrafts() const;
+    // Standing on ice: a box of `width` with its bottom at `feet`.
+    bool isOnIce(sf::Vector2f feet, float width) const;
+    bool isIce(int x, int y) const;
+    // Along the line from `from` towards `to`, at most `range` away: what the rope meets first.
+    std::optional<RopeHit> ropeHit(sf::Vector2f from, sf::Vector2f to, float range) const;
+    // The things that move or glow, drawn after the tiles.
+    void drawMoving(sf::RenderTarget& target, sf::Vector2f centr, float time) const;
 
     // The tiles are drawn with the theme's tiles.png. New levels use Theme::DEFAULT.
     void setTheme(std::shared_ptr<const Theme> theme);
@@ -134,6 +228,26 @@ private:
     std::vector<sf::Vector2f> m_benches;
     std::vector<sf::Vector2f> m_levers;
     bool m_gatesOpen = false;
+
+    // What moves or changes (see update).
+    struct Crumbling
+    {
+        float stood = 0.f; // seconds stood on (or near) it
+        float gone = 0.f;  // seconds until it's back, > 0 while it's gone
+    };
+    std::unordered_map<long long, Crumbling> m_crumbling; // by tile, crumbling blocks and clouds
+    Crumbling* crumbling(int x, int y);
+    const Crumbling* crumbling(int x, int y) const;
+    std::vector<Ring> m_rings;
+    std::vector<Lamp> m_lamps;
+    std::vector<QuestItem> m_questItems;
+    std::vector<Finish> m_finishes;
+    std::vector<Icicle> m_icicles;
+    std::vector<sf::FloatRect> m_updrafts;
+    std::vector<sf::Vector2i> m_updraftTiles; // where they start: their tops are found once all the tiles are in
+    float m_wind = 0.f;
+    bool m_dark = false;
+    float m_time = 0.f;
     std::shared_ptr<const Theme> m_theme;
     sf::Texture m_objects;
     sf::Texture m_items;

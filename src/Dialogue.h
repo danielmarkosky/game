@@ -6,15 +6,16 @@
 #include <vector>
 
 // What a character says, from a text file: assets/dialogue/<id>.txt. See
-// assets/dialogue/README.md for how they're written: lines, choices, jumps to labels and flags.
+// assets/dialogue/README.md for how they're written: lines, choices, jumps to labels, flags, and
+// commands: giving and taking things, opening the shop, starting a race.
 
 // One step of a conversation.
 struct DialogueStep
 {
-    enum class Kind { Line, Choice, Set, Jump, Label };
+    enum class Kind { Line, Choice, Set, Do, Jump, Label };
     Kind kind = Kind::Line;
     std::string speaker; // Line: who says it ("You" is the player)
-    std::string text;    // Line: what's said. Set: the flag. Jump, Label: the label
+    std::string text;    // Line: what's said. Set: the flag. Do: the command. Jump, Label: the label
     std::vector<std::pair<std::string, std::string>> options; // Choice: what you can say, and the label it leads to
 };
 
@@ -34,6 +35,9 @@ public:
     // label that isn't there.
     static Dialogue load(const std::string& id);
     static Dialogue parse(const std::string& text);
+    // The commands a conversation can give: "give gems 5", "give outfit fox", "give item lure",
+    // "take item lure", "shop", "race garden". True if `command` is one.
+    static bool isCommand(const std::string& command);
 
     const std::vector<Conversation>& conversations() const;
 
@@ -51,7 +55,9 @@ private:
 class DialogueRunner
 {
 public:
-    DialogueRunner(const Conversation& conversation, std::function<void(const std::string&)> setFlag);
+    // `act` is told every command ("give gems 5", "shop"...) as the conversation reaches it.
+    DialogueRunner(const Conversation& conversation, std::function<void(const std::string&)> setFlag,
+                   std::function<void(const std::string&)> act = {});
 
     bool finished() const;
     // The line being said, or the choice being made.
@@ -67,5 +73,6 @@ private:
 
     const Conversation* conversation;
     std::function<void(const std::string&)> setFlag;
+    std::function<void(const std::string&)> act;
     size_t at = 0;
 };

@@ -24,10 +24,12 @@ struct PlayerInput
 // Something that happened during an update, so the game can show an effect for it.
 struct PlayerEvent
 {
-    enum class Type { Jumped, AirJumped, WallJumped, Landed, Stepped, Grabbed, RopeThrown, RopeAttached, RopeWrapped, RopeBounced };
+    enum class Type { Jumped, AirJumped, WallJumped, Landed, Stepped, Grabbed, RopeThrown, RopeAttached, RopeWrapped, RopeBounced,
+                      LeverTugged, LampTugged };
     Type type;
     sf::Vector2f position;
     float strength = 0.f; // Landed: how fast the player was falling
+    int index = -1;       // LeverTugged, LampTugged: which, in the level's list
 };
 
 class Player
@@ -37,12 +39,14 @@ public:
 
     // The looks to choose from, in the order of the rows in assets/gfx/player.png (made by
     // tools/make_art.py). Only the sprite changes: every skin has the same hitbox.
-    static constexpr std::array<const char*, 10> SKINS = {
-        "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom"};
-    // Every look in player.png: the skins, then the people you meet, who aren't for choosing.
-    static constexpr std::array<const char*, 15> LOOKS = {
+    static constexpr std::array<const char*, 15> SKINS = {
         "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom",
-        "wren", "pip", "moss", "juniper", "ash"};
+        "scholar", "gardener", "fisher", "smith", "scarf"};
+    // Every look in player.png: the skins, then the people you meet, who aren't for choosing.
+    static constexpr std::array<const char*, 24> LOOKS = {
+        "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom",
+        "scholar", "gardener", "fisher", "smith", "scarf",
+        "wren", "pip", "moss", "juniper", "ash", "tuck", "bramble", "pell", "cinder"};
     void setSkin(size_t index);
     // The skin running on the spot, standing at `feet`, for the options screen.
     void drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scale, float time) const;
@@ -70,13 +74,15 @@ public:
     sf::Vector2f centre() const;
     // Bottom-left corner of the hitbox. Always whole pixels.
     sf::Vector2f getPosition() const;
+    sf::FloatRect hitbox() const;
     sf::Vector2f getVelocity() const;
     void setVelocity(sf::Vector2f v);
     bool isGrounded() const;
     bool isTouchingDanger() const;
     const Rope* getRope() const;
-    // Where a rope thrown towards `aim` now would catch, if anywhere: on rock or a hook block within
-    // reach(), not on slick stone.
+    // What a rope thrown towards `aim` now would meet first, within reach() (see Level::ropeHit).
+    std::optional<RopeHit> aimHit(sf::Vector2f aim) const;
+    // Where it would catch, if anywhere: on rock, a hook block or a ring, not on slick stone.
     std::optional<sf::Vector2f> ropeTarget(sf::Vector2f aim) const;
     // How far a throw now would reach: less in the air.
     float reach() const;
@@ -96,7 +102,8 @@ public:
     // With the updraft feather: one more jump in the air, until landing or catching the rope.
     void setCanDoubleJump(bool can);
     bool hasAirJump() const; // it could double jump now
-    // Where a rope thrown towards `aim` would hit something and bounce off: slick stone.
+    // Where a rope thrown towards `aim` would hit something and bounce off: slick stone, or rock too
+    // close to catch on.
     std::optional<sf::Vector2f> ropeBounce(sf::Vector2f aim) const;
     // The rope's in your hand and you're where it can be thrown from.
     bool canShootRope() const;
@@ -134,6 +141,7 @@ private:
     void updateThrow(float dt, bool grounded);
     void throwRope();
     void letGoOfRope(); // it falls from where it was hooked, and is reeled back in
+    bool anchorHeld() const; // there's still rock where it's hooked (crumbling blocks give way)
     // Climbing: what's to grab on `side` (-1 left, 1 right) at hand height, and holding on.
     bool wallToGrab(int side) const;
     void updateClimbing(float dt, bool grounded);
@@ -163,6 +171,9 @@ private:
     sf::Vector2f hookTarget;      // where it's flying to
     bool hookCatches = false;     // and whether it'll stick there
     bool hookBounces = false;     // or hit something it won't stick to
+    RopeHit::Kind hookKind = RopeHit::Kind::Rock;
+    int hookIndex = -1;           // the ring, lever or lamp it's flying to
+    std::optional<size_t> ringAnchor; // hooked on a moving ring
     bool hasRope = true;
     bool throwsInAir = true;
 

@@ -18,6 +18,10 @@ gravity 800
 jump_speed 215              # jump height is jump_speed^2 / (2 * gravity): about 29 px, 3.6 tiles
 jump_release_gravity 3      # letting go of jump early falls this many times faster: short hops
 max_fall_speed 300
+ice_acceleration 100        # on ice: slow to get going...
+ice_deceleration 40         # ...and slower to stop
+updraft_lift 1400           # an updraft (heat rising) pushing you up, against gravity...
+updraft_speed 180           # ...up to this fast
 coyote_time 0.1             # a jump still works this long after running off a ledge
 jump_buffer_time 0.1        # and when pressed this long before landing
 air_jump_speed 195          # the updraft feather's jump

@@ -33,6 +33,10 @@ struct Progress
     std::set<std::string> gems;           // found, as "<room> <tile x> <tile y>"
     std::set<std::string> conversations; // had, as "<dialogue> <number>", counting from 0
     std::set<std::string> flags;          // set in conversations: what's happened in the story
+    std::set<std::string> items;          // carried, for quests: "moss_page"
+    std::set<std::string> outfits;        // owned, besides the classic look everyone has
+    std::string wearing = "classic";      // one of Player::SKINS
+    int spent = 0;                        // gems spent at the shop, less gems given as rewards
     float playTime = 0.f;                 // seconds
     int deaths = 0;
     bool finished = false;                // got out at the end at least once

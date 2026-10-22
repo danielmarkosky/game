@@ -1,6 +1,12 @@
 # Ash, the sister, keeper of the signal fire at the top of the mountain. The end of the story:
 # what you say to her decides the ending (see endings.txt).
 
+--- read_note_crevasse read_note_ruins read_note_garden read_note_frost read_note_ember read_note_sky !read_all_notes
+Ash: ...You found my notes? All of them? Then you know everything already.
+Ash: Here. My scarf. It's kept me warm all the way up. Your turn.
+give outfit scarf
+set read_all_notes
+
 --- !ash_answered
 Ash: ...You? You climbed all this way?
 You: You didn't come back, Ash. Three winters.

@@ -92,7 +92,8 @@ TEST(Dialogue, EveryCharacterInTheWorldHasSomethingToSay) {
         for (const Npc& npc : room.level->npcs()) {
             SCOPED_TRACE(room.name + ": " + npc.dialogue);
             const Dialogue d = Dialogue::load(npc.dialogue);
-            EXPECT_TRUE(std::find(Player::LOOKS.begin(), Player::LOOKS.end(), npc.look) != Player::LOOKS.end()) << npc.look;
+            // Someone (one of the looks), or one of Ash's notes.
+            EXPECT_TRUE(npc.look == "note" || std::find(Player::LOOKS.begin(), Player::LOOKS.end(), npc.look) != Player::LOOKS.end()) << npc.look;
             for (const auto& conversation : d.conversations()) {
                 for (const auto& step : conversation.steps) {
                     // Only what the font can draw.
@@ -147,4 +148,23 @@ TEST(Text, WrapsAtSpacesToFitAWidth) {
     EXPECT_EQ(text::wrap("Pneumonoultramicroscopic", 20.f).size(), 1u); // too long to break: on its own line
     EXPECT_GT(text::width("m"), text::width("i"));
     EXPECT_EQ(text::width("ab"), text::width("a") + 1.f + text::width("b"));
+}
+
+TEST(Dialogue, CommandsGiveTakeShopAndRace) {
+    EXPECT_TRUE(Dialogue::isCommand("give gems 5"));
+    EXPECT_TRUE(Dialogue::isCommand("give outfit scholar"));
+    EXPECT_TRUE(Dialogue::isCommand("take item moss_page"));
+    EXPECT_TRUE(Dialogue::isCommand("shop"));
+    EXPECT_TRUE(Dialogue::isCommand("race garden"));
+    EXPECT_FALSE(Dialogue::isCommand("give"));
+    EXPECT_FALSE(Dialogue::isCommand("give hugs 5"));
+    EXPECT_FALSE(Dialogue::isCommand("shop now"));
+
+    const Dialogue d = Dialogue::parse("---\nTuck: Have a look.\nshop\nTuck: Here, a gift.\ngive gems 2\nset met_tuck\n");
+    std::vector<std::string> done;
+    std::set<std::string> flags;
+    DialogueRunner run(d.conversations()[0], [&](const std::string& f) { flags.insert(f); }, [&](const std::string& c) { done.push_back(c); });
+    while (!run.finished()) run.next();
+    EXPECT_EQ(done, (std::vector<std::string>{"shop", "give gems 2"}));
+    EXPECT_EQ(flags, std::set<std::string>{"met_tuck"});
 }

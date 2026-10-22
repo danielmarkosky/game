@@ -76,9 +76,10 @@ The buttons can be changed in CONTROLS too. The pad that was pressed last is the
 - **Ash's chalk bag**, on the top shelf of the Archive: push into a wall in the air to grab it,
   climb up and down, leap off it. Your grip lasts a few seconds (the bar over your head), and comes
   back on the ground. Not slick stone.
-- **The throwing glove**, up a chimney at The Summit: the rope can be thrown in the air too, straight
-  away, reaching a little less far there (85%): there's nothing to push off.
-- **The updraft feather**, in Backtrack: one more jump in the air, until you land or catch the rope.
+- **The throwing glove**, at Ash's frozen camp at the end of the Frost Caves: the rope can be thrown
+  in the air too, straight away, reaching a little less far there (85%): there's nothing to push off.
+- **The updraft feather**, at the top of the Updraft in the Ember Chimney: one more jump in the air,
+  until you land or catch the rope.
 
 The numbers are all in [assets/physics.txt](assets/physics.txt).
 
@@ -94,21 +95,25 @@ woven through it: Ash's. Its first swings are over safe pits, the last one over 
 up beyond it is The Cave, where Wren sits by a bench, and The Well, climbed shelf by shelf to the
 Crossroads, the hub.
 
-West, the ruins climb through the Sunken Gate and Mushroom Hollow to the Archive, where Moss keeps
-Ash's chalk bag on the top shelf. East, the Hook Garden leads to Curtains, where the long rope lies
-down a slick-walled hollow you only get out of with it. Up from the Crossroads is the Tall Hall:
-crystal-smooth walls and ledges, every hook a tile beyond a short rope. Above it is The Summit,
-Juniper's camp, with a lever that opens the Drop (straight back down to the Crossroads), a chimney
-to climb wall to wall for the throwing glove, and a cliff whose hook you can only catch from the top
-of a jump. Beyond are Stepping Stones, The Chimney, Pendulums, Backtrack and the updraft feather,
-the Windy Ledge, all slick stone, whose gaps only the feather gets you across, and Daylight, where
-Ash is, and the way out at the top.
+Forty-six rooms in nine regions: [docs/world.md](docs/world.md) is the plan, with the map. In short:
+west, the Sunken Ruins, with a gate the rope opens by tugging its lever through a slit, a stair
+lit only by the lamps the rope lights, and the Archive, where Moss keeps Ash's chalk bag. East,
+past Tuck's Market, the Hook Garden: hook rings sliding on tracks, Bramble's Greenhouse, and the
+long rope at the bottom of Curtains. Up through the Tall Hall, the Summit, Juniper's camp, and the
+Drop back down. West of it the Frost Caves (ice you slide on, icicles that fall) and the throwing
+glove; east the Ember Chimney (heat that lifts you, blocks that crumble) and the updraft feather;
+and above it all the Sky (clouds that fade, wind that pushes), and Daylight, where Ash is, and the
+way out at the top. Every region has a challenge room off the main path, full of gems.
 
-Every room was rebuilt for the slower physics and the thrown rope: small, one idea each, and checked
-by the level bot with exactly the abilities you'd have when you get there.
+People ask for things: quests, in the pause menu's QUESTS list. Moss lost a page, Wren a lantern,
+Pell a lure; Bramble and Cinder race you. Ash left notes along her way. Gems buy outfits from Tuck,
+and the quests win the rest.
+
+Every room is small, one idea each, and checked by the level bot with exactly the abilities you'd
+have when you get there.
 
 Each part of the world has its own look and its own music: the cave, the garden, the ruins, the
-snowy mountains, the ember chimney and the daylight. Coming into a room, the first place you land
+snowy mountains, the frost caves, the ember chimney, the sky and the daylight. Coming into a room, the first place you land
 is your checkpoint, until you reach a flag.
 
 **People.** Wren at the top of the crevasse, by The Cave's bench, Pip the mapmaker in the Crossroads, Moss in the Archive,

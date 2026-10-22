@@ -1,0 +1,20 @@
+# Pell, who fishes through the ice at the Frost Camp, and has lost a lucky lure.
+
+--- !asked_lure
+Pell: Shh. You'll scare the fish. ...There aren't any fish. But you'll scare them.
+Pell: Name's Pell. I fish through the ice, and I think about things.
+Pell: A girl with a green scarf camped further in, years back. Her camp's still there, frozen over.
+Pell: And a crow took my lucky lure. Flew east, over the Summit, to the Ember Chimney. Crows like it warm.
+set asked_lure
+
+--- lucky_lure !gave_lure
+Pell: My lure! Bright as the day I lost it. Here: a coat for the cold, and the rain, and the crows.
+take item lucky_lure
+give outfit fisher
+set gave_lure
+
+--- !gave_lure
+Pell: Still no lure. Still no fish. It's all connected, I tell you.
+
+--- gave_lure
+Pell: Caught nothing all day. Best day of my life.

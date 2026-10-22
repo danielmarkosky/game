@@ -42,7 +42,13 @@ Wren: Up the well, climber.
   and the conversation goes on from `= label`. Reaching the next `= label` line ends the branch;
   `-> label` jumps to another, and `-> end` ends the conversation.
 - **Flags.** `set name` remembers that something happened, for this save. Other conversations can
-  depend on it, and so does the ending.
+  depend on it, and so does the ending. Items you carry (`moss_page`) are facts too.
+- **Commands.** `give gems 5`, `give outfit scholar`, `give item lucky_lure`, `take item
+  lucky_lure`: rewards and quest items (see [`assets/quests.txt`](../quests.txt) and
+  [`assets/outfits.txt`](../outfits.txt)). `shop` opens Tuck's shop and `race garden` starts a race,
+  when the conversation's over.
+- **Notes.** An Npc whose `look` is `note` is one of Ash's notes, lying on the ground. A line's
+  speaker who has a look of their own (`Ash:`) shows their own face.
 - **The ending.** `endings.txt` is read the same way: the end screen shows the lines of the first
   conversation whose facts hold. Keep the last one without any, for when none fit.
 - Stick to plain ASCII: letters, digits and the usual punctuation. That's what the font has.

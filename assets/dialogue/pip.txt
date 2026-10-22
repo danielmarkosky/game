@@ -14,6 +14,7 @@ Pip: East is the Hook Garden. Lovely place, if you like spikes. West are the old
 Pip: And up there is the Tall Hall. Crystal walls, nothing to hold on to, and the only hook is way, way up.
 Pip: They say there's a coil of long rope at the far end of the garden. That would reach it.
 Pip: Oh, and sit on any bench you find. Good for resting, and for coming back to.
+Pip: And Tuck has a stall just east of here, at the Market. Bring gems.
 
 --- !long_rope
 Pip: The garden's east. The long rope should be at the far end of it. The ruins are west, if you're curious.

@@ -12,6 +12,7 @@ Text rooms use the characters in assets/levels/README.md. rooms.txt lists them l
   theme cave                                   # the theme of the rooms below it
   level1   0 0  The Cave                       # file (next to rooms.txt), map position, title
   entity level4 142 25 ability=long_rope      # fields of the entity at column 142, row 25
+  room level7 wind=-60 dark=1                  # a room's settings: wind (px/s each second), dark
 
 Positions are in tiles, of the room's bottom-left tile, x to the right and y up. Rows count from
 the top of the room, like lines of the text file. Importing into an existing project keeps its
@@ -26,11 +27,12 @@ GRID = 8
 
 # IntGrid values of the Tiles layer, and the text characters for them.
 TILES = [(1, '#', 'rock', '#6A5C7A'), (2, '%', 'hook_block', '#A6B6CC'), (3, '-', 'platform', '#B47C48'),
-         (4, '^', 'spikes', '#EEF1F8'), (5, 'x', 'crystal', '#E5487A'), (6, '=', 'gate', '#8899AA'), (7, 'o', 'slick', '#9AC0E0')]
+         (4, '^', 'spikes', '#EEF1F8'), (5, 'x', 'crystal', '#E5487A'), (6, '=', 'gate', '#8899AA'), (7, 'o', 'slick', '#9AC0E0'),
+         (8, '~', 'ice', '#CFEFFF'), (9, '&', 'crumble', '#A8886C'), (10, '_', 'cloud', '#FFFFFF')]
 CHAR_OF = {value: char for value, char, _, _ in TILES}
 VALUE_OF = {char: value for value, char, _, _ in TILES}
 
-THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight', 'ruins']
+THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight', 'ruins', 'ice', 'sky']
 ABILITIES = ['rope', 'long_rope', 'wall_climb', 'air_throw', 'double_jump']
 
 # Entities: identifier, text character, colour, at most one per room, fields.
@@ -44,13 +46,21 @@ ENTITIES = [
     ('Bench', 'B', '#B47C48', False, []),
     ('Lever', 'L', '#E8443A', False, []),
     ('Prop', 'D', '#8A8AA0', False, [('kind', 'String')]),
+    ('Icicle', 'Y', '#CFEFFF', False, []),
+    ('Updraft', 'U', '#FF8C3C', False, []),
+    ('Ring', 'R', '#E8B94A', False, [('to', 'String'), ('period', 'String')]),
+    ('Lamp', 'Q', '#FFD86A', False, []),
+    ('Item', 'I', '#E8C04A', False, [('item', 'String')]),
+    ('Finish', 'F', '#FFFFFF', False, [('race', 'String')]),
 ]
 ENTITY_OF_CHAR = {char: ident for ident, char, *_ in ENTITIES}
 CHAR_OF_ENTITY = {ident: char for ident, char, *_ in ENTITIES}
 DEFAULT_FIELDS = {'Pickup': {'ability': 'rope'}}
 
 # Fixed uids, so the definitions are the same in every project this makes.
-UID = {'Tiles': 1, 'Entities': 2, 'Theme': 3, 'Ability': 4, 'title': 5, 'theme': 6}
+UID = {'Tiles': 1, 'Entities': 2, 'Theme': 3, 'Ability': 4, 'title': 5, 'theme': 6, 'wind': 7, 'dark': 8}
+# A room's own settings besides its title and theme: in rooms.txt as "room <name> wind=40 dark=1".
+ROOM_FIELDS = ['wind', 'dark']
 for n, (ident, *_rest) in enumerate(ENTITIES):
     UID[ident] = 10 + n
 FIELD_UID = {}
@@ -130,7 +140,8 @@ def definitions():
         'tilesets': [],
         'enums': [enum_def('Theme', THEMES), enum_def('Ability', ABILITIES)],
         'externalEnums': [],
-        'levelFields': [field_def('title', 'String', UID['title']), field_def('theme', 'Theme', UID['theme'])],
+        'levelFields': [field_def('title', 'String', UID['title']), field_def('theme', 'Theme', UID['theme'])]
+                       + [field_def(name, 'String', UID[name]) for name in ROOM_FIELDS],
     }
 
 
@@ -244,7 +255,8 @@ def room_to_ldtk(room, old_level, level_uid, world_y):
         '__bgColor': '#22263A', 'bgColor': None, 'useAutoIdentifier': False, 'bgRelPath': None, 'bgPos': None,
         'bgPivotX': 0.5, 'bgPivotY': 0.5, '__smartColor': '#ADADB5', '__bgPos': None, 'externalRelPath': None,
         'fieldInstances': [field_instance('title', 'String', UID['title'], room['title']),
-                           field_instance('theme', 'Theme', UID['theme'], room['theme'])],
+                           field_instance('theme', 'Theme', UID['theme'], room['theme'])]
+                          + [field_instance(name, 'String', UID[name], room['settings'].get(name, '')) for name in ROOM_FIELDS],
         'layerInstances': [layer('Entities', 'Entities', entityInstances=entities),
                            layer('Tiles', 'IntGrid', intGridCsv=[VALUE_OF.get(ch, 0) for row in rows for ch in row])],
         '__neighbours': [],
@@ -268,7 +280,9 @@ def ldtk_to_room(level, bottom):
     return {'name': level['identifier'], 'rows': [''.join(r) for r in grid],
             'x': level['worldX'] // GRID, 'y': (bottom - level['worldY'] - level['pxHei']) // GRID,
             'title': field_value(level['fieldInstances'], 'title', level['identifier']),
-            'theme': field_value(level['fieldInstances'], 'theme', 'cave'), 'fields': fields}
+            'theme': field_value(level['fieldInstances'], 'theme', 'cave'), 'fields': fields,
+            'settings': {name: field_value(level['fieldInstances'], name) for name in ROOM_FIELDS
+                         if field_value(level['fieldInstances'], name)}}
 
 
 # ----------------------------------------------------------------------------------------------
@@ -277,7 +291,7 @@ def ldtk_to_room(level, bottom):
 
 def read_text_world(list_path):
     folder = os.path.dirname(list_path)
-    rooms, theme, extra = [], 'cave', []
+    rooms, theme, extra, settings = [], 'cave', [], []
     for line in open(list_path):
         words = line.split('#', 1)[0].split() if not line.lstrip().startswith('#') else []
         if not words:
@@ -286,12 +300,16 @@ def read_text_world(list_path):
             theme = words[1]
         elif words[0] == 'entity':
             extra.append(words[1:])
+        elif words[0] == 'room':
+            settings.append(words[1:])
         else:
             name = words[0][:-4] if words[0].endswith('.txt') else words[0]
             rows = open(os.path.join(folder, name + '.txt')).read().rstrip('\n').split('\n')
             rooms.append({'name': name, 'rows': rows, 'x': int(words[1]), 'y': int(words[2]),
-                          'title': ' '.join(words[3:]), 'theme': theme, 'fields': {}})
+                          'title': ' '.join(words[3:]), 'theme': theme, 'fields': {}, 'settings': {}})
     by_name = {r['name']: r for r in rooms}
+    for room, *pairs in settings:
+        by_name[room]['settings'].update(dict(p.split('=', 1) for p in pairs))
     for room, x, y, *pairs in extra:
         by_name[room]['fields'][(int(x), int(y))] = dict(p.split('=', 1) for p in pairs)
     return rooms
@@ -307,6 +325,9 @@ def write_text_world(rooms, folder):
             lines.append(f'theme {theme}')
         lines.append(f"{room['name']:<12} {room['x']:>5} {room['y']:>5}  {room['title']}")
         open(os.path.join(folder, room['name'] + '.txt'), 'w').write('\n'.join(room['rows']) + '\n')
+    for room in rooms:
+        if room.get('settings'):
+            lines.append(f"room {room['name']} " + ' '.join(f'{k}={v}' for k, v in room['settings'].items()))
     for room in rooms:
         for (x, y), values in sorted(room['fields'].items(), key=lambda kv: (kv[0][1], kv[0][0])):
             lines.append(f"entity {room['name']} {x} {y} " + ' '.join(f'{k}={v}' for k, v in values.items()))

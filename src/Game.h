@@ -53,7 +53,7 @@ public:
     sf::Vector2f playerPosition() const;
 
 private:
-    enum class Screen { Title, Slots, ConfirmErase, Options, Controls, Playing, Paused, Complete, Map, Talking };
+    enum class Screen { Title, Slots, ConfirmErase, Options, Controls, Playing, Paused, Complete, Map, Talking, Shop, Quests };
 
     // Moving from one room into the next: the camera pans across from the old one.
     struct Transition
@@ -104,6 +104,15 @@ private:
     std::string gemTotal() const;            // "GEMS 5/20"
     std::string gemTally(size_t room) const; // "1/2", or empty if the room has none
 
+    // Quests, races and the shop (see assets/quests.txt and assets/outfits.txt)
+    void act(const std::string& command); // a conversation's command: see Dialogue::isCommand
+    int gemsFound() const;
+    int money() const;                    // gems found, less what's been spent
+    std::vector<std::string> ownedOutfits() const; // the classic look first
+    void wear(const std::string& look);
+    void startRace(const std::string& id);
+    void checkQuestItemsAndRaces(float dt); // picking things up, crossing finishing lines, the clock
+
     // Talking
     void startTalk(const Npc& npc);
     void endTalk();
@@ -121,7 +130,8 @@ private:
     // Levers: pulling one opens the gates in its room, from then on.
     std::optional<size_t> leverInReach() const;
     void pullLever();
-    void applyGates(); // every room's gates, open or shut as the slot says
+    void applyGates(); // every room's gates, open or shut, and lamps, lit or not, as the slot says
+    std::string lampKey(size_t room, size_t lamp) const; // the flag that it's lit
 
     // Map
     void openMap(bool travel = false);
@@ -225,6 +235,14 @@ private:
     float messageTimer = 0.f;
     bool shownRockHint = false;
     std::optional<Talk> talk;
+    bool pendingShop = false;                // asked for in a conversation: opened when it's over
+    std::optional<std::string> pendingRace;  // the same for a race
+    struct Race
+    {
+        std::string id;
+        float left; // seconds
+    };
+    std::optional<Race> race;
     std::string notice;      // see showNotice
     float noticeTimer = 0.f;
     float fade = 0.f;        // > 0 while fading in after travelling

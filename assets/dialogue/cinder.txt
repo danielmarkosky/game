@@ -1,0 +1,26 @@
+# Cinder, the smith at the Forge, at the foot of the Ember Chimney: a race up it.
+
+--- !asked_race_chimney
+Cinder: Hot enough for you? This is the Forge. I make hooks, chains, and bad decisions.
+Cinder: A girl came through here years back. Green scarf. Went up the Chimney like a spark up a flue.
+Cinder: Nobody's climbed it faster since. Think you can? The top of the Chimney, in forty-five seconds.
+set asked_race_chimney
+? Let's go.       -> race
+? Not yet.        -> end
+= race
+race chimney
+
+--- won_chimney !paid_chimney
+Cinder: Hah! Faster than a spark. Take my old apron. It's seen worse.
+give outfit smith
+set paid_chimney
+
+--- !won_chimney
+Cinder: The Chimney's waiting. Forty-five seconds, from right here.
+? Go!          -> race
+? Not now.     -> end
+= race
+race chimney
+
+--- won_chimney
+Cinder: Sparks fly upward, climber. So do you.

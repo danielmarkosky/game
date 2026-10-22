@@ -1,0 +1,6 @@
+# One of Ash's notes: in her old camp at the bottom of the crevasse.
+
+---
+Ash: Three days down here, learning this rope. My hands are raw, and I can finally hit what I aim at.
+Ash: I'm leaving it for whoever falls in next. I'll find a longer one higher up. - A.
+set read_note_crevasse

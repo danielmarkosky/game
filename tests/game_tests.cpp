@@ -159,7 +159,7 @@ TEST(GameFlow, ChangingAKeyInTheControls) {
     Game game(world(), {.headless = true, .saveFolder = saves});
     game.pressKey(sf::Keyboard::Down);
     game.pressKey(sf::Keyboard::Enter); // OPTIONS
-    for (int ii = 0; ii < 7; ++ii) game.pressKey(sf::Keyboard::Down);
+    for (int ii = 0; ii < 6; ++ii) game.pressKey(sf::Keyboard::Down); // (no outfits out of a game)
     game.pressKey(sf::Keyboard::Enter); // CONTROLS
     ASSERT_EQ(game.screenName(), "controls");
     for (int ii = 0; ii < 4; ++ii) game.pressKey(sf::Keyboard::Down);
@@ -197,4 +197,35 @@ TEST(GameFlow, AGamepadWorksTheMenusAndThePause) {
     EXPECT_EQ(game.screenName(), "map");
     game.pressButton(1);
     EXPECT_EQ(game.screenName(), "playing");
+}
+
+TEST(GameFlow, TuckSellsOutfitsForGems) {
+    const std::string saves = freshSaves("game_flow_shop");
+    std::ofstream(saves + "/slot1.txt") << "bench market 0\nexplored market\nability rope\nspent -4\n"; // 4 gems to spend
+    Game game(world(), {.headless = true, .saveFolder = saves});
+    game.pressKey(sf::Keyboard::Enter);
+    game.pressKey(sf::Keyboard::Enter);
+    ASSERT_EQ(game.roomName(), "market");
+    // Along from the bench to Tuck (W by the bench would sit back down), and talk.
+    game.advance(0.6f, walking(1.f));
+    for (int i = 0; i < 40 && game.screenName() != "talking"; ++i) {
+        game.advance(0.1f, walking(1.f));
+        game.pressKey(sf::Keyboard::W);
+    }
+    ASSERT_EQ(game.screenName(), "talking");
+    for (int i = 0; i < 200 && game.screenName() == "talking"; ++i) {
+        game.advance(0.05f);
+        game.pressKey(sf::Keyboard::Enter); // through the lines, and "Let's see what you've got"
+    }
+    ASSERT_EQ(game.screenName(), "shop");
+    // The classic look first, then the kid, 3 gems.
+    game.pressKey(sf::Keyboard::Down);
+    game.pressKey(sf::Keyboard::Enter);
+    EXPECT_TRUE(game.state().outfits.count("kid"));
+    EXPECT_EQ(game.state().wearing, "kid");
+    EXPECT_EQ(game.state().spent, -1);
+    // The frog is 4: one gem short.
+    game.pressKey(sf::Keyboard::Down);
+    game.pressKey(sf::Keyboard::Enter);
+    EXPECT_FALSE(game.state().outfits.count("frog"));
 }

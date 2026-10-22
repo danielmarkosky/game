@@ -1,12 +1,15 @@
 #include "Game.h"
 #include "src/GameShared.h"
+#include "src/Catalog.h"
 #include "src/Hud.h"
 #include "src/Physics.h"
 #include "src/Text.h"
 #include "src/utils.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
 #include <iostream>
+#include <sstream>
 
 using namespace game_detail;
 
@@ -124,6 +127,7 @@ void Game::spawnAtStart()
     needsSpawnPoint = false;
     sitting.reset();
     waking = false;
+    level->reset(); // icicles back, crumbled blocks whole again
     player->respawn(checkpoint);
     particles.clear();
     transition.reset();
@@ -141,6 +145,7 @@ void Game::enterRoom(size_t index, Level::Side side)
     transition = Transition{levelIndex, drawCamera() + shift, checkpoint};
     levelIndex = index;
     level = rooms[index];
+    level->reset();
     player->enterLevel(level, shift, side == Level::Side::Top);
     particles.clear();
 
@@ -201,6 +206,7 @@ bool Game::hasAbility(const std::string& ability) const
 
 bool Game::hasFact(const std::string& fact) const
 {
+    if (progress.items.count(fact)) return true;
     for (const AbilityInfo& info : ABILITIES) {
         if (fact == info.id) return hasAbility(fact);
     }
@@ -323,7 +329,8 @@ void Game::startTalk(const Npc& npc)
         auto had = [&](size_t n) { return progress.conversations.count(npc.dialogue + " " + std::to_string(n)) > 0; };
         const std::optional<size_t> conversation = dialogue.next(had, [this](const std::string& f) { return hasFact(f); });
         if (!conversation) return;
-        talk.emplace(npc, std::move(dialogue), *conversation, [this](const std::string& flag) { progress.flags.insert(flag); });
+        talk.emplace(npc, std::move(dialogue), *conversation, [this](const std::string& flag) { progress.flags.insert(flag); },
+                     [this](const std::string& command) { act(command); });
     } catch (const std::exception&) {
         return; // nothing to say; game_tests checks every character's file is there
     }
@@ -336,6 +343,112 @@ void Game::endTalk()
     saveProgress();
     talk.reset();
     openScreen(Screen::Playing);
+    // What the conversation asked for, now it's over.
+    if (pendingShop) {
+        pendingShop = false;
+        openScreen(Screen::Shop);
+    }
+    if (pendingRace) {
+        startRace(*pendingRace);
+        pendingRace.reset();
+    }
+}
+
+void Game::act(const std::string& command)
+{
+    std::istringstream words(command);
+    std::string verb, what, name;
+    words >> verb >> what >> name;
+    if (verb == "shop") {
+        pendingShop = true;
+    } else if (verb == "race") {
+        pendingRace = what;
+    } else if (verb == "give" && what == "gems") {
+        const int gems = std::atoi(name.c_str());
+        progress.spent -= gems;
+        showNotice("+" + std::to_string(gems) + " GEMS");
+        audio.play(Audio::Sfx::Gem);
+    } else if (verb == "give" && what == "outfit") {
+        progress.outfits.insert(name);
+        const catalog::Outfit* outfit = catalog::outfit(name);
+        showMessage("A NEW OUTFIT", (outfit ? outfit->name : hud::upper(name)) + ": WEAR IT FROM THE PAUSE MENU, OPTIONS");
+        audio.play(Audio::Sfx::Pickup);
+    } else if (verb == "give" && what == "item") {
+        progress.items.insert(name);
+    } else if (verb == "take" && what == "item") {
+        progress.items.erase(name);
+    }
+    saveProgress();
+}
+
+int Game::gemsFound() const
+{
+    int found = 0;
+    for (size_t room = 0; room < rooms.size(); ++room) {
+        for (size_t gem = 0; gem < rooms[room]->gems().size(); ++gem) found += gemFound(room, gem) ? 1 : 0;
+    }
+    return found;
+}
+
+int Game::money() const
+{
+    return gemsFound() - progress.spent;
+}
+
+std::vector<std::string> Game::ownedOutfits() const
+{
+    std::vector<std::string> owned = {"classic"};
+    for (const catalog::Outfit& outfit : catalog::outfits()) {
+        if (outfit.look != "classic" && progress.outfits.count(outfit.look)) owned.push_back(outfit.look);
+    }
+    return owned;
+}
+
+void Game::wear(const std::string& look)
+{
+    progress.wearing = look;
+    settings.skin = look; // and on the title screen
+    player->setSkin(Player::lookNamed(look));
+    saveProgress();
+    saveSettings();
+}
+
+void Game::startRace(const std::string& id)
+{
+    const catalog::Race* info = catalog::race(id);
+    if (!info) return;
+    race = Race{id, info->seconds};
+    showMessage("GO!", "GET TO THE FINISH IN " + std::to_string(static_cast<int>(info->seconds)) + " SECONDS");
+    audio.play(Audio::Sfx::Checkpoint);
+}
+
+void Game::checkQuestItemsAndRaces(float dt)
+{
+    const sf::FloatRect box = player->hitbox();
+    if (auto found = level->questItemAt(box)) {
+        const std::string& id = level->questItems()[*found].item;
+        if (!progress.flags.count("got_" + id)) {
+            progress.flags.insert("got_" + id);
+            progress.items.insert(id);
+            const catalog::Item* info = catalog::item(id);
+            showMessage(info ? info->name : hud::upper(id), info ? info->text : "");
+            audio.play(Audio::Sfx::Pickup);
+            saveProgress();
+        }
+    }
+    if (!race) return;
+    race->left -= dt;
+    if (auto finish = level->finishAt(box); finish && level->finishes()[*finish].race == race->id) {
+        progress.flags.insert("won_" + race->id);
+        showMessage("YOU WON!", "WITH " + std::to_string(static_cast<int>(std::ceil(race->left))) + " SECONDS TO SPARE");
+        audio.play(Audio::Sfx::Pickup);
+        race.reset();
+        saveProgress();
+    } else if (race->left <= 0.f) {
+        showMessage("TOO SLOW!", "TALK TO THEM AGAIN TO HAVE ANOTHER GO");
+        audio.play(Audio::Sfx::Death);
+        race.reset();
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -373,6 +486,7 @@ void Game::sitDown(size_t bench)
     const sf::Vector2f seat = level->benches()[bench];
     checkpoint = {std::round(seat.x + (Level::BENCH_WIDTH - Player::WIDTH) * 0.5f), seat.y};
     needsSpawnPoint = false;
+    level->reset(); // icicles back, crumbled blocks whole again
     player->respawn(checkpoint);
     updateCamera(0.f, true);
     sitting = bench;
@@ -434,7 +548,17 @@ void Game::pullLever()
 
 void Game::applyGates()
 {
-    for (size_t room = 0; room < rooms.size(); ++room) rooms[room]->setGatesOpen(progress.flags.count("open_" + levelKey(room)) > 0);
+    for (size_t room = 0; room < rooms.size(); ++room) {
+        rooms[room]->setGatesOpen(progress.flags.count("open_" + levelKey(room)) > 0);
+        for (size_t lamp = 0; lamp < rooms[room]->lamps().size(); ++lamp) {
+            rooms[room]->setLampLit(lamp, progress.flags.count(lampKey(room, lamp)) > 0);
+        }
+    }
+}
+
+std::string Game::lampKey(size_t room, size_t lamp) const
+{
+    return "lamp_" + levelKey(room) + "_" + std::to_string(lamp);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -519,6 +643,7 @@ void Game::frame(float frameTime, std::optional<PlayerInput> scripted)
     audio.update(frameTime);
     // The air: what drifts in it moves along with the camera, at its own depth.
     ambience.setTheme(levels[levelIndex].theme);
+    ambience.setDark(level->isDark());
     const sf::Vector2f cameraWorld = drawCamera() + roomOrigin(levelIndex);
     const sf::Vector2f moved = cameraWorld - lastCamera;
     lastCamera = cameraWorld;
@@ -624,6 +749,8 @@ std::string Game::screenName() const
         case Screen::ConfirmErase: return "erase";
         case Screen::Options: return "options";
         case Screen::Controls: return "controls";
+        case Screen::Shop: return "shop";
+        case Screen::Quests: return "quests";
         case Screen::Playing: return "playing";
         case Screen::Paused: return "paused";
         case Screen::Complete: return "complete";
@@ -818,6 +945,7 @@ void Game::step(float dt)
         deathTimer -= dt;
         if (deathTimer <= 0.f) {
             deathTimer = 0.f;
+            level->reset(); // icicles back, crumbled blocks whole again
             player->respawn(checkpoint);
             audio.play(Audio::Sfx::Respawn);
             particles.spawn(player->centre(), {.count = 12, .speed = 30.f, .life = 0.4f, .gravity = 0.f,
@@ -827,6 +955,7 @@ void Game::step(float dt)
         return;
     }
 
+    level->update(dt, player->hitbox());
     player->update(dt);
     showEffects(player->takeEvents());
 
@@ -861,6 +990,7 @@ void Game::step(float dt)
     if (const Pickup* pickup = level->pickupAt(player->getPosition(), Player::HEIGHT, Player::WIDTH); pickup && !hasAbility(pickup->ability)) {
         collect(*pickup);
     }
+    checkQuestItemsAndRaces(dt);
     if (auto gem = level->gemAt(player->getPosition(), Player::HEIGHT, Player::WIDTH); gem && !gemFound(levelIndex, *gem)) {
         progress.gems.insert(gemKey(levelIndex, *gem));
         saveProgress();
@@ -936,6 +1066,19 @@ void Game::showEffects(const std::vector<PlayerEvent>& events)
                 break;
             case PlayerEvent::Type::RopeWrapped:
                 particles.spawn(e.position, {.count = 4, .speed = 30.f, .life = 0.2f, .gravity = 100.f, .colors = sparks});
+                break;
+            case PlayerEvent::Type::LeverTugged:
+                audio.play(Audio::Sfx::RopeClink, 0.7f);
+                if (!level->gatesOpen()) pullLever();
+                break;
+            case PlayerEvent::Type::LampTugged:
+                if (e.index >= 0 && !level->lamps()[static_cast<size_t>(e.index)].lit) {
+                    level->setLampLit(static_cast<size_t>(e.index), true);
+                    progress.flags.insert(lampKey(levelIndex, static_cast<size_t>(e.index)));
+                    saveProgress();
+                    audio.play(Audio::Sfx::Checkpoint);
+                    particles.spawn(e.position, {.count = 14, .speed = 40.f, .life = 0.5f, .gravity = -20.f, .colors = sparks});
+                }
                 break;
             case PlayerEvent::Type::RopeBounced:
                 audio.play(Audio::Sfx::RopeClink);

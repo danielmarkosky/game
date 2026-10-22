@@ -57,6 +57,10 @@ Ambience::Style Ambience::styleFor(const std::string& theme)
         s = {45, {3.f, -16.f}, 5.f, true, {sf::Color(255, 170, 70, 230), sf::Color(255, 110, 50, 210), sf::Color(255, 230, 140, 200)}, 0.45f, sf::Color(255, 160, 90)};
     } else if (theme == "ruins") {
         s = {40, {1.f, -6.f}, 7.f, true, {sf::Color(110, 240, 210, 220), sf::Color(255, 140, 220, 200), sf::Color(190, 255, 240, 180)}, 0.6f, sf::Color(150, 255, 225)};
+    } else if (theme == "ice") {
+        s = {50, {-3.f, 6.f}, 5.f, true, {sf::Color(200, 240, 255, 220), sf::Color(140, 210, 255, 190), sf::Color(255, 255, 255, 200)}, 0.5f, sf::Color(170, 220, 255)};
+    } else if (theme == "sky") {
+        s = {34, {28.f, -2.f}, 3.f, false, {sf::Color(255, 255, 255, 170), sf::Color(230, 240, 255, 130)}, 0.f, sf::Color::White};
     } else if (theme == "daylight") {
         s = {24, {10.f, -1.f}, 8.f, false, {sf::Color(255, 250, 210, 200), sf::Color(255, 255, 255, 160)}, 0.f, sf::Color::White};
     }
@@ -119,8 +123,40 @@ void Ambience::drawNear(sf::RenderTarget& target) const
     draw(target, true);
 }
 
+void Ambience::setDark(bool isDark)
+{
+    dark = isDark;
+}
+
+bool Ambience::isDark() const
+{
+    return dark;
+}
+
 void Ambience::drawLight(sf::RenderTarget& target, const std::vector<Light>& lights) const
 {
+    if (dark) {
+        // The dark, with the lights adding to it, laid over everything: where it's black you see
+        // nothing, where a light falls you see what's there.
+        const sf::Vector2u size = target.getSize();
+        if (lightMap.getSize() != size) lightMap.create(size.x, size.y);
+        lightMap.clear(sf::Color(14, 12, 22));
+        sf::Sprite spot(glow);
+        const float glowSize = static_cast<float>(glow.getSize().x);
+        for (const Light& light : lights) {
+            spot.setOrigin(glowSize * 0.5f, glowSize * 0.5f);
+            spot.setScale(light.radius * 2.6f / glowSize, light.radius * 2.6f / glowSize);
+            spot.setPosition(light.position);
+            sf::Color colour = light.color;
+            colour.a = 255;
+            spot.setColor(colour);
+            lightMap.draw(spot, sf::BlendAdd);
+            lightMap.draw(spot, sf::BlendAdd);
+        }
+        lightMap.display();
+        target.draw(sf::Sprite(lightMap.getTexture()), sf::BlendMultiply);
+        return;
+    }
     if (style.darkness > 0.f) {
         sf::Sprite shade(vignette);
         shade.setColor(sf::Color(255, 255, 255, static_cast<sf::Uint8>(255.f * style.darkness)));

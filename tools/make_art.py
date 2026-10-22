@@ -230,6 +230,40 @@ slick = ['3333333w',
          '21111111']
 
 
+# Ice: solid and grabbable by the rope, but you slide on it and hands don't hold on it.
+ICE = {'1': rgb('#5a8ab8'), '2': rgb('#9ad0f0'), '3': rgb('#d8f4ff'), 'w': rgb('#ffffff')}
+ice_tile = ['33333333',
+            '3w222232',
+            '322w2221',
+            '3222w221',
+            '32222w21',
+            '3222222w',
+            '32w22221',
+            '21111111']
+
+# Crumbling stone: cracked, it gives way a moment after you stand on it, and comes back.
+CRUMBLE = {'0': rgb('#3a2c24'), '1': rgb('#7a6250'), '2': rgb('#a8886c'), '3': rgb('#cfb090')}
+crumble_tile = ['33332333',
+                '32220221',
+                '322022.1',
+                '3.20.221',
+                '32220221',
+                '322.0221',
+                '3222.021',
+                '11011101']
+
+# Cloud: stand on it, and it fades from under you after a moment.
+CLOUD = {'1': rgb('#b8c8e8'), '2': rgb('#e0eaff'), '3': rgb('#ffffff')}
+cloud_tile = ['.33.333.',
+              '33333333',
+              '32232223',
+              '22222222',
+              '.112211.',
+              '........',
+              '........',
+              '........']
+
+
 def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip), spike=SPIKE,
                rocks=(rock_a, rock_b, rock_c, rock_deep)):
     """The tiles of one theme: `rock` is the palette for the rock and everything growing on it."""
@@ -242,7 +276,8 @@ def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip),
         (spikes_up, CRYSTAL), (flip_v(spikes_up), CRYSTAL),                             # 16-17
         (rotate(spikes_up), CRYSTAL), (rotate(rotate(rotate(spikes_up))), CRYSTAL),     # 18-19
         (plank_left, WOOD), (plank_mid, WOOD), (plank_right, WOOD), (hook_block, METAL),  # 20-23
-        (gate, METAL), (slick, SLICK),                                                  # 24-25
+        (gate, METAL), (slick, SLICK), (ice_tile, ICE), (crumble_tile, CRUMBLE),                  # 24-27
+        (cloud_tile, CLOUD),                                                            # 28
     ]
 
 
@@ -445,6 +480,76 @@ SKINS = [
          body=['..CccccC..',
                '.gcccccCg.'],
          legs='bb', hand='g'),
+    # The outfits that are only won, not bought (see assets/outfits.txt).
+    dict(name='scholar',  # Moss's reward: round glasses, a plum robe, a book under the arm
+         palette={'h': '#3a2a2a', 'd': '#f1c9a0', 'D': '#c98f72', 'o': '#e8e8f0', 'e': '#16131f',
+                  'p': '#7a4a9a', 'P': '#4a2a6a', 'b': '#c8a050', 'n': '#2c2a3c'},
+         head=['...hhhh...',
+               '..hhhhhh..',
+               '..hddddh..',
+               '..oedoed..',
+               '..dddddd..',
+               '...DddD...'],
+         body=['.pppppp...',
+               'dpPpppbbd.',
+               '.ppPppbb..',
+               '..pppppP..'],
+         legs='nn', hand='d'),
+    dict(name='gardener',  # Bramble's reward: a straw hat, a green apron
+         palette={'y': '#e8c860', 'Y': '#b89038', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f',
+                  'g': '#5a9a4a', 'G': '#3a6a2a', 'w': '#e8e0d0', 'k': '#6a4434'},
+         head=['...yyyy...',
+               '.yyyyyyyy.',
+               'YYYYYYYYYY',
+               '..dddded..',
+               '..dddddd..',
+               '...DddD...'],
+         body=['.wggggww..',
+               'dwgggggwd.',
+               '.wggGggw..',
+               '..gggggG..'],
+         legs='kk', hand='d'),
+    dict(name='fisher',  # Pell's reward: a yellow rain hat and coat
+         palette={'y': '#f0d040', 'Y': '#c0a020', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 'n': '#3a4a6a'},
+         head=['...yyyy...',
+               '..yyyyyy..',
+               '.YYYYYYYY.',
+               '..dddded..',
+               '..dddddd..',
+               '...DddD...'],
+         body=['.yyyyyyy..',
+               'dyyYyyyyd.',
+               '.yyYyyyy..',
+               '..yyyyyY..'],
+         legs='nn', hand='d'),
+    dict(name='smith',  # Cinder's reward: a red headband, a leather apron, soot
+         palette={'h': '#2a2020', 'r': '#c8443a', 'd': '#e0a878', 'D': '#a87048', 'e': '#16131f',
+                  'l': '#8a5a34', 'L': '#5a3a20', 'w': '#d8d0c8', 'k': '#3a3030'},
+         head=['...hhhh...',
+               '..hhhhhh..',
+               '..rrrrrr..',
+               '..dddded..',
+               '..dDdddd..',
+               '...DddD...'],
+         body=['.wllllww..',
+               'dwlLlllwd.',
+               '.wllLllw..',
+               '..llllll..'],
+         legs='kk', hand='d'),
+    dict(name='scarf',  # for finding all of Ash's notes: her green scarf, on you
+         palette={'h': '#5a3a33', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 's': '#4ac08a',
+                  'S': '#2a8a5a', 'w': '#e8eef8', 'W': '#a9aec4', 'n': '#2c3a5c', 'k': '#6a4434'},
+         head=['..hhhhh...',
+               '.hhhhhhhh.',
+               '.hhddddhd.',
+               '..hdddded.',
+               '..dddddd..',
+               '...DddD...'],
+         body=['ssssssss..',
+               '.Swwwwww..',
+               '..wwwwwWd.',
+               '..wwwwWW..'],
+         legs='nk', hand='d'),
 ]
 
 # Legs for each pose, in leg (L) and foot (F) colours. A '-' row means the body bobs down a pixel.
@@ -572,6 +677,62 @@ NPCS = [
                '..wwwwwWd.',
                '..wwwwWW..'],
          legs='nk', hand='d'),
+    dict(name='tuck',  # the trader at the Market: an orange hat, a big moustache, a pack of wares
+         palette={'o': '#e8803a', 'O': '#a8502a', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 'm': '#5a3a2a',
+                  'c': '#7a8a5a', 'C': '#4a5a3a', 'k': '#4a3a30', 'b': '#a87a48'},
+         head=['...ooo....',
+               '..ooooo...',
+               '.OOOOOOO..',
+               '..dddded..',
+               '..mmmmmm..',
+               '...DddD...'],
+         body=['bccccccc..',
+               'bcCcccccd.',
+               'bcccccc...',
+               'b.cccccC..'],
+         legs='kk', hand='d'),
+    dict(name='bramble',  # the gardener of the Greenhouse: a crown of leaves and flowers, green overalls
+         palette={'j': '#5a9a3a', 'J': '#3a6a2a', 'p': '#e87bd0', 'd': '#d8a878', 'D': '#a87850', 'e': '#16131f',
+                  'g': '#6aa84a', 'G': '#3f7a35', 'w': '#e8d8b0', 'k': '#5a4030'},
+         head=['.jpjjjpj..',
+               '.jjjjjjjj.',
+               '..jddddj..',
+               '..dddded..',
+               '..dddddd..',
+               '...DddD...'],
+         body=['.wwggggw..',
+               'dgggGgggd.',
+               '.gggGggg..',
+               '..gggggG..'],
+         legs='kk', hand='d'),
+    dict(name='pell',  # the ice fisher of the Frost Caves: a fur-trimmed hood, a blue parka
+         palette={'f': '#e8e0d0', 'F': '#b8a890', 'b': '#3a6aa8', 'B': '#2a4a78', 'd': '#e8b890', 'D': '#b8865e',
+                  'e': '#16131f', 'k': '#3a3a4a'},
+         head=['..ffffff..',
+               '.fbbbbbbf.',
+               '.fbddddbf.',
+               '.fbdeddbf.',
+               '..fddddf..',
+               '...ffff...'],
+         body=['.bbbbbbb..',
+               'dbbBbbbbd.',
+               '.bbBbbbb..',
+               '..bbbbbB..'],
+         legs='kk', hand='d'),
+    dict(name='cinder',  # the smith at the Forge: a red bandana, a black beard, a leather apron
+         palette={'r': '#c8443a', 'R': '#8a2a2a', 'd': '#d89868', 'D': '#a86848', 'e': '#16131f', 'h': '#1a1414',
+                  'l': '#8a5a34', 'L': '#5a3a20', 'w': '#6a6060', 'k': '#2a2424'},
+         head=['...rrrr...',
+               '..rrrrrrR.',
+               '..dddddd..',
+               '..dddded..',
+               '..hhhhhh..',
+               '...hhhh...'],
+         body=['.wllllww..',
+               'dwlLlllwd.',
+               '.wllLllw..',
+               '..llllll..'],
+         legs='kk', hand='d'),
 ]
 
 
@@ -1704,6 +1865,64 @@ PROPS = [
                 '..sSsSsS..',
                 '.sSsSsSsSs',
                 'sSsSsSsSsS']], 0, False, None),
+    ('vent', [['.ZzZzZzZzZzZzZ.',
+               'ZzKzKzKzKzKzKzZ',
+               'ZZZZZZZZZZZZZZZ']], 0, False, (255, 140, 60, 20)),
+    ('ring', [['.zzz.',
+               'z...z',
+               'Z...Z',
+               '.ZZZ.']], 0, False, None),
+    ('lamp', [['..Z..', '.ZZZ.', 'ZsSsZ', 'ZSsSZ', 'ZsSsZ', '.ZZZ.']], 0, True, None),
+    ('lamp_lit', [['..Z..', '.ZZZ.', 'ZyfyZ', 'ZfyfZ', 'ZyfyZ', '.ZZZ.']], 0, True, (255, 200, 110, 60)),
+    ('icicle', [['iIi', 'iIi', 'iI.', '.I.', '.I.', '.i.']], 0, True, None),
+    ('note', [['....sS....',
+               '..xxsSx...',
+               '.xxxxxxx..',
+               'xKKxKKxx..',
+               'xxxxxxxxx.',
+               '.xxKKKxxx.',
+               'xxxxxxxx..']], 0, False, None),
+    ('page', [['.xxxxx', 'xKKxKx', 'xxxxxx', 'xKxKKx', 'xxxxx.']], 0, False, None),
+    ('lantern', [['..Z..', '.ZZZ.', 'ZyfyZ', 'ZfyfZ', 'ZyfyZ', 'ZZZZZ']], 0, False, (255, 200, 110, 24)),
+    ('lure', [['...z', '..z.', 'rdd.', 'rDdr', '.rr.']], 0, False, None),
+    ('finish_flag', [['WKfKf',
+                      'WfKfK',
+                      'WKfKf',
+                      'WfKfK',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'WW...']], 0, False, None),
+    ('stall', [['rrrrrrrrrrrrrrrrrrrrrr',
+                'rffrffrffrffrffrffrffr',
+                'rrrrrrrrrrrrrrrrrrrrrr',
+                '.W..................W.',
+                '.W..................W.',
+                '.W..dd...gg...DD....W.',
+                '.W.dyyd.gGGg.DDDD...W.',
+                'WWWWWWWWWWWWWWWWWWWWWW',
+                'wwwwwwwwwwwwwwwwwwwwww',
+                '.W..................W.',
+                '.W..................W.',
+                '.W..................W.']], 0, False, None),
+    ('anvil', [['ZZZZZZZZZZZ.',
+                '.ZzzzzzzzZZZ',
+                '...ZzzzZ....',
+                '...ZzzzZ....',
+                '..ZZZZZZZ...',
+                '.ZZZZZZZZZ..']], 0, False, None),
+    ('fishing_hole', [['.........W.....',
+                       '........W.z....',
+                       '.......W...z...',
+                       '......W.....z..',
+                       '.............z.',
+                       'IiiIiiiiiiIiIi.',
+                       'iBBBBBBBBBBBBi.',
+                       'IiiiiIiiiiiiiI.']], 0, False, None),
     ('icicles', [['iiIiiIiiIiiIii',
                   '.iI.iI..iI.iI.',
                   '.iI.i...iI..I.',
@@ -1752,7 +1971,122 @@ def outlined_prop(grid):
     return [''.join(r) for r in out]
 
 
-THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight, make_ruins]
+# Ice: the Frost Caves. Deep blue rock under frost, icicles, and ice pillars glowing in the dark.
+ICE_ROCK = {'0': rgb('#0e1828'), '1': rgb('#1e3048'), '2': rgb('#2a4462'), '3': rgb('#3c5c82'),
+            'g': rgb('#6aa0d0'), 'G': rgb('#a8d4f4'), 'h': rgb('#dcf2ff'), 'H': rgb('#ffffff'),
+            't': rgb('#4a90c8'), 'T': rgb('#8ad0ff'), 'w': rgb('#5a6a88')}
+frost_top = ['HHhHHHhH',
+             'hGhhGhhh',
+             'GgGG3GgG',
+             'g.g...g.',
+             '........',
+             '........',
+             '........',
+             '........']
+frost_top_b = ['HhHHHHHh',
+               'hhGhhGhG',
+               'GGgG3gGG',
+               '.g..g..g',
+               '........',
+               '........',
+               '........',
+               '........']
+ice_shard = ['........',
+             '........',
+             '...T....',
+             '..TT..T.',
+             '..Tt.TT.',
+             '.tTt.Tt.',
+             '.tTttTt.',
+             'ttttttt.']
+frost_drip = ['3gg3gg3.',
+              '.gT.Tg..',
+              '..T..T..',
+              '..t..T..',
+              '.....t..',
+              '........',
+              '........',
+              '........']
+
+
+def make_ice():
+    make_tiles('ice', tile_sheet(ICE_ROCK, (frost_top, frost_top_b), (ice_shard, ice_shard, frost_drip), IRON))
+    c = sky('#0c1424', '#16263c')
+    stars(c, count=40, seed=3, color='#8ad0ff', below=H)
+    c.save('themes/ice/sky.png')
+    c = cave_layer('#162438', top_depth=30, bottom_height=40, seed=2.7, jag=1)
+    stalactites(c, '#1c3050', seed=4, count=26, length=(20, 60))
+    c.save('themes/ice/far.png')
+    c = cave_layer('#101a2c', top_depth=18, bottom_height=26, seed=6.3, jag=2)
+    stalactites(c, '#2a5a8a', seed=11, count=14, length=(10, 34))
+    c.save('themes/ice/near.png')
+
+
+# Sky: pale stone islands among the clouds, high above everything, bright and windy.
+SKY_ROCK = {'0': rgb('#5a6478'), '1': rgb('#7a849a'), '2': rgb('#98a2b8'), '3': rgb('#bcc4d6'),
+            'g': rgb('#5aa060'), 'G': rgb('#86c86a'), 'h': rgb('#b8ec8c'), 'H': rgb('#e8ffc8'),
+            'f': rgb('#ffffff'), 'p': rgb('#f0d060'), 'w': rgb('#8a6a4a')}
+cloud_moss = ['HhHHhHHh',
+              'hGhhGhhG',
+              'GgGG3GgG',
+              '3g3333g3',
+              '3.3..3.3',
+              '........',
+              '........',
+              '........']
+cloud_moss_b = ['hHhHHHhH',
+                'GhhGhhGh',
+                'gGG3GGgG',
+                '33g33g33',
+                '.3..3..3',
+                '........',
+                '........',
+                '........']
+sky_tuft = ['........',
+            '........',
+            '........',
+            '........',
+            '...f....',
+            '..fpf.h.',
+            '...H.hH.',
+            '..HhHhH.']
+sky_wisp = ['........',
+            '........',
+            '........',
+            '........',
+            '........',
+            '.ff.....',
+            'fffff.f.',
+            '.fffffff']
+
+
+def make_sky():
+    make_tiles('sky', tile_sheet(SKY_ROCK, (cloud_moss, cloud_moss_b), (sky_tuft, sky_wisp, roots)))
+    c = sky('#5a9ae0', '#d8ecff')
+    glow(c, 270, 26, 10, '#fffbe0', rings=4)
+    for x, y, size in ((40, 30, 12), (120, 52, 16), (210, 20, 9), (290, 70, 14), (70, 96, 10), (180, 110, 13)):
+        cloud(c, x, y, size, '#ffffff', '#dce8f6')
+    c.save('themes/sky/sky.png')
+    c = Canvas(W, H)
+    rng = random.Random(21)
+    for _ in range(9):  # far islands, hanging in the haze
+        cx, cy, w = rng.randrange(W), rng.randrange(60, 130), rng.randrange(14, 34)
+        for y in range(10):
+            half = w * (1 - y / 10) * 0.5 + 2
+            for x in range(int(cx - half), int(cx + half) + 1):
+                c.put(x % W, cy + y, rgb('#a8bcd8'))
+        for x in range(cx - w // 2, cx + w // 2 + 1):
+            c.put(x % W, cy - 1, rgb('#b8d8b8'))
+    c.save('themes/sky/far.png')
+    c = Canvas(W, H)
+    for x in range(W):  # a bank of cloud below
+        top = int(H - 30 - 10 * periodic_noise(x, 8.1))
+        for y in range(top, H):
+            c.put(x, y, rgb('#f0f6ff' if y < top + 3 else '#e2ecf8'))
+    c.save('themes/sky/near.png')
+
+
+THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight, make_ruins, make_ice, make_sky]
 
 
 if __name__ == '__main__':

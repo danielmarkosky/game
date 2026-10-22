@@ -45,6 +45,8 @@ Rope::Rope(sf::Vector2f attachPos, sf::Vector2f anchor, std::shared_ptr<const Le
 
 sf::Vector2f Rope::anchor() const { return m_pivots.front(); }
 
+void Rope::moveAnchor(sf::Vector2f anchor) { m_pivots.front() = anchor; }
+
 sf::Vector2f Rope::pivot() const { return m_pivots.back(); }
 
 const std::vector<sf::Vector2f>& Rope::pivots() const { return m_pivots; }

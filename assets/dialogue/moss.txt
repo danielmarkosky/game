@@ -27,5 +27,18 @@ Moss: Far up, past the summit, there is a ledge where the wind blows so hard tha
 Moss: Climbers go up the mountain to find something. Some of them find it. Some of them stay with it.
 Moss: Go and see.
 
+--- wall_climb !asked_page
+Moss: One more thing, since you're climbing. My oldest book is missing its last page.
+Moss: The wind took it, years ago, up past the Summit. Into the Frost Caves, I expect. Everything cold ends up there.
+Moss: If you find it, I would very much like to read how it ends.
+set asked_page
+
+--- moss_page !gave_page
+Moss: The last page! The ink's run, but... yes. Yes. So that's how it ends.
+Moss: Take this. A scholar's robe. It's no use to me: I never go anywhere.
+take item moss_page
+give outfit scholar
+set gave_page
+
 --- wall_climb
 Moss: Go on. The books will still be here. They always are.

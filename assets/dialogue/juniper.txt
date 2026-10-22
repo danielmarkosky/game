@@ -1,4 +1,4 @@
-# Juniper, a hermit at the high camp at the foot of The Summit, where Ash left her throwing glove.
+# Juniper, a hermit at the high camp on The Summit, between the Frost Caves and the Ember Chimney.
 
 ---
 Juniper: Hah! Another one up through the Tall Hall. Sit, sit. The bench is warm.
@@ -8,15 +8,15 @@ Juniper: That lever pulls the old gate. Opens a drop straight back down to the C
 = ash
 Juniper: Ash? Stubborn as the mountain. She came up three winters back and never came down.
 Juniper: She's alive, if that's what you're asking. She keeps the signal fire at the very top, in the daylight.
-Juniper: She left a glove up that chimney there. Said a rope's no good if you can only throw it standing.
+Juniper: She camped in the Frost Caves for a while, west of here. Left a glove behind, she said. Too cold for it.
 set heard_ash_alive
 -> end
 = ahead
-Juniper: A long fall, and a hook you only catch on the way down. Then stepping stones, the chimney, the pendulums.
-Juniper: There's a glove up that chimney. Climb up and get it: you'll want to throw from the air out there.
+Juniper: West, up that wall, the Frost Caves: ice, and a frozen camp at the far end. East, a cliff, and the Ember Chimney.
+Juniper: That cliff's hook is too high to throw to from the ground. You'll want to throw from the air. Try the caves first.
 
 --- !air_throw
-Juniper: Up the chimney, climber. Hands on the rock, rope when the hands give out.
+Juniper: The Frost Caves first, climber. Hands on the rock, rope when the hands give out.
 
 ---
 Juniper: Past the pendulums the wind gets strong. They say it leaves feathers on the ledges, for those who reach them.

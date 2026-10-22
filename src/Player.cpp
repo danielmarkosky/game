@@ -100,18 +100,26 @@ void Player::update(float dt)
     } else {
         const float speed = std::abs(velocity.x);
         const bool along = inputX * velocity.x > 0.f; // holding the way you're going
+        // On ice there's hardly any grip: slow to start, slow to stop.
+        const bool ice = grounded && level->isOnIce(position, WIDTH);
+        const float groundAcceleration = ice ? p.iceAcceleration : p.runAcceleration;
+        const float groundDeceleration = ice ? p.iceDeceleration : p.runDeceleration;
         if (speed > p.runSpeed && (inputX == 0.f || along)) {
             // Faster than running, after a swing: slowing back down, holding on or not.
-            const float slowing = grounded ? p.runDeceleration : p.flingDeceleration;
+            const float slowing = grounded ? groundDeceleration : p.flingDeceleration;
             velocity.x = sign(velocity.x) * std::max(p.runSpeed, speed - slowing * dt);
         } else if (inputX != 0.f) {
             // Towards top speed. Turning round brakes as well, so it's quicker than starting.
-            const float acceleration = grounded ? p.runAcceleration : p.airAcceleration;
-            const float braking = along || velocity.x == 0.f ? 0.f : grounded ? p.runDeceleration : p.airDeceleration;
+            const float acceleration = grounded ? groundAcceleration : p.airAcceleration;
+            const float braking = along || velocity.x == 0.f ? 0.f : grounded ? groundDeceleration : p.airDeceleration;
             velocity.x = approach(velocity.x, inputX * p.runSpeed, (acceleration + braking) * dt);
         } else {
-            velocity.x = approach(velocity.x, 0.f, (grounded ? p.runDeceleration : p.airDeceleration) * dt);
+            velocity.x = approach(velocity.x, 0.f, (grounded ? groundDeceleration : p.airDeceleration) * dt);
         }
+    }
+    // Wind pushes whatever's in the air: jumping, falling, swinging.
+    if (!grounded && !clinging) {
+        velocity.x += level->wind() * dt;
     }
 
     // --- Vertical ---
@@ -121,6 +129,11 @@ void Player::update(float dt)
         if (jumping && !input.jumpHeld) gravity *= p.jumpReleaseGravity;
         velocity.y -= gravity * dt;
         if (velocity.y < -p.maxFallSpeed) velocity.y = -p.maxFallSpeed;
+        // Heat rising: lifted, up to a point.
+        if (level->updraftAt(exactCentre()) > 0.f && velocity.y < p.updraftSpeed) {
+            velocity.y = std::min(velocity.y + p.updraftLift * dt, p.updraftSpeed);
+            jumping = false;
+        }
     }
     if (grounded && velocity.y < 0.f) {
         // Standing: don't let gravity pile up in the sub-pixel remainder.
@@ -169,6 +182,11 @@ void Player::update(float dt)
     }
 
     // --- Rope ---
+    if (rope) {
+        // On a ring, it goes where the ring goes. In rock that's crumbled away, it's let go.
+        if (ringAnchor) rope->moveAnchor(level->ringPosition(*ringAnchor));
+        else if (!anchorHeld()) letGoOfRope();
+    }
     if (rope) {
         if (input.moveY != 0.f) rope->setLength(rope->length() - input.moveY * p.reelSpeed * dt);
 
@@ -234,6 +252,8 @@ void Player::updateThrow(float dt, bool grounded)
             else if (windUp <= 0.f) throwRope();
             break;
         case Hook::Out: {
+            // After a ring, wherever it's got to.
+            if (hookKind == RopeHit::Kind::Ring) hookTarget = level->ringPosition(static_cast<size_t>(hookIndex));
             const sf::Vector2f to = hookTarget - hookHead;
             const float left = magnitude(to), step = p.throwSpeed * dt;
             if (left > step) {
@@ -246,11 +266,17 @@ void Player::updateThrow(float dt, bool grounded)
             // It holds if the rope still reaches: you may have moved while it flew.
             if (hookCatches && distance(exactCentre(), hookTarget) <= ropeRange + 4.f) {
                 rope.emplace(exactCentre(), hookTarget, level);
+                if (hookKind == RopeHit::Kind::Ring) ringAnchor = static_cast<size_t>(hookIndex);
                 loose.reset();
                 hook = Hook::InHand;
                 airJumped = false;
                 clinging = 0;
                 events.push_back({PlayerEvent::Type::RopeAttached, hookTarget});
+            } else if (hookKind == RopeHit::Kind::Lever || hookKind == RopeHit::Kind::Lamp) {
+                // A tug, and back it comes.
+                const auto type = hookKind == RopeHit::Kind::Lever ? PlayerEvent::Type::LeverTugged : PlayerEvent::Type::LampTugged;
+                events.push_back({type, hookTarget, 0.f, hookIndex});
+                hook = Hook::Back;
             } else {
                 if (hookBounces) {
                     loose->bounce(exactCentre() - hookTarget);
@@ -280,16 +306,20 @@ void Player::throwRope()
     hookHead = from;
     loose.emplace(from, level);
     hookCatches = hookBounces = false;
-    if (auto hit = ropeTarget(input.aim)) {
-        hookTarget = *hit;
-        hookCatches = true;
-    } else if (auto bounce = ropeBounce(input.aim)) {
-        hookTarget = *bounce;
-        hookBounces = true;
-    } else if (auto wall = nearestSolidPoint(from, from + direction, level, 0.f, reach())) {
-        // Rock too close to hook on: it bounces off it, not through it.
-        hookTarget = *wall;
-        hookBounces = true;
+    hookKind = RopeHit::Kind::Rock;
+    hookIndex = -1;
+    if (const auto hit = level->ropeHit(from, from + direction, reach())) {
+        hookTarget = hit->point;
+        hookKind = hit->kind;
+        hookIndex = hit->index;
+        if (hit->kind == RopeHit::Kind::Ring) {
+            hookCatches = true;
+        } else if (hit->kind == RopeHit::Kind::Rock && hit->distance >= Rope::MIN_LENGTH) {
+            hookCatches = true;
+        } else if (hit->kind == RopeHit::Kind::Rock || hit->kind == RopeHit::Kind::Slick) {
+            // Slick stone, or rock too close to hook on: it bounces off it, not through it.
+            hookBounces = true;
+        }
     } else {
         hookTarget = from + direction * reach();
     }
@@ -302,6 +332,20 @@ void Player::letGoOfRope()
     loose.emplace(rope->path(), level);
     hook = Hook::Back;
     rope.reset();
+    ringAnchor.reset();
+}
+
+bool Player::anchorHeld() const
+{
+    // The rock the anchor's in: right next to it.
+    const sf::Vector2f anchor = rope->anchor();
+    for (float dx : {-0.5f, 0.5f}) {
+        for (float dy : {-0.5f, 0.5f}) {
+            const auto [x, y] = tailNumbers(anchor + sf::Vector2f(dx, dy));
+            if (level->isSolid(x, y)) return true;
+        }
+    }
+    return false;
 }
 
 bool Player::wallToGrab(int side) const
@@ -309,7 +353,7 @@ bool Player::wallToGrab(int side) const
     // Rock (or a gate, or a hook block) right beside your hands. Not slick stone.
     const float x = side > 0 ? position.x + WIDTH + 0.5f : position.x - 0.5f;
     const auto [tileX, tileY] = tailNumbers({x, position.y + HEIGHT - 2.f});
-    return level->isSolid(tileX, tileY) && !level->isSlick(tileX, tileY);
+    return level->isSolid(tileX, tileY) && !level->isSlick(tileX, tileY) && !level->isIce(tileX, tileY);
 }
 
 void Player::updateClimbing(float dt, bool grounded)
@@ -532,6 +576,7 @@ void Player::enterLevel(std::shared_ptr<const Level> lvl, sf::Vector2f shift, bo
     level = std::move(lvl);
     position += shift;
     rope.reset();
+    ringAnchor.reset();
     loose.reset();
     hook = Hook::InHand;
     clinging = 0;
@@ -548,6 +593,7 @@ void Player::respawn(sf::Vector2f pos)
     remainder = {0.f, 0.f};
     velocity = {0.f, 0.f};
     rope.reset();
+    ringAnchor.reset();
     loose.reset();
     hook = Hook::InHand;
     clinging = 0;
@@ -575,6 +621,8 @@ sf::Vector2f Player::exactCentre() const
 }
 
 sf::Vector2f Player::getPosition() const { return position; }
+
+sf::FloatRect Player::hitbox() const { return {position.x, position.y, WIDTH, HEIGHT}; }
 
 sf::Vector2f Player::getVelocity() const { return velocity; }
 
@@ -604,15 +652,17 @@ std::vector<PlayerEvent> Player::takeEvents()
     return taken;
 }
 
+std::optional<RopeHit> Player::aimHit(sf::Vector2f aim) const
+{
+    return level->ropeHit(exactCentre(), aim, reach());
+}
+
 std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 {
-    auto hit = nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, reach());
-    if (!hit) return hit;
-    // The tile the shot ran into is just past the surface point. Nothing sticks to slick stone.
-    const sf::Vector2f dir = (aim - exactCentre()) / distance(aim, exactCentre());
-    auto [tileX, tileY] = tailNumbers(*hit + dir * 0.25f);
-    if (level->isSlick(tileX, tileY)) return std::nullopt;
-    return hit;
+    const auto hit = aimHit(aim);
+    if (!hit) return std::nullopt;
+    if (hit->kind == RopeHit::Kind::Ring || (hit->kind == RopeHit::Kind::Rock && hit->distance >= Rope::MIN_LENGTH)) return hit->point;
+    return std::nullopt;
 }
 
 sf::Vector2f Player::aimAlong(sf::Vector2f direction) const
@@ -640,8 +690,10 @@ bool Player::isFacingLeft() const
 
 std::optional<sf::Vector2f> Player::ropeBounce(sf::Vector2f aim) const
 {
-    if (ropeTarget(aim)) return std::nullopt;
-    return nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, reach());
+    const auto hit = aimHit(aim);
+    if (!hit) return std::nullopt;
+    if (hit->kind == RopeHit::Kind::Slick || (hit->kind == RopeHit::Kind::Rock && hit->distance < Rope::MIN_LENGTH)) return hit->point;
+    return std::nullopt;
 }
 
 float Player::reach() const
@@ -654,6 +706,7 @@ void Player::setHasRope(bool has)
     hasRope = has;
     if (!has) {
         rope.reset();
+        ringAnchor.reset();
         loose.reset();
         hook = Hook::InHand;
     }

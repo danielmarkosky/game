@@ -1,0 +1,6 @@
+# One of Ash's notes: on the Last Ledge, below the top.
+
+---
+Ash: I can see the fire from here. Someone's kept it burning for years, alone, for climbers lost in the dark.
+Ash: If the keeper's gone, someone has to keep it. - A.
+set read_note_sky

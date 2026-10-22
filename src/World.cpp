@@ -1,6 +1,8 @@
 #include "World.h"
 #include <nlohmann/json.hpp>
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <stdexcept>
@@ -20,6 +22,9 @@ namespace
             case 5: return 'x';
             case 6: return '=';
             case 7: return 'o';
+            case 8: return '~';
+            case 9: return '&';
+            case 10: return '_';
             default: return '.';
         }
     }
@@ -66,7 +71,23 @@ namespace
             else if (kind == "Bench") level->addBench(tile);
             else if (kind == "Lever") level->addLever(tile);
             else if (kind == "Prop") level->addProp(field(fields, "kind"), tile);
+            else if (kind == "Icicle") level->addIcicle(tile);
+            else if (kind == "Updraft") level->addUpdraft(tile);
+            else if (kind == "Lamp") level->addLamp(tile);
+            else if (kind == "Item") level->addQuestItem(field(fields, "item"), tile);
+            else if (kind == "Finish") level->addFinish(field(fields, "race"), tile);
+            else if (kind == "Ring") {
+                // `to`: where its track ends, in tiles right and up from it, "6,0"; `period`: seconds there and back.
+                int dx = 6, dy = 0;
+                std::sscanf(field(fields, "to", "6,0").c_str(), "%d,%d", &dx, &dy);
+                const float period = std::strtof(field(fields, "period", "4").c_str(), nullptr);
+                level->addRing(tile, {tile.x + dx, tile.y + dy}, period);
+            }
         }
+        // The room: windy, dark.
+        const json& roomFields = data.at("fieldInstances");
+        level->setWind(std::strtof(field(roomFields, "wind", "0").c_str(), nullptr));
+        level->setDark(field(roomFields, "dark", "0") == "1");
         if (!level->hasStart()) throw std::runtime_error("Room " + data.at("identifier").get<std::string>() + " has no Start");
         return level;
     }

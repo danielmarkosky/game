@@ -22,6 +22,10 @@ struct Physics
     float jumpSpeed = 215.f;         // straight up, from the ground
     float jumpReleaseGravity = 3.f;  // gravity times this after letting go of jump early: short hops
     float maxFallSpeed = 300.f;
+    float iceAcceleration = 100.f;   // on ice: slow to get going...
+    float iceDeceleration = 40.f;    // ...and slower to stop
+    float updraftLift = 1400.f;      // an updraft pushing up, against gravity
+    float updraftSpeed = 180.f;      // up to this fast
     float coyoteTime = 0.1f;         // a jump still works this long after running off a ledge
     float jumpBufferTime = 0.1f;     // and pressed this long before landing
     float airJumpSpeed = 195.f;      // the double jump

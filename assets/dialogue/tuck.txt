@@ -1,0 +1,17 @@
+# Tuck, the trader at the Market, between the Crossroads and the garden: outfits, for gems.
+
+---
+Tuck: Customer! Come in, come in. Tuck's the name, and I sell the finest outfits on the mountain.
+Tuck: The only outfits on the mountain, if I'm honest. But fine ones!
+Tuck: I take gems. You'll find them all over, if you look where nobody else bothers to.
+? Let's see what you've got.     -> shop
+? Maybe later.                   -> end
+= shop
+shop
+
+---
+Tuck: Back again! Gems burning a hole in your pocket?
+? Show me the outfits.     -> shop
+? Just passing through.    -> end
+= shop
+shop

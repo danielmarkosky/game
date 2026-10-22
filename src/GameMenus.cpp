@@ -1,6 +1,7 @@
 // Game: the screens and menus, and the settings they change.
 #include "Game.h"
 #include "src/GameShared.h"
+#include "src/Catalog.h"
 #include "src/Hud.h"
 #include "src/Text.h"
 #include "src/utils.h"
@@ -16,9 +17,10 @@ namespace
     {
         PLAY, OPTIONS, QUIT, ERASE, ERASE_YES, ERASE_NO,
         RESUME, RETRY, MAIN_MENU, BACK, MAP,
-        WINDOW_SIZE, FULLSCREEN, SCREEN_SHAKE, TIMER, SKIN, MUSIC, SOUND, CONTROLS, RESET_CONTROLS,
+        WINDOW_SIZE, FULLSCREEN, SCREEN_SHAKE, TIMER, SKIN, MUSIC, SOUND, CONTROLS, RESET_CONTROLS, QUESTS,
         FIRST_SLOT = 1000,   // + slot number
         FIRST_ACTION = 2000, // + controls::Action, in the controls
+        FIRST_OUTFIT = 3000, // + its number in catalog::outfits(), in the shop
     };
 
     MenuItem button(int id, std::string label)
@@ -50,6 +52,8 @@ void Game::openScreen(Screen next)
         case Screen::Paused: menu.top = 78.f; menu.maxVisible = 9; break;
         case Screen::Complete: menu.top = 132.f; menu.maxVisible = 9; break;
         case Screen::Playing:
+        case Screen::Shop: menu.top = 44.f; menu.maxVisible = 10; break;
+        case Screen::Quests: menu.top = 160.f; menu.maxVisible = 1; break;
         case Screen::Map:
         case Screen::Talking: break;
     }
@@ -93,7 +97,11 @@ void Game::refreshMenu()
             items.push_back({FULLSCREEN, "FULLSCREEN", onOff(s.fullscreen), true});
             items.push_back({SCREEN_SHAKE, "SCREEN SHAKE", onOff(s.screenShake), true});
             items.push_back({TIMER, "TIMER", onOff(s.showTimer), true});
-            items.push_back({SKIN, "SKIN", hud::upper(Player::SKINS[skinIndex()]), true});
+            // What to wear: in a game, the outfits you've got.
+            if (returnScreen == Screen::Paused && slot >= 0) {
+                const catalog::Outfit* outfit = catalog::outfit(progress.wearing);
+                items.push_back({SKIN, "OUTFIT", outfit ? outfit->name : hud::upper(progress.wearing), true});
+            }
             items.push_back({MUSIC, "MUSIC", std::to_string(s.musicVolume), true});
             items.push_back({SOUND, "SOUNDS", std::to_string(s.soundVolume), true});
             items.push_back({CONTROLS, "CONTROLS", " ", false});
@@ -118,6 +126,7 @@ void Game::refreshMenu()
         case Screen::Paused:
             items.push_back(button(RESUME, "RESUME"));
             items.push_back(button(MAP, "MAP"));
+            items.push_back(button(QUESTS, "QUESTS"));
             items.push_back(button(RETRY, "RETRY"));
             items.push_back(button(OPTIONS, "OPTIONS"));
             items.push_back(button(MAIN_MENU, "MAIN MENU"));
@@ -126,6 +135,22 @@ void Game::refreshMenu()
             items.push_back(button(MAIN_MENU, "MAIN MENU"));
             break;
         case Screen::Playing:
+        case Screen::Shop: {
+            // Tuck's outfits: what's for sale, and what you've got already.
+            const auto& outfits = catalog::outfits();
+            for (size_t ii = 0; ii < outfits.size(); ++ii) {
+                const catalog::Outfit& o = outfits[ii];
+                const bool owned = o.look == "classic" || progress.outfits.count(o.look);
+                if (!owned && o.price <= 0) continue;
+                const std::string value = progress.wearing == o.look ? "WEARING" : owned ? "WEAR" : std::to_string(o.price) + " GEMS";
+                items.push_back({FIRST_OUTFIT + static_cast<int>(ii), o.name, value, false});
+            }
+            items.push_back({BACK, "THAT'S ALL", " ", false});
+            break;
+        }
+        case Screen::Quests:
+            items.push_back(button(BACK, "BACK"));
+            break;
         case Screen::Map:
         case Screen::Talking:
             break;
@@ -148,6 +173,7 @@ void Game::onMenuChoice(MenuChoice choice)
             break;
         case ERASE_NO: back(); break;
         case OPTIONS: openScreen(Screen::Options); break;
+        case QUESTS: openScreen(Screen::Quests); break;
         case CONTROLS: openScreen(Screen::Controls); break;
         case RESET_CONTROLS:
             settings.controls = {};
@@ -178,7 +204,22 @@ void Game::onMenuChoice(MenuChoice choice)
             changeSetting(choice.id, choice.direction == 0 ? 1 : choice.direction);
             break;
         default:
-            if (choice.id >= FIRST_ACTION) {
+            if (choice.id >= FIRST_OUTFIT) {
+                const catalog::Outfit& o = catalog::outfits()[static_cast<size_t>(choice.id - FIRST_OUTFIT)];
+                const bool owned = o.look == "classic" || progress.outfits.count(o.look);
+                if (!owned && money() < o.price) {
+                    showNotice("NOT ENOUGH GEMS");
+                    audio.play(Audio::Sfx::RopeClink);
+                } else {
+                    if (!owned) {
+                        progress.spent += o.price;
+                        progress.outfits.insert(o.look);
+                        audio.play(Audio::Sfx::Pickup);
+                    }
+                    wear(o.look);
+                }
+                refreshMenu();
+            } else if (choice.id >= FIRST_ACTION) {
                 rebinding = static_cast<controls::Action>(choice.id - FIRST_ACTION);
                 refreshMenu();
             } else if (choice.id >= FIRST_SLOT) {
@@ -199,6 +240,8 @@ void Game::back()
     switch (screen) {
         case Screen::Options: openScreen(returnScreen); break;
         case Screen::Controls: openScreen(Screen::Options); break;
+        case Screen::Shop: openScreen(Screen::Playing); break;
+        case Screen::Quests: openScreen(Screen::Paused); break;
         case Screen::Slots: openScreen(Screen::Title); break;
         case Screen::ConfirmErase: openScreen(Screen::Slots); break;
         case Screen::Paused: openScreen(Screen::Playing); break;
@@ -235,10 +278,11 @@ void Game::changeSetting(int id, int direction)
             break;
         }
         case SKIN: {
-            const int count = static_cast<int>(Player::SKINS.size());
-            const size_t next = static_cast<size_t>((static_cast<int>(skinIndex()) + direction + count) % count);
-            s.skin = Player::SKINS[next];
-            player->setSkin(next);
+            const std::vector<std::string> owned = ownedOutfits();
+            const auto at = std::find(owned.begin(), owned.end(), progress.wearing);
+            const int count = static_cast<int>(owned.size());
+            const int here = at == owned.end() ? 0 : static_cast<int>(at - owned.begin());
+            wear(owned[static_cast<size_t>((here + direction + count) % count)]);
             break;
         }
         default: break;
@@ -295,7 +339,9 @@ bool Game::inGame() const
         case Screen::Paused:
         case Screen::Complete:
         case Screen::Map:
-        case Screen::Talking: return true;
+        case Screen::Talking:
+        case Screen::Shop:
+        case Screen::Quests: return true;
         case Screen::Options:
         case Screen::Controls: return returnScreen == Screen::Paused;
         case Screen::Title:
@@ -307,7 +353,8 @@ bool Game::inGame() const
 
 size_t Game::skinIndex() const
 {
-    return Player::lookNamed(settings.skin);
+    // In a game, what you're wearing in it; otherwise what was worn last.
+    return Player::lookNamed(slot >= 0 ? progress.wearing : settings.skin);
 }
 
 std::string Game::slotSummary(const Progress& p) const
@@ -405,6 +452,46 @@ void Game::drawMenuScreen()
         case Screen::Talking:
             talk->draw(canvas, *player, skinIndex(), clockTime);
             break;
+        case Screen::Shop: {
+            hud::dim(canvas, 190);
+            hud::drawCentred(canvas, "TUCK'S OUTFITS", HALF_W, 12.f, hud::GOLD, 2.f);
+            hud::drawCentred(canvas, std::to_string(money()) + " GEMS TO SPEND", HALF_W, 30.f, hud::CYAN);
+            // The one picked, turning on the spot.
+            const auto& outfits = catalog::outfits();
+            size_t shown = skinIndex();
+            const size_t at = menu.selected();
+            size_t row = 0;
+            for (size_t ii = 0; ii < outfits.size(); ++ii) {
+                const bool owned = outfits[ii].look == "classic" || progress.outfits.count(outfits[ii].look);
+                if (!owned && outfits[ii].price <= 0) continue;
+                if (row++ == at) shown = Player::lookNamed(outfits[ii].look);
+            }
+            player->drawFigure(canvas, shown, {292.f, 110.f}, std::fmod(clockTime, 2.f) < 1.f, clockTime, 3.f);
+            hud::drawCentred(canvas, "UP / DOWN - CHOOSE    " + hint(controls::Action::Confirm) + " - BUY OR WEAR    " + hint(controls::Action::Back) + " - LEAVE", HALF_W, 168.f, hud::GREY);
+            break;
+        }
+        case Screen::Quests: {
+            hud::dim(canvas, 200);
+            hud::drawCentred(canvas, "QUESTS", HALF_W, 10.f, hud::GOLD, 2.f);
+            float y = 30.f;
+            int listed = 0;
+            for (const catalog::Quest& quest : catalog::quests()) {
+                if (!hasFact(quest.start)) continue;
+                const bool done = hasFact(quest.done);
+                hud::drawText(canvas, quest.title + (done ? "  - DONE" : ""), {24.f, y}, done ? hud::GREY : hud::WHITE);
+                y += 8.f;
+                if (!done) {
+                    for (const std::string& line : text::wrap(quest.text, 272.f)) {
+                        text::draw(canvas, line, {28.f, y}, hud::GREY);
+                        y += text::LINE_HEIGHT;
+                    }
+                }
+                y += 4.f;
+                ++listed;
+            }
+            if (listed == 0) hud::drawCentred(canvas, "NOTHING YET. PEOPLE WILL ASK.", HALF_W, 70.f, hud::GREY);
+            break;
+        }
         case Screen::Playing:
             break;
     }

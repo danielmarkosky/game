@@ -70,6 +70,18 @@ Dialogue Dialogue::load(const std::string& id)
     return dialogue;
 }
 
+bool Dialogue::isCommand(const std::string& command)
+{
+    std::istringstream words(command);
+    std::string verb, what, name;
+    words >> verb >> what >> name;
+    if (verb == "shop") return what.empty();
+    if (verb == "race") return !what.empty() && name.empty();
+    if (verb == "give") return (what == "gems" || what == "outfit" || what == "item") && !name.empty();
+    if (verb == "take") return what == "item" && !name.empty();
+    return false;
+}
+
 Dialogue Dialogue::parse(const std::string& text)
 {
     Dialogue dialogue;
@@ -102,6 +114,9 @@ Dialogue Dialogue::parse(const std::string& text)
         } else if (startsWith(line, "set ")) {
             step.kind = DialogueStep::Kind::Set;
             step.text = trim(line.substr(4));
+        } else if (isCommand(line)) {
+            step.kind = DialogueStep::Kind::Do;
+            step.text = line;
         } else if (startsWith(line, "? ")) {
             // Choices next to each other are one choice.
             const size_t arrow = line.find("->");
@@ -150,8 +165,9 @@ std::optional<size_t> Dialogue::next(const std::function<bool(size_t)>& had, con
     return lastAllowed;
 }
 
-DialogueRunner::DialogueRunner(const Conversation& c, std::function<void(const std::string&)> set)
-    : conversation(&c), setFlag(std::move(set))
+DialogueRunner::DialogueRunner(const Conversation& c, std::function<void(const std::string&)> set,
+                               std::function<void(const std::string&)> command)
+    : conversation(&c), setFlag(std::move(set)), act(std::move(command))
 {
     run(0);
 }
@@ -185,6 +201,9 @@ void DialogueRunner::run(size_t from)
             case DialogueStep::Kind::Line:
             case DialogueStep::Kind::Choice: return;
             case DialogueStep::Kind::Set: setFlag(steps[at].text); break;
+            case DialogueStep::Kind::Do:
+                if (act) act(steps[at].text);
+                break;
             case DialogueStep::Kind::Jump: jump(steps[at].text); return;
             // Reaching the next label is the end of a branch.
             case DialogueStep::Kind::Label: at = steps.size(); return;

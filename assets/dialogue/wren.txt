@@ -24,5 +24,16 @@ Wren: And keep your eyes up. There's something shiny stuck in the ceiling, just 
 --- told_wren
 Wren: Up the well, climber. If anyone can find her, it's someone holding her rope.
 
+--- !asked_lantern
+Wren: Oh, and climber. If you're ever down the Deep, below the Well, I dropped my old lantern there.
+Wren: Years ago. My hands aren't what they were. I'd give a lot to have it back.
+set asked_lantern
+
+--- wren_lantern !gave_lantern
+Wren: My lantern! Still lights, too. Here, for your trouble. I've been saving these for a rainy day.
+take item wren_lantern
+give gems 5
+set gave_lantern
+
 ---
 Wren: Up and out. And don't look down.

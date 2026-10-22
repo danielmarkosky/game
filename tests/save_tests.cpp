@@ -130,3 +130,17 @@ TEST(SaveFiles, SavingReplacesTheFileWhole) {
     for (const auto& entry : std::filesystem::directory_iterator(folder)) EXPECT_EQ(entry.path().extension(), ".txt") << entry.path();
     std::filesystem::remove_all(folder);
 }
+
+TEST(Progress, KeepsItemsOutfitsAndWhatsBeenSpent) {
+    Progress p;
+    p.items = {"moss_page"};
+    p.outfits = {"fox", "scholar"};
+    p.wearing = "fox";
+    p.spent = 6;
+    const Progress loaded = Progress::parse(p.serialize());
+    EXPECT_EQ(loaded.items, p.items);
+    EXPECT_EQ(loaded.outfits, p.outfits);
+    EXPECT_EQ(loaded.wearing, "fox");
+    EXPECT_EQ(loaded.spent, 6);
+    EXPECT_EQ(Progress::parse("").wearing, "classic");
+}
