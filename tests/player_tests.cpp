@@ -472,9 +472,10 @@ TEST(PlayerTest, TheRopeCooldownCarriesOnAfterLanding) {
 TEST(PlayerTest, EverySkinHasARowOfFrames) {
     sf::Image sheet;
     ASSERT_TRUE(sheet.loadFromFile(config::assetPath("gfx/player.png")));
-    // 9 frames of 12x14 per skin, one skin per row (see tools/make_art.py).
-    EXPECT_EQ(sheet.getSize().x, 9u * 12u);
-    EXPECT_EQ(sheet.getSize().y, Player::SKINS.size() * 14u);
+    // 10 frames of 12x14 per look, one look per row: the skins first (see tools/make_art.py).
+    EXPECT_EQ(sheet.getSize().x, 10u * 12u);
+    EXPECT_EQ(sheet.getSize().y, Player::LOOKS.size() * 14u);
+    for (size_t ii = 0; ii < Player::SKINS.size(); ++ii) EXPECT_STREQ(Player::LOOKS[ii], Player::SKINS[ii]);
 }
 
 TEST(PlayerTest, EnteringAnotherRoomKeepsTheSpeedButLetsGoOfTheRope) {
@@ -541,4 +542,36 @@ TEST(PlayerTest, WithoutThePickTheRopeOnlySticksToMetal) {
     player.setCanHookRock(true);
     player.handleInput(in);
     EXPECT_NE(player.getRope(), nullptr);
+}
+
+TEST(PlayerTest, DoubleJumpOnceUntilLanding) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({120.f, 8.f});
+    PlayerInput jump;
+    jump.jumpPressed = jump.jumpHeld = true;
+
+    // Without the feather, jumping in the air does nothing.
+    hold(player, jump, 0.3f);
+    const float fallingAt = player.getVelocity().y;
+    hold(player, jump, DT);
+    EXPECT_LE(player.getVelocity().y, fallingAt);
+    hold(player, {}, 2.f);
+    ASSERT_TRUE(player.isGrounded());
+
+    player.setCanDoubleJump(true);
+    hold(player, jump, 0.3f);
+    EXPECT_TRUE(player.hasAirJump());
+    hold(player, jump, DT);
+    EXPECT_FLOAT_EQ(player.getVelocity().y, Player::AIR_JUMP_SPEED);
+    EXPECT_FALSE(player.hasAirJump());
+    // Only once.
+    hold(player, {}, 0.1f);
+    const float before = player.getVelocity().y;
+    hold(player, jump, DT);
+    EXPECT_LT(player.getVelocity().y, before);
+    // Back on landing.
+    hold(player, {}, 2.f);
+    EXPECT_TRUE(player.isGrounded());
+    EXPECT_TRUE(player.hasAirJump());
 }

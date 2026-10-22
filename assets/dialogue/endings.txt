@@ -1,0 +1,18 @@
+# What the end screen says, by how the story went: the first one whose flags fit.
+# (Not a character: these are read the same way, but only the lines are used.)
+
+--- ash_home
+Ash came down the mountain with you.
+Behind you, the signal fire burned on. Someone new keeps it now.
+
+--- ash_stay
+You stayed at the top with Ash.
+Two keepers of one fire. The lost climbers never had it so good.
+
+--- ash_letgo
+You climbed out into the daylight alone, but lighter.
+Every night after, you could see the fire from home.
+
+---
+You climbed out into the daylight.
+Somewhere above, a signal fire burned. You never learned who kept it.

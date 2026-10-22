@@ -1,0 +1,13 @@
+# The ruins: old, glowing and strange, A Dorian.
+tempo 78
+lead 0.16 sine
+arp 0.07 updown
+pad 0.15
+bass 0.2 x.....x.
+echo 0.45
+
+chords Am Am D D | Fmaj7 Fmaj7 E E | Am Am D D | Fmaj7 G Am Am
+melody A4 - C5 - E5 - G5 -   | E5 - - - D5 - C5 -   | F#5 - A5 - D5 - - -  | E5 - F#5 - - - . .
+melody A5 - - - E5 - C5 -    | F5 - E5 - - - . .    | G#5 - - - E5 - B4 -  | E5 - - - - - . .
+melody C6 - - - B5 - A5 -    | G5 - E5 - - - . .    | F#5 - A5 - D6 - A5 - | F#5 - - - - - . .
+melody E5 - A5 - C6 - A5 -   | B5 - - - D6 - B5 -   | A5 - - - E5 - C5 -   | A4 - - - - - . .

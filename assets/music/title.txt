@@ -1,0 +1,13 @@
+# The title screen: wistful, F major. Every bar is 8 steps; see README.md.
+tempo 84
+lead 0.17 triangle
+arp 0.06 up
+pad 0.14
+bass 0.2 x...x...
+echo 0.3
+
+chords F C Dm Bb | F C Bb C | F C Dm Bb | Gm C F F
+melody A4 - C5 - F5 - - -   | E5 - D5 - C5 - - -   | D5 - F5 - A5 - - -   | G5 - F5 - D5 - - -
+melody C5 - - - F5 - A5 -   | G5 - - - E5 - C5 -   | D5 - F5 - Bb5 - - -  | G5 - - - - - . .
+melody A5 - - - C6 - A5 -   | G5 - - - E5 - G5 -   | F5 - - - A5 - D6 -   | D6 - C6 - Bb5 - - -
+melody Bb5 - - - G5 - D5 -  | E5 - G5 - C6 - - -   | A5 - - - F5 - C5 -   | F5 - - - - - . .

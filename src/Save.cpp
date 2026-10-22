@@ -56,6 +56,9 @@ Settings Settings::parse(const std::string& text)
             flag = on != 0;
         } else if (key == "skin") {
             words >> s.skin;
+        } else if (key == "music_volume" || key == "sound_volume") {
+            int level;
+            if (words >> level && level >= 0 && level <= 10) (key == "music_volume" ? s.musicVolume : s.soundVolume) = level;
         } else if (key == "last_slot") {
             int slot;
             if (words >> slot && slot >= 0 && slot < SaveFiles::SLOTS) s.lastSlot = slot;
@@ -73,6 +76,8 @@ std::string Settings::serialize() const
     out << "show_timer " << showTimer << "\n";
     out << "skin " << skin << "\n";
     out << "last_slot " << lastSlot << "\n";
+    out << "music_volume " << musicVolume << "\n";
+    out << "sound_volume " << soundVolume << "\n";
     return out.str();
 }
 
@@ -103,6 +108,9 @@ Progress Progress::parse(const std::string& text)
         } else if (key == "talked") {
             std::string dialogue;
             if (words >> dialogue >> x) p.conversations.insert(dialogue + " " + std::to_string(x));
+        } else if (key == "flag") {
+            std::string flag;
+            if (words >> flag) p.flags.insert(flag);
         } else if (key == "play_time") {
             words >> p.playTime;
         } else if (key == "deaths") {
@@ -126,6 +134,7 @@ std::string Progress::serialize() const
     for (const auto& ability : abilities) out << "ability " << ability << "\n";
     for (const auto& gem : gems) out << "gem " << gem << "\n";
     for (const auto& conversation : conversations) out << "talked " << conversation << "\n";
+    for (const auto& flag : flags) out << "flag " << flag << "\n";
     out << "play_time " << playTime << "\n";
     out << "deaths " << deaths << "\n";
     out << "finished " << finished << "\n";

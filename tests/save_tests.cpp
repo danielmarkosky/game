@@ -14,7 +14,8 @@ namespace
 }
 
 TEST(Settings, RoundTripThroughText) {
-    const Settings s{.windowScale = 3, .fullscreen = true, .screenShake = false, .showTimer = false, .skin = "robot", .lastSlot = 2};
+    const Settings s{.windowScale = 3, .fullscreen = true, .screenShake = false, .showTimer = false, .skin = "robot", .lastSlot = 2,
+                     .musicVolume = 3, .soundVolume = 10};
     const Settings loaded = Settings::parse(s.serialize());
     EXPECT_EQ(loaded.windowScale, 3);
     EXPECT_TRUE(loaded.fullscreen);
@@ -22,6 +23,8 @@ TEST(Settings, RoundTripThroughText) {
     EXPECT_FALSE(loaded.showTimer);
     EXPECT_EQ(loaded.skin, "robot");
     EXPECT_EQ(loaded.lastSlot, 2);
+    EXPECT_EQ(loaded.musicVolume, 3);
+    EXPECT_EQ(loaded.soundVolume, 10);
 }
 
 TEST(Settings, SkipBrokenLines) {

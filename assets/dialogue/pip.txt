@@ -2,17 +2,29 @@
 
 --- !long_rope
 Pip: Oh, hello! A new face. Welcome to the Crossroads. I'm Pip, and I draw maps.
-Pip: Keep your own map handy, by the way: M or Tab. It fills itself in as you go.
-Pip: East of here is the Hook Garden. Lovely place, if you like spikes.
-Pip: And up there is the Tall Hall. The walls are all crystal, nothing to hold on to. And the only hook is way, way up.
-You: Too far for my rope?
-Pip: Far too far. But they say there's a coil of long rope at the very end of the garden. That would do it.
+? Have you seen a climber with a green scarf?   -> ash
+? Where can I go from here?                     -> ways
+= ash
+Pip: Green scarf... Ash? Of course! She bought a map of the mountain from me. Paid in gems, too.
+Pip: She went up through the Tall Hall. But first she spent days in the ruins, west of here, with old Moss.
+set asked_pip
+-> ways
+= ways
+Pip: East is the Hook Garden. Lovely place, if you like spikes. West are the old ruins.
+Pip: And up there is the Tall Hall. Crystal walls, nothing to hold on to, and the only hook is way, way up.
+Pip: They say there's a coil of long rope at the far end of the garden. That would reach it.
+Pip: Oh, and sit on any bench you find. Good for resting, and for coming back to.
 
 --- !long_rope
-Pip: The garden's through the door to the east. The long rope should be at the far end of it.
+Pip: The garden's east. The long rope should be at the far end of it. The ruins are west, if you're curious.
+? Tell me about the ruins.     -> ruins
+? Thanks, Pip.                 -> end
+= ruins
+Pip: Nobody knows who built them. Moss lives at the bottom, in the Archive, with all the old books.
+Pip: She keeps something there that she says belongs to the wind. Whatever that means.
 
 --- long_rope
-Pip: You found the long rope! Well, then the Tall Hall is yours.
+Pip: You found the long rope! Then the Tall Hall is yours.
 Pip: Aim for the hook block way up there, and reel yourself in. Then out the door at the top.
 Pip: Past the hall are the mountains. I've never been that far. Come back and tell me about it?
 

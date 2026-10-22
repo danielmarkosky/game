@@ -23,7 +23,7 @@ struct PlayerInput
 // Something that happened during an update, so the game can show an effect for it.
 struct PlayerEvent
 {
-    enum class Type { Jumped, Landed, Stepped, RopeAttached, RopeWrapped, RopeBounced };
+    enum class Type { Jumped, AirJumped, Landed, Stepped, RopeAttached, RopeWrapped, RopeBounced };
     Type type;
     sf::Vector2f position;
     float strength = 0.f; // Landed: how fast the player was falling
@@ -38,14 +38,20 @@ public:
     // tools/make_art.py). Only the sprite changes: every skin has the same hitbox.
     static constexpr std::array<const char*, 10> SKINS = {
         "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom"};
+    // Every look in player.png: the skins, then the people you meet, who aren't for choosing.
+    static constexpr std::array<const char*, 15> LOOKS = {
+        "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom",
+        "wren", "pip", "moss", "juniper", "ash"};
     void setSkin(size_t index);
     // The skin running on the spot, standing at `feet`, for the options screen.
     void drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scale, float time) const;
-    // Someone else standing still in one of the skins, breathing, with their feet at `feet`
+    // Someone else standing still in one of the LOOKS, breathing, with their feet at `feet`
     // (screen pixels): the characters in the world and their faces in conversations.
-    void drawFigure(sf::RenderTarget& target, size_t skinIndex, sf::Vector2f feet, bool facingLeft, float time, float scale = 1.f) const;
-    // The index of a skin in SKINS by its name, or 0 if there's none called that.
-    static size_t skinNamed(const std::string& name);
+    void drawFigure(sf::RenderTarget& target, size_t lookIndex, sf::Vector2f feet, bool facingLeft, float time, float scale = 1.f) const;
+    // The index of a look in LOOKS by its name, or 0 if there's none called that.
+    static size_t lookNamed(const std::string& name);
+    // Sitting on a bench: drawn sitting, until moving again.
+    void setSitting(bool sit);
 
     // Once per rendered frame: reacts to button presses (shooting and releasing the rope, buffering jumps).
     void handleInput(const PlayerInput& input);
@@ -73,7 +79,11 @@ public:
     void setCanHookRock(bool can);
     // How far the rope reaches: ROPE_RANGE, or LONG_ROPE_RANGE with the long rope.
     void setRopeRange(float range);
-    // Where a rope shot towards `aim` would hit rock and bounce off, for want of the pick.
+    // With the updraft feather: one more jump in the air, until landing or catching the rope.
+    void setCanDoubleJump(bool can);
+    bool hasAirJump() const; // it could double jump now
+    // Where a rope shot towards `aim` would hit something and bounce off: rock without the pick,
+    // or slick stone.
     std::optional<sf::Vector2f> ropeBounce(sf::Vector2f aim) const;
     // False during the cooldown after leaving the rope.
     bool canShootRope() const;
@@ -92,6 +102,7 @@ public:
     static constexpr float JUMP_RELEASE_GRAVITY = 3.f;  // gravity multiplier when jump is let go early
     static constexpr float COYOTE_TIME = 0.1f;          // can still jump this long after leaving a ledge
     static constexpr float JUMP_BUFFER_TIME = 0.1f;     // a jump pressed this long before landing still counts
+    static constexpr float AIR_JUMP_SPEED = 215.f;      // the double jump: a little lower than from the ground
 
     // Damping per 1/60 s, applied the same at any frame rate
     static constexpr float GROUND_DRAG = 0.85f;         // stops quickly on ground
@@ -145,6 +156,9 @@ private:
     bool facingLeft = false;
     bool hooksRock = true;
     float ropeRange = ROPE_RANGE;
+    bool canDoubleJump = false;
+    bool sitting = false;
+    bool airJumped = false; // used the double jump since last on the ground or the rope
 
     // Looks
     size_t skin = 0;

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include "src/Config.h"
 #include "src/World.h"
+#include <nlohmann/json.hpp>
 #include <filesystem>
 #include <fstream>
 #include "src/Level.h"
@@ -198,4 +199,21 @@ TEST(World, BenchesStandOnTheGround) {
         }
     }
     EXPECT_GE(benches, 3u);
+}
+
+TEST(World, TheLDtkProjectDefinesEveryTileTheRoomsUse) {
+    // Otherwise LDtk shows them as unknown, though the game would load them.
+    std::ifstream file(config::assetPath("world.ldtk"));
+    const auto project = nlohmann::json::parse(file);
+    std::set<int> defined;
+    for (const auto& layer : project["defs"]["layers"]) {
+        for (const auto& value : layer["intGridValues"]) defined.insert(value["value"].get<int>());
+    }
+    for (const auto& level : project["levels"]) {
+        for (const auto& layer : level["layerInstances"]) {
+            for (const auto& value : layer["intGridCsv"]) {
+                if (value.get<int>() != 0) EXPECT_TRUE(defined.count(value.get<int>())) << level["identifier"] << " uses tile " << value;
+            }
+        }
+    }
 }

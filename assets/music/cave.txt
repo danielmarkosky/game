@@ -1,0 +1,13 @@
+# The Cave: slow, sparse and echoing, A minor.
+tempo 70
+lead 0.16 triangle
+arp 0.05 up
+pad 0.14
+bass 0.22 x.......
+echo 0.4
+
+chords Am Am F F | C C G E | Am Am F F | Dm Dm E E
+melody E5 - - - C5 - - -   | A4 - - - . . E4 -   | F4 - A4 - C5 - - -   | A4 - - - . . . .
+melody G4 - C5 - E5 - - -   | D5 - C5 - - - . .   | B4 - - - D5 - - -    | G#4 - - - - - . .
+melody E5 - - - A5 - - -    | G5 - E5 - - - . .   | F5 - - - E5 - C5 -   | A4 - - - - - . .
+melody D5 - F5 - A5 - - -   | G5 - F5 - D5 - - -  | E5 - - - G#4 - B4 -  | E5 - - - - - . .

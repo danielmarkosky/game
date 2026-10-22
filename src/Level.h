@@ -52,6 +52,7 @@ public:
     void addGem(sf::Vector2i tile);
     void addNpc(const std::string& dialogue, const std::string& look, sf::Vector2i tile);
     void addBench(sf::Vector2i tile);
+    void addLever(sf::Vector2i tile);
 
     // The tiles are drawn with the theme's tiles.png. New levels use Theme::DEFAULT.
     void setTheme(std::shared_ptr<const Theme> theme);
@@ -61,6 +62,7 @@ public:
     void drawMarkers(sf::RenderTarget& target, sf::Vector2f centr, std::optional<sf::Vector2f> activeCheckpoint, float time) const;
     // The pickups whose ability `owned` says the player doesn't have yet, bobbing up and down.
     void drawPickups(sf::RenderTarget& target, sf::Vector2f centr, float time, const std::function<bool(const std::string&)>& owned) const;
+    void drawLevers(sf::RenderTarget& target, sf::Vector2f centr) const;
     // The benches, the one at `glowing` (if any) lit up: where the game was saved last.
     void drawBenches(sf::RenderTarget& target, sf::Vector2f centr, std::optional<size_t> glowing, float time) const;
     // The gems, the ones `collected` says were found already as faint ghosts.
@@ -69,6 +71,7 @@ public:
     int tileAt(int x, int y) const;
     bool isSolid(int x, int y) const;
     bool isHookBlock(int x, int y) const; // '%'
+    bool isSlick(int x, int y) const;     // 'o': solid, but the rope slides off it
     bool isDangerous(int x, int y) const;
     // One-way platforms: you can jump up through them, but land on their top.
     bool isPlatform(int x, int y) const;
@@ -91,6 +94,10 @@ public:
     const std::vector<Npc>& npcs() const;
     // Benches to sit on, two tiles wide, each the bottom-left of its left tile.
     const std::vector<sf::Vector2f>& benches() const;
+    // Gates ('=') are solid until a lever in the same room is pulled; then they all stay open.
+    const std::vector<sf::Vector2f>& levers() const;
+    void setGatesOpen(bool open);
+    bool gatesOpen() const;
     static constexpr float BENCH_WIDTH = 2 * TILE_SIZE;
     // Which edge of the level `point` has gone past, if any.
     std::optional<Side> exitThrough(sf::Vector2f point) const;
@@ -113,6 +120,8 @@ private:
     std::vector<sf::Vector2f> m_gems;
     std::vector<Npc> m_npcs;
     std::vector<sf::Vector2f> m_benches;
+    std::vector<sf::Vector2f> m_levers;
+    bool m_gatesOpen = false;
     std::shared_ptr<const Theme> m_theme;
     sf::Texture m_objects;
     sf::Texture m_items;

@@ -21,4 +21,20 @@ namespace hud
 
     // "m:ss.t"
     std::string formatTime(float seconds);
+    // The HUD font only has capitals (its lowercase 'x' is a cross), so titles are shown in them.
+    std::string upper(std::string text);
+
+    // The colours of the HUD and menus.
+    inline const sf::Color WHITE(235, 235, 245);
+    inline const sf::Color GOLD(255, 210, 60);
+    inline const sf::Color RED(255, 90, 90);
+    inline const sf::Color GREY(150, 150, 170);
+    inline const sf::Color CYAN(110, 220, 240);
+    sf::Color withAlpha(sf::Color color, sf::Uint8 alpha);
+
+    void fillRect(sf::RenderTarget& target, sf::FloatRect area, sf::Color color);
+    // A 1 px border just outside `area`.
+    void frame(sf::RenderTarget& target, sf::FloatRect area, sf::Color color);
+    // Darkens the whole screen.
+    void dim(sf::RenderTarget& target, sf::Uint8 alpha);
 }

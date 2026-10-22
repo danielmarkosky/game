@@ -16,6 +16,8 @@ namespace
     constexpr int TILE_CRYSTAL = 3;  // 'x'
     constexpr int TILE_SPIKES = 4;   // '^'
     constexpr int TILE_PLATFORM = 5; // '-'
+    constexpr int TILE_GATE = 6;     // '='
+    constexpr int TILE_SLICK = 7;    // 'o'
 
     // Where things are in the sprite sheets made by tools/make_art.py.
     namespace sheet
@@ -37,6 +39,8 @@ namespace
         constexpr int PLANK_MID = 21;
         constexpr int PLANK_RIGHT = 22;
         constexpr int HOOK_BLOCK = 23;
+        constexpr int GATE = 24;
+        constexpr int SLICK = 25;
 
         // assets/gfx/objects.png, 8x24 frames.
         constexpr int OBJECT_WIDTH = 8;
@@ -49,7 +53,8 @@ namespace
         constexpr int ITEM_SIZE = 10;
         constexpr int GEM = 1;
         // The frame of each ability's pickup.
-        const std::pair<const char*, int> ITEMS[] = {{"climbing_pick", 0}, {"long_rope", 2}};
+        const std::pair<const char*, int> ITEMS[] = {{"climbing_pick", 0}, {"long_rope", 2}, {"double_jump", 5}};
+        constexpr int LEVER_UP = 3, LEVER_DOWN = 4;
     }
 
     // Spikes point away from the rock they're stuck to.
@@ -188,6 +193,9 @@ std::shared_ptr<Level> Level::fromRows(const std::vector<std::string>& rows)
                 case '^': level->m_tileMap[x][y] = TILE_SPIKES; break;
                 case 'x': level->m_tileMap[x][y] = TILE_CRYSTAL; break;
                 case '-': level->m_tileMap[x][y] = TILE_PLATFORM; break;
+                case '=': level->m_tileMap[x][y] = TILE_GATE; break;
+                case 'o': level->m_tileMap[x][y] = TILE_SLICK; break;
+                case 'L': level->addLever({x, y}); break;
                 case 'S': level->setStart({x, y}); break;
                 case 'C': level->addCheckpoint({x, y}); break;
                 case 'G': level->setGoal({x, y}); break;
@@ -236,6 +244,38 @@ void Level::addNpc(const std::string& dialogue, const std::string& look, sf::Vec
 void Level::addBench(sf::Vector2i tile)
 {
     m_benches.push_back(sf::Vector2f(tile) * TILE_SIZE);
+}
+
+void Level::addLever(sf::Vector2i tile)
+{
+    m_levers.push_back(sf::Vector2f(tile) * TILE_SIZE);
+}
+
+const std::vector<sf::Vector2f>& Level::levers() const
+{
+    return m_levers;
+}
+
+void Level::setGatesOpen(bool open)
+{
+    m_gatesOpen = open;
+}
+
+bool Level::gatesOpen() const
+{
+    return m_gatesOpen;
+}
+
+void Level::drawLevers(sf::RenderTarget& target, sf::Vector2f centr) const
+{
+    sf::Sprite sprite(m_items);
+    const int frame = m_gatesOpen ? sheet::LEVER_DOWN : sheet::LEVER_UP;
+    sprite.setTextureRect(sf::IntRect(frame * sheet::ITEM_SIZE, 0, sheet::ITEM_SIZE, sheet::ITEM_SIZE));
+    for (const sf::Vector2f& lever : m_levers) {
+        auto pos = viewCoordinates(lever + sf::Vector2f(-1.f, TILE_SIZE + 1.f), centr);
+        sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
+        target.draw(sprite);
+    }
 }
 
 void Level::loadTextures()
@@ -326,6 +366,10 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
             } else if (isDangerous(x, y)) {
                 const int first = tile == TILE_CRYSTAL ? sheet::CRYSTALS : sheet::SPIKES;
                 drawTile(first + static_cast<int>(spikeDir(*this, x, y)), x, y);
+            } else if (tile == TILE_SLICK) {
+                drawTile(sheet::SLICK, x, y);
+            } else if (tile == TILE_GATE) {
+                if (!m_gatesOpen) drawTile(sheet::GATE, x, y);
             } else if (tile == TILE_PLATFORM) {
                 const bool openLeft = !isPlatform(x - 1, y) && !isSolid(x - 1, y);
                 const bool openRight = !isPlatform(x + 1, y) && !isSolid(x + 1, y);
@@ -419,6 +463,11 @@ int Level::tileAt(int x, int y) const
     return ity->second;
 }
 
+bool Level::isSlick(int x, int y) const
+{
+    return tileAt(x, y) == TILE_SLICK;
+}
+
 bool Level::isHookBlock(int x, int y) const
 {
     return tileAt(x, y) == TILE_METAL;
@@ -427,7 +476,7 @@ bool Level::isHookBlock(int x, int y) const
 bool Level::isSolid(int x, int y) const
 {
     int tile = this->tileAt(x, y);
-    return tile == TILE_ROCK or tile == TILE_METAL;
+    return tile == TILE_ROCK || tile == TILE_METAL || tile == TILE_SLICK || (tile == TILE_GATE && !m_gatesOpen);
 }
 
 bool Level::isDangerous(int x, int y) const

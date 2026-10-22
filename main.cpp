@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
             }
             startRoom = static_cast<size_t>(room - levels.begin());
         }
-        Game game(levels, argc > 1, startRoom);
+        Game game(levels, {.testing = argc > 1, .startRoom = startRoom});
         game.run();
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << std::endl;

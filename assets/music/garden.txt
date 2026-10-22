@@ -1,0 +1,14 @@
+# The garden: warm and bouncy, D major, with light drums.
+tempo 92
+lead 0.16 triangle
+arp 0.08 updown
+pad 0.12
+bass 0.22 x...x.x.
+drums 0.1 x...x... ....x... ..x...x.
+echo 0.2
+
+chords D D G A | Bm G D A | D D G A | Bm G A D
+melody F#5 - A5 - F#5 - D5 - | E5 - F#5 - A4 - - -  | G5 - - - B4 - D5 -   | C#5 - E5 - A4 - - -
+melody D5 - F#5 - B5 - A5 -  | G5 - - - B4 - D5 -   | F#5 - - - A4 - D5 -  | E5 - - - - - . .
+melody A5 - - - F#5 - A5 -   | B5 - A5 - F#5 - D5 - | G5 - B5 - D6 - B5 -  | A5 - - - E5 - C#5 -
+melody D5 - - - F#5 - B4 -   | G5 - - - D5 - B4 -   | C#5 - E5 - A5 - G5 - | F#5 - - - D5 - - -

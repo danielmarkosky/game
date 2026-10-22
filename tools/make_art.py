@@ -207,10 +207,34 @@ hook_block = ['00000000',
               '02111110',
               '00000000']
 
-def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip), spike=SPIKE):
+# A portcullis: solid until a lever opens it.
+gate = ['.1..1..1',
+        '.2..2..2',
+        '33333333',
+        '.2..2..2',
+        '.2..2..2',
+        '33333333',
+        '.2..2..2',
+        '.1..1..1']
+
+
+# Slick stone, polished smooth by the wind: solid, but the rope slides off it.
+SLICK = {'1': rgb('#7a90b0'), '2': rgb('#a8c0dc'), '3': rgb('#d8e8f8'), 'w': rgb('#ffffff')}
+slick = ['3333333w',
+         '32222w21',
+         '3222w221',
+         '322w2221',
+         '32w22221',
+         '3w222221',
+         '32222221',
+         '21111111']
+
+
+def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip), spike=SPIKE,
+               rocks=(rock_a, rock_b, rock_c, rock_deep)):
     """The tiles of one theme: `rock` is the palette for the rock and everything growing on it."""
     return [
-        (rock_a, rock), (rock_b, rock), (rock_c, rock), (rock_deep, rock),             # 0-3
+        (rocks[0], rock), (rocks[1], rock), (rocks[2], rock), (rocks[3], rock),         # 0-3
         (grass[0], rock), (grass[1], rock), (edge_left, rock), (edge_right, rock),      # 4-7
         (edge_bottom, rock), (decor[0], rock), (decor[1], rock), (decor[2], rock),      # 8-11: tuft, flower, drip
         (spikes_up, spike), (flip_v(spikes_up), spike),                                 # 12-13: up, down
@@ -218,6 +242,7 @@ def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip),
         (spikes_up, CRYSTAL), (flip_v(spikes_up), CRYSTAL),                             # 16-17
         (rotate(spikes_up), CRYSTAL), (rotate(rotate(rotate(spikes_up))), CRYSTAL),     # 18-19
         (plank_left, WOOD), (plank_mid, WOOD), (plank_right, WOOD), (hook_block, METAL),  # 20-23
+        (gate, METAL), (slick, SLICK),                                                  # 24-25
     ]
 
 
@@ -231,8 +256,9 @@ def make_tiles(name, tiles):
 
 
 # ----------------------------------------------------------------------------------------------
-# Player: assets/gfx/player.png, one row per skin, 12x14 frames. The skin order and the frame
-# order are mirrored in src/Player.cpp: idle (2), run (4), jump, fall, swing.
+# Player: assets/gfx/player.png, one row per look (the skins, then the people you meet), 12x14
+# frames. The order of both is mirrored in src/Player.h and .cpp: idle (2), run (4), jump, fall,
+# swing, sitting.
 # ----------------------------------------------------------------------------------------------
 
 FRAME_W, FRAME_H = 12, 14
@@ -276,6 +302,7 @@ PLAYER_FRAMES = [
     frame(HEAD, BODY, ['..hh.hh..', '.........']),                      # 6 jump (feet tucked)
     frame(HEAD_WIND, BODY, ['..h...h..', '..h...h..']),                 # 7 fall
     frame(HEAD_WIND, BODY, ['...hhh...', '...h.h...']),                 # 8 swing
+    frame(HEAD, ['.gyggggg.'] + BODY[2:], ['...hhhh..'], drop=2),       # 9 sitting
 ]
 
 
@@ -428,6 +455,7 @@ LEGS = {
     'jump': ['..LL.LL...', '..........'],
     'fall': ['..L...L...', '..F...F...'],
     'swing': ['...LL.....', '...FF.....'],
+    'sit': ['-', '..LLLLFF..'],
 }
 
 
@@ -463,24 +491,99 @@ def outlined(fill):
 def skin_frames(skin):
     poses = [pose(skin, 'idle'), pose(skin, 'idle', breathe=True),
              pose(skin, 'run_a'), pose(skin, 'pass_a'), pose(skin, 'run_b'), pose(skin, 'pass_b'),
-             pose(skin, 'jump'), pose(skin, 'fall'), pose(skin, 'swing', hand_up=True)]
+             pose(skin, 'jump'), pose(skin, 'fall'), pose(skin, 'swing', hand_up=True), pose(skin, 'sit')]
     return [outlined(p) for p in poses]
+
+
+# The people you meet: drawn like the skins, and after them in player.png, but not for choosing.
+# Their names are what an Npc's `look` field says, and mirrored in Player::LOOKS.
+NPCS = [
+    dict(name='wren',  # an old climber: grey bun, worn green jacket
+         palette={'w': '#d8d8e0', 'W': '#a0a0b0', 'd': '#e8b890', 'D': '#b8865e', 'e': '#16131f',
+                  'g': '#5f8a4a', 'G': '#3f6a35', 'k': '#5a4030'},
+         head=['...www....',
+               '..wwwww...',
+               '.wwWwwww..',
+               '.wwddddd..',
+               '..dddded..',
+               '...DddD...'],
+         body=['.gggggg...',
+               'dgggggggd.',
+               '.gGggggg..',
+               '..gggggG..'],
+         legs='kk', hand='d'),
+    dict(name='pip',  # the mapmaker: red beret, round glasses, satchel
+         palette={'r': '#c8443a', 'd': '#f1c9a0', 'D': '#c98f72', 'o': '#3a2a2a', 'y': '#e8c04a',
+                  'Y': '#b8902a', 'B': '#7a4e2c', 'n': '#3a4060'},
+         head=['...rrrr...',
+               '..rrrrrrr.',
+               '..dddddd..',
+               '..oodood..',
+               '..dddddd..',
+               '...DddD...'],
+         body=['.yyyyyyy..',
+               'dyByyyyyd.',
+               '.yyBBByy..',
+               '..yyyyyY..'],
+         legs='nn', hand='d'),
+    dict(name='moss',  # the scholar of the ruins: mossy hood, eyes glowing in the dark, a lantern
+         palette={'M': '#3f6a4a', 'm': '#5f9a5a', 'f': '#1d1a2a', 'w': '#c8ffd0', 'l': '#ffd86a'},
+         head=['...MMM....',
+               '..MMmMM...',
+               '.MMmmmMM..',
+               '.MMffffM..',
+               '.MMfwfwM..',
+               '..MMMMM...'],
+         body=['.MMmmmMM..',
+               'lMmmmmmMl.',
+               '.MmmmmmM..',
+               '.MMmmmMM..'],
+         legs='MM', hand='l'),
+    dict(name='juniper',  # the hermit of the high camp: fur hat, white beard, blue coat
+         palette={'f': '#e8e0d0', 'F': '#b8a890', 'd': '#e0b088', 'e': '#16131f', 'b': '#d8d8d8',
+                  'c': '#3a6aa8', 'C': '#2a4a78', 'k': '#4a3a30'},
+         head=['..ffffff..',
+               '.fFffffFf.',
+               '..dddddd..',
+               '..dddded..',
+               '.bbbbbbb..',
+               '..bbbbb...'],
+         body=['.cccccccc.',
+               'dccbcccccd',
+               '.ccccccc..',
+               '..cccccC..'],
+         legs='kk', hand='d'),
+    dict(name='ash',  # the one you came looking for: long auburn hair, green scarf, white jacket
+         palette={'a': '#a8482a', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 's': '#4ac08a',
+                  'S': '#2a8a5a', 'w': '#e8eef8', 'W': '#a9aec4', 'n': '#2c3a5c', 'k': '#6a4434'},
+         head=['..aaaaa...',
+               '.aaaaaaaa.',
+               'aaaaadaad.',
+               'aaddddded.',
+               'a.dddddd..',
+               '...DdddD..'],
+         body=['ssssssss..',
+               '.Swwwwww..',
+               '..wwwwwWd.',
+               '..wwwwWW..'],
+         legs='nk', hand='d'),
+]
 
 
 def make_player():
     rows = [('classic', PLAYER, classic_frames())]
-    for skin in SKINS:
+    for skin in SKINS + NPCS:
         palette = {k: rgb(v) for k, v in skin['palette'].items()}
         palette['#'] = OUTLINE
         rows.append((skin['name'], palette, skin_frames(skin)))
-    c = Canvas(FRAME_W * 9, FRAME_H * len(rows))
+    c = Canvas(FRAME_W * 10, FRAME_H * len(rows))
     for r, (name, palette, frames) in enumerate(rows):
-        assert len(frames) == 9, name
+        assert len(frames) == 10, name
         for i, f in enumerate(frames):
             assert len(f) == FRAME_H and all(len(row) == FRAME_W for row in f), f'{name} frame {i} is not {FRAME_W}x{FRAME_H}'
             c.blit(f, palette, i * FRAME_W, r * FRAME_H)
     c.save('player.png')
-    print('  skins:', ', '.join(name for name, _, _ in rows))
+    print('  looks:', ', '.join(name for name, _, _ in rows))
 
 
 # ----------------------------------------------------------------------------------------------
@@ -523,12 +626,14 @@ def make_objects():
 
 # ----------------------------------------------------------------------------------------------
 # Items: assets/gfx/items.png, 10x10 frames, things to pick up that give an ability. The order is
-# mirrored in src/Level.cpp (namespace `sheet`). 0: the climbing pick, 1: a gem, 2: the long rope.
+# mirrored in src/Level.cpp (namespace `sheet`). 0: the climbing pick, 1: a gem, 2: the long rope,
+# 3-4: a lever up and pulled down, 5: the updraft feather.
 # ----------------------------------------------------------------------------------------------
 
 ITEM = {'3': rgb('#e8eef8'), '2': rgb('#9aa6bc'), 'w': rgb('#b47c48'), 'W': rgb('#7a4e2c'), '#': OUTLINE,
         'a': rgb('#eaffff'), 'b': rgb('#9ff0ff'), 'c': rgb('#4fd0e8'), 'd': rgb('#2a8fb0'),
-        'r': rgb('#e6d6b4'), 'R': rgb('#9a8460')}
+        'r': rgb('#e6d6b4'), 'R': rgb('#9a8460'), 'k': rgb('#e8443a'), 'K': rgb('#9a2a2a'),
+        'f': rgb('#ffffff'), 'F': rgb('#bfe6ff'), 'q': rgb('#7ab8e8')}
 # A pickaxe lying diagonally: the steel head across the top, the wooden handle down to the left.
 climbing_pick = ['..33....',
                  '...32...',
@@ -572,7 +677,27 @@ long_rope = ['..rrrr..',
              '..rrrrR.',
              '.......r']
 
-ITEMS = [climbing_pick, gem, long_rope]
+# A lever on a wooden base: up, then pulled down.
+lever_up = ['.kk.....',
+            '.kK.....',
+            '..2.....',
+            '...2....',
+            '....2...',
+            '.....2..',
+            '..WWWWW.',
+            '..WwwwW.']
+lever_down = [row[::-1] for row in lever_up[:6]] + lever_up[6:]
+# A white feather, lifting.
+feather = ['......fF',
+           '.....fFq',
+           '....fFq.',
+           '...fFq..',
+           '..fFq...',
+           '.fFq....',
+           '.Fq.....',
+           'W.......']
+
+ITEMS = [climbing_pick, gem, long_rope, lever_up, lever_down, feather]
 
 
 def make_items():
@@ -1174,7 +1299,128 @@ def make_daylight():
     c.save('themes/daylight/near.png')
 
 
-THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight]
+# Ruins: old stone bricks under glowing moss, pink glowing mushrooms, hanging roots tipped with
+# light, and broken arches in the dark behind.
+RUINS = {'0': rgb('#1a1528'), '1': rgb('#3a3050'), '2': rgb('#4e4468'), '3': rgb('#6a5c88'),
+         'g': rgb('#2a5a5a'), 'G': rgb('#3a8a7a'), 'h': rgb('#5ae0c0'), 'H': rgb('#b0fff0'),
+         'p': rgb('#ff7ad8'), 'P': rgb('#b8409a'), 'f': rgb('#ffe0f8'), 'r': rgb('#5a4430')}
+bricks_a = ['33303333',
+            '22202222',
+            '21201112',
+            '00000000',
+            '33333033',
+            '22222022',
+            '11211021',
+            '00000000']
+bricks_b = ['33333303',
+            '22222202',
+            '12112101',
+            '00000000',
+            '33033333',
+            '22022222',
+            '21021112',
+            '00000000']
+bricks_c = ['33303333',   # cracked
+            '22202022',
+            '21201102',
+            '00000000',
+            '33333033',
+            '22202022',
+            '11011021',
+            '00000000']
+bricks_deep = [r.replace('1', '0').replace('2', '1').replace('3', '1') for r in bricks_a]
+glow_moss = ['HhHHhHHh',
+             'hGhhGhhG',
+             'GgGGgGgG',
+             'g2gg2g2g',
+             '.g...g..',
+             '........',
+             '........',
+             '........']
+glow_moss_b = ['hHhHHhHH',
+               'GhGhhGhG',
+               'gGgGGgGg',
+               '2g2gg2g2',
+               '..g...g.',
+               '........',
+               '........',
+               '........']
+sprouts = ['........',
+           '........',
+           '........',
+           '........',
+           '..h.....',
+           '..G..h..',
+           '.hG.hG.h',
+           '.GG.GG.G']
+glowcap = ['........',
+           '........',
+           '..pppp..',
+           '.pfppfp.',
+           'PPPPPPPP',
+           '...ff...',
+           '...ff...',
+           '..rffr..']
+root = ['r..r.rr.',
+        'r..r..r.',
+        '.r.r..r.',
+        '.r..r.r.',
+        '.h..r..h',
+        '....h...',
+        '........',
+        '........']
+
+
+def arches(c, color, seed, count):
+    """Broken arches and pillars standing on the ground."""
+    rng = random.Random(seed)
+    col = rgb(color)
+    for _ in range(count):
+        cx, w, tall = rng.randrange(W), rng.randrange(18, 34), rng.randrange(60, 110)
+        for y in range(H - tall, H):
+            for x in (cx - w // 2, cx - w // 2 + 1, cx - w // 2 + 2, cx + w // 2 - 2, cx + w // 2 - 1, cx + w // 2):
+                c.put(x % W, y, col)
+        # The arch over the pillars, sometimes broken off.
+        r = w // 2
+        broken = rng.random() < 0.4
+        for a in range(0, 181, 2):
+            if broken and a > 120:
+                break
+            for thick in range(3):
+                x = int(cx + (r - thick) * math.cos(math.radians(a)))
+                y = int(H - tall - (r - thick) * math.sin(math.radians(a)))
+                c.put(x % W, y, col)
+
+
+def make_ruins():
+    make_tiles('ruins', tile_sheet(RUINS, (glow_moss, glow_moss_b), (sprouts, glowcap, root),
+                                   rocks=(bricks_a, bricks_b, bricks_c, bricks_deep)))
+    c = sky('#160f24', '#14303a')
+    sparks(c, seed=21, count=60, colors=('#5ae0c0', '#b0fff0', '#ff7ad8'), above=20)  # spores
+    c.save('themes/ruins/sky.png')
+    c = Canvas(W, H)
+    arches(c, '#241c3a', seed=22, count=7)
+    fill_up(c, rgb('#241c3a'), lambda x: 30 + 8 * periodic_noise(x, 2.2))
+    c.save('themes/ruins/far.png')
+    c = Canvas(W, H)
+    vines(c, '#120c1e', '#2a6a5a', seed=23, count=30, length=(10, 60))
+    fill_down(c, rgb('#120c1e'), lambda x: 5 + 4 * periodic_noise(x, 3.1))
+    # Giant mushrooms on the ground, close.
+    rng = random.Random(24)
+    for _ in range(6):
+        cx, r, stem = rng.randrange(W), rng.randrange(8, 16), rng.randrange(14, 30)
+        for y in range(H - stem, H):
+            for x in range(cx - 2, cx + 3):
+                c.put(x % W, y, rgb('#120c1e'))
+        for y in range(-r, 1):
+            for x in range(-r, r + 1):
+                if x * x + y * y <= r * r:
+                    c.put((cx + x) % W, H - stem + y, rgb('#120c1e'))
+    fill_up(c, rgb('#120c1e'), lambda x: 14 + 6 * periodic_noise(x, 4.7))
+    c.save('themes/ruins/near.png')
+
+
+THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight, make_ruins]
 
 
 if __name__ == '__main__':

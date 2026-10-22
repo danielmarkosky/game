@@ -115,7 +115,7 @@ TEST(Level_Theme, EveryShippedThemeLoads) {
     for (const auto& name : themes) {
         SCOPED_TRACE(name);
         auto theme = Theme::get(name);
-        EXPECT_EQ(theme->tiles.getSize(), sf::Vector2u(64, 24));
+        EXPECT_EQ(theme->tiles.getSize(), sf::Vector2u(64, 32)); // 25 tiles, 8 to a row
         for (const auto& layer : theme->layers) EXPECT_EQ(layer.getSize(), sf::Vector2u(320, 180));
     }
     EXPECT_THROW(Theme::get("no_such_theme"), std::runtime_error);
@@ -164,6 +164,19 @@ TEST(Level_Benches, AreReadFromTheFile) {
     ASSERT_EQ(lvl->benches().size(), 1u);
     EXPECT_EQ(lvl->benches()[0], sf::Vector2f(24.f, 8.f));
     EXPECT_FALSE(lvl->isSolid(3, 1));
+}
+
+TEST(Level_Gates, AreSolidUntilOpened) {
+    auto lvl = Level::loadFromString(
+        "#####\n"
+        "#SL.#\n"
+        "##=##\n");
+    ASSERT_EQ(lvl->levers().size(), 1u);
+    EXPECT_EQ(lvl->levers()[0], sf::Vector2f(16.f, 8.f));
+    EXPECT_TRUE(lvl->isSolid(2, 0));
+    lvl->setGatesOpen(true);
+    EXPECT_FALSE(lvl->isSolid(2, 0));
+    EXPECT_TRUE(lvl->isSolid(1, 0));
 }
 
 TEST(Level_IsDangerousSpace, OnlyThePointyHalfOfASpikeHurts) {

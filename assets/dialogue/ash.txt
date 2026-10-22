@@ -1,0 +1,35 @@
+# Ash, the sister, keeper of the signal fire at the top of the mountain. The end of the story:
+# what you say to her decides the ending (see endings.txt).
+
+--- !ash_answered
+Ash: ...You? You climbed all this way?
+You: You didn't come back, Ash. Three winters.
+Ash: I know. I'm sorry. I found this place, and the fire. Lost climbers see it from the dark and find their way up.
+Ash: Every time I meant to leave, there was someone else down there in the dark.
+? Come home with me.           -> home
+? Then I'll stay with you.     -> stay
+? I understand.                -> letgo
+= home
+Ash: ...You're right. Someone else can learn to keep the fire. Let's go home.
+set ash_home
+set ash_answered
+-> end
+= stay
+Ash: Two keepers, then. The mountain won't know what hit it.
+set ash_stay
+set ash_answered
+-> end
+= letgo
+Ash: Tell them I'm all right. Tell them the light's on, and that I'll keep it on.
+set ash_letgo
+set ash_answered
+-> end
+
+--- ash_home
+Ash: Come on. The way out is just above us.
+
+--- ash_stay
+Ash: Look at that view. Every single morning.
+
+--- ash_letgo
+Ash: Up and out. I'll keep the light on.

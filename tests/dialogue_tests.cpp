@@ -4,7 +4,29 @@
 #include "src/Player.h"
 #include "src/Text.h"
 #include "src/World.h"
+#include <filesystem>
+#include <fstream>
 #include <set>
+
+namespace
+{
+    // Runs a conversation to the end, picking `choices` in turn, and returns the lines said.
+    std::vector<std::string> play(const Conversation& c, std::vector<size_t> choices, std::set<std::string>& flags)
+    {
+        std::vector<std::string> said;
+        DialogueRunner run(c, [&](const std::string& flag) { flags.insert(flag); });
+        while (!run.finished()) {
+            if (run.current().kind == DialogueStep::Kind::Choice) {
+                run.choose(choices.front());
+                choices.erase(choices.begin());
+            } else {
+                said.push_back(run.current().speaker + ": " + run.current().text);
+                run.next();
+            }
+        }
+        return said;
+    }
+}
 
 TEST(Dialogue, ReadsSpeakersLinesAndConversations) {
     const Dialogue d = Dialogue::parse(
@@ -13,21 +35,39 @@ TEST(Dialogue, ReadsSpeakersLinesAndConversations) {
         "Still me talking.\n"
         "You: Hi: nice to meet you.\n"
         "\n"
-        "--- climbing_pick\n"
+        "--- climbing_pick !met\n"
         "Wren: Nice pick.\n");
     ASSERT_EQ(d.conversations().size(), 2u);
-    const auto& first = d.conversations()[0].lines;
-    ASSERT_EQ(first.size(), 3u);
-    EXPECT_EQ(first[0].speaker, "Wren");
-    EXPECT_EQ(first[0].text, "Hello there.");
-    EXPECT_EQ(first[1].speaker, "Wren"); // no name: the same speaker as before
-    EXPECT_EQ(first[1].text, "Still me talking.");
-    EXPECT_EQ(first[2].speaker, "You");
-    EXPECT_EQ(first[2].text, "Hi: nice to meet you.");
-    EXPECT_EQ(d.conversations()[1].needs, "climbing_pick");
+    std::set<std::string> flags;
+    EXPECT_EQ(play(d.conversations()[0], {}, flags),
+              (std::vector<std::string>{"Wren: Hello there.", "Wren: Still me talking.", "You: Hi: nice to meet you."}));
+    EXPECT_EQ(d.conversations()[1].needs, (std::vector<std::string>{"climbing_pick", "!met"}));
 }
 
-TEST(Dialogue, PicksTheFirstNewConversationTheAbilitiesAllow) {
+TEST(Dialogue, ChoicesLeadToTheirLabelsAndSetFlags) {
+    const Dialogue d = Dialogue::parse(
+        "Wren: Why are you here?\n"
+        "? My sister.     -> sister\n"
+        "? Just passing.  -> passing\n"
+        "= sister\n"
+        "Wren: Ash? I knew her.\n"
+        "set told_wren\n"
+        "-> after\n"
+        "= passing\n"
+        "Wren: Suit yourself.\n"
+        "= after\n"
+        "Wren: Off you go.\n");
+    const Conversation& c = d.conversations()[0];
+    std::set<std::string> flags;
+    EXPECT_EQ(play(c, {0}, flags), (std::vector<std::string>{"Wren: Why are you here?", "Wren: Ash? I knew her.", "Wren: Off you go."}));
+    EXPECT_EQ(flags, std::set<std::string>{"told_wren"});
+    flags.clear();
+    // The other way stops at the next label.
+    EXPECT_EQ(play(c, {1}, flags), (std::vector<std::string>{"Wren: Why are you here?", "Wren: Suit yourself."}));
+    EXPECT_TRUE(flags.empty());
+}
+
+TEST(Dialogue, PicksTheFirstNewConversationTheFactsAllow) {
     const Dialogue d = Dialogue::parse("--- !pick\nA: one\n--- !pick\nA: two\n--- pick\nA: three\n--- pick\nA: four\n");
     std::set<size_t> had;
     bool hasPick = false;
@@ -52,15 +92,46 @@ TEST(Dialogue, EveryCharacterInTheWorldHasSomethingToSay) {
         for (const Npc& npc : room.level->npcs()) {
             SCOPED_TRACE(room.name + ": " + npc.dialogue);
             const Dialogue d = Dialogue::load(npc.dialogue);
-            EXPECT_TRUE(std::find(Player::SKINS.begin(), Player::SKINS.end(), npc.look) != Player::SKINS.end());
+            EXPECT_TRUE(std::find(Player::LOOKS.begin(), Player::LOOKS.end(), npc.look) != Player::LOOKS.end()) << npc.look;
             for (const auto& conversation : d.conversations()) {
-                for (const auto& line : conversation.lines) {
+                for (const auto& step : conversation.steps) {
                     // Only what the font can draw.
-                    for (char c : line.speaker + line.text) EXPECT_TRUE(c >= ' ' && c <= '~') << line.text;
+                    std::string shown = step.speaker + step.text;
+                    for (const auto& option : step.options) shown += option.first;
+                    for (char c : shown) EXPECT_TRUE(c >= ' ' && c <= '~') << shown;
                 }
             }
         }
     }
+}
+
+TEST(Dialogue, ThereIsAlwaysAnEnding) {
+    // The end screen shows the first ending the story's flags allow: the last needs none.
+    const Dialogue endings = Dialogue::load("endings");
+    ASSERT_FALSE(endings.conversations().empty());
+    EXPECT_TRUE(endings.conversations().back().needs.empty());
+}
+
+TEST(Dialogue, WhatYouTellAshDecidesTheEnding) {
+    const Dialogue endings = Dialogue::load("endings");
+    auto endingFor = [&](const std::set<std::string>& facts) {
+        for (const auto& c : endings.conversations()) {
+            if (Dialogue::allowed(c, [&](const std::string& f) { return facts.count(f) > 0; })) return c.steps.front().text;
+        }
+        return std::string();
+    };
+    // Each answer in ash.txt sets one of these.
+    std::set<std::string> seen;
+    for (const char* answer : {"ash_home", "ash_stay", "ash_letgo"}) seen.insert(endingFor({answer, "ash_answered"}));
+    seen.insert(endingFor({}));
+    EXPECT_EQ(seen.size(), 4u); // all different
+}
+
+TEST(Dialogue, ALabelThatIsntThereIsAnError) {
+    const auto path = std::filesystem::path(config::assetPath("dialogue")) / "test_broken.txt";
+    std::ofstream(path) << "A: hi\n? go -> nowhere\n";
+    EXPECT_THROW(Dialogue::load("test_broken"), std::runtime_error);
+    std::filesystem::remove(path);
 }
 
 TEST(Text, WrapsAtSpacesToFitAWidth) {

@@ -1,0 +1,14 @@
+# Daylight: bright and hopeful, C major.
+tempo 100
+lead 0.18 triangle
+arp 0.08 up
+pad 0.12
+bass 0.22 x...x.x.
+drums 0.12 x...x... ....x... ..x...x.
+echo 0.15
+
+chords C G Am F | C G F G | C G Am F | Dm G C C
+melody E5 - G5 - C6 - G5 -   | D5 - G5 - B5 - - -   | C6 - B5 - A5 - E5 -  | F5 - - - A5 - - -
+melody G5 - E5 - C5 - E5 -   | D5 - - - G5 - - -    | A5 - G5 - F5 - C5 -  | D5 - - - - - . .
+melody E5 - G5 - C6 - D6 -   | B5 - - - G5 - D5 -   | E5 - A5 - C6 - B5 -  | A5 - - - F5 - - -
+melody D5 - F5 - A5 - F5 -   | G5 - B5 - D6 - B5 -  | C6 - - - G5 - E5 -   | C5 - - - - - . .

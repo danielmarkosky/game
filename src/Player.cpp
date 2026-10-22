@@ -27,6 +27,7 @@ namespace
         constexpr int JUMP = 6;
         constexpr int FALL = 7;
         constexpr int SWING = 8;
+        constexpr int SIT = 9;
     }
 }
 
@@ -51,6 +52,7 @@ void Player::handleInput(const PlayerInput& in)
             ropeShotQueued = false;
             if (auto hit = ropeTarget(in.aim)) {
                 rope.emplace(exactCentre(), *hit, level);
+                airJumped = false;
                 events.push_back({PlayerEvent::Type::RopeAttached, *hit});
             } else if (auto bounce = ropeBounce(in.aim)) {
                 events.push_back({PlayerEvent::Type::RopeBounced, *bounce});
@@ -67,6 +69,7 @@ void Player::handleInput(const PlayerInput& in)
 void Player::update(float dt)
 {
     const bool grounded = isGrounded();
+    if (grounded) airJumped = false;
     coyoteTimer = grounded ? COYOTE_TIME : std::max(0.f, coyoteTimer - dt);
     jumpBufferTimer = std::max(0.f, jumpBufferTimer - dt);
     dropThroughTimer = std::max(0.f, dropThroughTimer - dt);
@@ -136,6 +139,13 @@ void Player::update(float dt)
             ropeJumpTimer = 0.f;
             ropeCooldownTimer = ROPE_JUMP_COOLDOWN;
             squash = {0.75f, 1.3f};
+        } else if (canDoubleJump && !airJumped) {
+            velocity.y = std::max(velocity.y, AIR_JUMP_SPEED);
+            jumping = true;
+            jumpBufferTimer = 0.f;
+            airJumped = true;
+            squash = {0.8f, 1.25f};
+            events.push_back({PlayerEvent::Type::AirJumped, position + sf::Vector2f(WIDTH * 0.5f, 0.f)});
         }
     }
 
@@ -264,7 +274,9 @@ void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     if (rope) rope->draw(target, centr);
 
     int frame;
-    if (!isGrounded()) {
+    if (sitting && isGrounded()) {
+        frame = frames::SIT;
+    } else if (!isGrounded()) {
         frame = rope ? frames::SWING : velocity.y > 0.f ? frames::JUMP : frames::FALL;
     } else if (std::abs(velocity.x) > 5.f) {
         frame = frames::RUN + static_cast<int>(animTime * 12.f) % 4;
@@ -282,11 +294,11 @@ void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     target.draw(sprite);
 }
 
-void Player::drawFigure(sf::RenderTarget& target, size_t skinIndex, sf::Vector2f feet, bool facingLeft, float time, float scale) const
+void Player::drawFigure(sf::RenderTarget& target, size_t lookIndex, sf::Vector2f feet, bool facingLeft, float time, float scale) const
 {
     const int frame = frames::IDLE + static_cast<int>(time * 2.f) % 2;
     sf::Sprite sprite(texture);
-    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(std::min(skinIndex, SKINS.size() - 1)) * frames::HEIGHT,
+    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(std::min(lookIndex, LOOKS.size() - 1)) * frames::HEIGHT,
                                       frames::WIDTH, frames::HEIGHT));
     sprite.setOrigin(frames::WIDTH * 0.5f, frames::HEIGHT - 1.f);
     sprite.setScale(facingLeft ? -scale : scale, scale);
@@ -294,12 +306,17 @@ void Player::drawFigure(sf::RenderTarget& target, size_t skinIndex, sf::Vector2f
     target.draw(sprite);
 }
 
-size_t Player::skinNamed(const std::string& name)
+size_t Player::lookNamed(const std::string& name)
 {
-    for (size_t ii = 0; ii < SKINS.size(); ++ii) {
-        if (name == SKINS[ii]) return ii;
+    for (size_t ii = 0; ii < LOOKS.size(); ++ii) {
+        if (name == LOOKS[ii]) return ii;
     }
     return 0;
+}
+
+void Player::setSitting(bool sit)
+{
+    sitting = sit;
 }
 
 void Player::setSkin(size_t index)
@@ -342,6 +359,7 @@ void Player::respawn(sf::Vector2f pos)
     ropeJumpTimer = 0.f;
     ropeCooldownTimer = 0.f;
     ropeShotQueued = false;
+    airJumped = false;
     squash = {1.f, 1.f};
     jumping = false;
     events.clear();
@@ -390,17 +408,19 @@ std::vector<PlayerEvent> Player::takeEvents()
 std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 {
     auto hit = nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ropeRange);
-    if (!hit || hooksRock) return hit;
-    // The tile the shot ran into is just past the surface point.
+    if (!hit) return hit;
+    // The tile the shot ran into is just past the surface point. Nothing sticks to slick stone;
+    // rock needs the pick, metal doesn't.
     const sf::Vector2f dir = (aim - exactCentre()) / distance(aim, exactCentre());
     auto [tileX, tileY] = tailNumbers(*hit + dir * 0.25f);
-    if (!level->isHookBlock(tileX, tileY)) return std::nullopt;
+    if (level->isSlick(tileX, tileY)) return std::nullopt;
+    if (!hooksRock && !level->isHookBlock(tileX, tileY)) return std::nullopt;
     return hit;
 }
 
 std::optional<sf::Vector2f> Player::ropeBounce(sf::Vector2f aim) const
 {
-    if (hooksRock || ropeTarget(aim)) return std::nullopt;
+    if (ropeTarget(aim)) return std::nullopt;
     return nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ropeRange);
 }
 
@@ -412,6 +432,16 @@ void Player::setCanHookRock(bool can)
 void Player::setRopeRange(float range)
 {
     ropeRange = range;
+}
+
+void Player::setCanDoubleJump(bool can)
+{
+    canDoubleJump = can;
+}
+
+bool Player::hasAirJump() const
+{
+    return canDoubleJump && !airJumped;
 }
 
 

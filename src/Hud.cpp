@@ -117,4 +117,38 @@ namespace hud
         std::snprintf(buffer, sizeof(buffer), "%d:%02d.%d", tenths / 600, (tenths / 10) % 60, tenths % 10);
         return buffer;
     }
+
+    std::string upper(std::string text)
+    {
+        for (char& c : text) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
+        return text;
+    }
+
+    sf::Color withAlpha(sf::Color color, sf::Uint8 alpha)
+    {
+        color.a = alpha;
+        return color;
+    }
+
+    void fillRect(sf::RenderTarget& target, sf::FloatRect area, sf::Color color)
+    {
+        sf::RectangleShape rect({area.width, area.height});
+        rect.setPosition(area.left, area.top);
+        rect.setFillColor(color);
+        target.draw(rect);
+    }
+
+    void frame(sf::RenderTarget& target, sf::FloatRect a, sf::Color color)
+    {
+        fillRect(target, {a.left - 1.f, a.top - 1.f, a.width + 2.f, 1.f}, color);
+        fillRect(target, {a.left - 1.f, a.top + a.height, a.width + 2.f, 1.f}, color);
+        fillRect(target, {a.left - 1.f, a.top, 1.f, a.height}, color);
+        fillRect(target, {a.left + a.width, a.top, 1.f, a.height}, color);
+    }
+
+    void dim(sf::RenderTarget& target, sf::Uint8 alpha)
+    {
+        const sf::Vector2f size(target.getView().getSize());
+        fillRect(target, {0.f, 0.f, size.x, size.y}, sf::Color(0, 0, 0, alpha));
+    }
 }

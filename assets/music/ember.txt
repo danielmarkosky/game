@@ -1,0 +1,14 @@
+# The chimney: hot and driving, D minor, with drums.
+tempo 104
+lead 0.13 square
+arp 0.08 updown
+pad 0.1
+bass 0.25 x.x.x.x.
+drums 0.16 x...x... ....x... x.x.x.x.
+echo 0.2
+
+chords Dm Dm Bb Bb | C C Dm A | Dm Dm Bb Bb | Gm Gm A A
+melody D5 - F5 - A5 - F5 -   | E5 - D5 - - - A4 -   | Bb4 - D5 - F5 - D5 -  | C5 - Bb4 - - - . .
+melody C5 - E5 - G5 - E5 -   | F5 - E5 - C5 - - -   | D5 - - - F5 - A5 -    | C#5 - - - - - . .
+melody A5 - - - D6 - A5 -    | F5 - - - D5 - . .    | F5 - D5 - Bb4 - D5 -  | F5 - - - - - . .
+melody G5 - Bb5 - D6 - Bb5 - | A5 - G5 - D5 - - -   | E5 - G5 - C#5 - E5 -  | A4 - - - - - . .

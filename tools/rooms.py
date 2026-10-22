@@ -26,12 +26,12 @@ GRID = 8
 
 # IntGrid values of the Tiles layer, and the text characters for them.
 TILES = [(1, '#', 'rock', '#6A5C7A'), (2, '%', 'hook_block', '#A6B6CC'), (3, '-', 'platform', '#B47C48'),
-         (4, '^', 'spikes', '#EEF1F8'), (5, 'x', 'crystal', '#E5487A')]
+         (4, '^', 'spikes', '#EEF1F8'), (5, 'x', 'crystal', '#E5487A'), (6, '=', 'gate', '#8899AA'), (7, 'o', 'slick', '#9AC0E0')]
 CHAR_OF = {value: char for value, char, _, _ in TILES}
 VALUE_OF = {char: value for value, char, _, _ in TILES}
 
-THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight']
-ABILITIES = ['climbing_pick', 'long_rope']
+THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight', 'ruins']
+ABILITIES = ['climbing_pick', 'long_rope', 'double_jump']
 
 # Entities: identifier, text character, colour, at most one per room, fields.
 ENTITIES = [
@@ -42,6 +42,7 @@ ENTITIES = [
     ('Gem', '*', '#4FD0E8', False, []),
     ('Npc', 'N', '#D77BBA', False, [('dialogue', 'String'), ('look', 'String')]),
     ('Bench', 'B', '#B47C48', False, []),
+    ('Lever', 'L', '#E8443A', False, []),
 ]
 ENTITY_OF_CHAR = {char: ident for ident, char, *_ in ENTITIES}
 CHAR_OF_ENTITY = {ident: char for ident, char, *_ in ENTITIES}
@@ -163,6 +164,11 @@ def ensure_definitions(project):
         if want:
             have = {f['identifier'] for f in entity['fieldDefs']}
             entity['fieldDefs'] += [f for f in want['fieldDefs'] if f['identifier'] not in have]
+    for layer in defs['layers']:
+        want = next((l for l in wanted['layers'] if l['identifier'] == layer['identifier']), None)
+        if want:
+            have = {v['value'] for v in layer['intGridValues']}
+            layer['intGridValues'] += [v for v in want['intGridValues'] if v['value'] not in have]
     for enum in defs['enums']:
         want = next((e for e in wanted['enums'] if e['identifier'] == enum['identifier']), None)
         if want:
