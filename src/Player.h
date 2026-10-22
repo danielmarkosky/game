@@ -41,6 +41,11 @@ public:
     void setSkin(size_t index);
     // The skin running on the spot, standing at `feet`, for the options screen.
     void drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scale, float time) const;
+    // Someone else standing still in one of the skins, breathing, with their feet at `feet`
+    // (screen pixels): the characters in the world and their faces in conversations.
+    void drawFigure(sf::RenderTarget& target, size_t skinIndex, sf::Vector2f feet, bool facingLeft, float time, float scale = 1.f) const;
+    // The index of a skin in SKINS by its name, or 0 if there's none called that.
+    static size_t skinNamed(const std::string& name);
 
     // Once per rendered frame: reacts to button presses (shooting and releasing the rope, buffering jumps).
     void handleInput(const PlayerInput& input);
@@ -66,6 +71,8 @@ public:
     std::optional<sf::Vector2f> ropeTarget(sf::Vector2f aim) const;
     // Without the climbing pick the rope only sticks to hook blocks ('%'); a shot at rock misses.
     void setCanHookRock(bool can);
+    // How far the rope reaches: ROPE_RANGE, or LONG_ROPE_RANGE with the long rope.
+    void setRopeRange(float range);
     // Where a rope shot towards `aim` would hit rock and bounce off, for want of the pick.
     std::optional<sf::Vector2f> ropeBounce(sf::Vector2f aim) const;
     // False during the cooldown after leaving the rope.
@@ -93,6 +100,7 @@ public:
 
     // Rope
     static constexpr float ROPE_RANGE = 100.f;
+    static constexpr float LONG_ROPE_RANGE = 150.f;
     static constexpr float SWING_ACCELERATION = 300.f;
     static constexpr float MAX_SWING_SPEED = 320.f;
     static constexpr float REEL_SPEED = 70.f;
@@ -136,6 +144,7 @@ private:
     bool jumping = false;
     bool facingLeft = false;
     bool hooksRock = true;
+    float ropeRange = ROPE_RANGE;
 
     // Looks
     size_t skin = 0;

@@ -282,6 +282,26 @@ void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     target.draw(sprite);
 }
 
+void Player::drawFigure(sf::RenderTarget& target, size_t skinIndex, sf::Vector2f feet, bool facingLeft, float time, float scale) const
+{
+    const int frame = frames::IDLE + static_cast<int>(time * 2.f) % 2;
+    sf::Sprite sprite(texture);
+    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(std::min(skinIndex, SKINS.size() - 1)) * frames::HEIGHT,
+                                      frames::WIDTH, frames::HEIGHT));
+    sprite.setOrigin(frames::WIDTH * 0.5f, frames::HEIGHT - 1.f);
+    sprite.setScale(facingLeft ? -scale : scale, scale);
+    sprite.setPosition(feet);
+    target.draw(sprite);
+}
+
+size_t Player::skinNamed(const std::string& name)
+{
+    for (size_t ii = 0; ii < SKINS.size(); ++ii) {
+        if (name == SKINS[ii]) return ii;
+    }
+    return 0;
+}
+
 void Player::setSkin(size_t index)
 {
     skin = std::min(index, SKINS.size() - 1);
@@ -369,7 +389,7 @@ std::vector<PlayerEvent> Player::takeEvents()
 
 std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 {
-    auto hit = nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ROPE_RANGE);
+    auto hit = nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ropeRange);
     if (!hit || hooksRock) return hit;
     // The tile the shot ran into is just past the surface point.
     const sf::Vector2f dir = (aim - exactCentre()) / distance(aim, exactCentre());
@@ -381,12 +401,17 @@ std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 std::optional<sf::Vector2f> Player::ropeBounce(sf::Vector2f aim) const
 {
     if (hooksRock || ropeTarget(aim)) return std::nullopt;
-    return nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ROPE_RANGE);
+    return nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ropeRange);
 }
 
 void Player::setCanHookRock(bool can)
 {
     hooksRock = can;
+}
+
+void Player::setRopeRange(float range)
+{
+    ropeRange = range;
 }
 
 

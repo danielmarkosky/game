@@ -4,7 +4,7 @@
 #include <stdexcept>
 #include <filesystem>
 #include <fstream>
-#include "src/Game.h"
+#include "src/World.h"
 #include <SFML/System.hpp>
 #include <set>
 #include <unordered_map>
@@ -108,62 +108,9 @@ TEST(Level_IsEmptySpace, BoxEndingOnTileEdgeDoesNotTouchIt) {
     EXPECT_FALSE(lvl.isEmptySpace({1.5f, 9.f}, 6.f, 7.f));
 }
 
-TEST(Level_LoadFromFile, AllShippedLevelsLoad) {
-    auto levels = loadLevelList(config::assetPath("levels/levels.txt"));
-    EXPECT_GE(levels.size(), 10u);
-    for (const auto& info : levels) {
-        SCOPED_TRACE(info.path);
-        EXPECT_FALSE(info.title.empty());
-        auto lvl = Level::loadFromFile(info.path);
-        EXPECT_GT(lvl->bounds().width, 0.f);
-    }
-}
-
-TEST(Level_LoadLevelList, ParsesFilesAndTitles) {
-    const auto path = std::filesystem::temp_directory_path() / "game_test_levels.txt";
-    {
-        std::ofstream file(path);
-        file << "# comment\n\nfirst.txt 0 0  The First One\nsecond.txt -3 12 Two\n";
-    }
-    auto levels = loadLevelList(path.string());
-    std::filesystem::remove(path);
-
-    ASSERT_EQ(levels.size(), 2u);
-    EXPECT_EQ(levels[0].path, (path.parent_path() / "first.txt").string());
-    EXPECT_EQ(levels[0].title, "The First One");
-    EXPECT_EQ(levels[1].title, "Two");
-    EXPECT_EQ(levels[1].position, sf::Vector2i(-3, 12));
-}
-
-TEST(Level_LoadLevelList, NeedsAPositionForEveryLevel) {
-    const auto path = std::filesystem::temp_directory_path() / "game_test_no_position.txt";
-    {
-        std::ofstream file(path);
-        file << "first.txt The First One\n";
-    }
-    EXPECT_THROW(loadLevelList(path.string()), std::runtime_error);
-    std::filesystem::remove(path);
-}
-
-TEST(Level_LoadLevelList, ThemeLinesApplyToTheLevelsAfterThem) {
-    const auto path = std::filesystem::temp_directory_path() / "game_test_themes.txt";
-    {
-        std::ofstream file(path);
-        file << "first.txt 0 0 One\ntheme snow\nsecond.txt 1 0 Two\nthird.txt 2 0 Three\ntheme ember\nfourth.txt 3 0 Four\n";
-    }
-    auto levels = loadLevelList(path.string());
-    std::filesystem::remove(path);
-
-    ASSERT_EQ(levels.size(), 4u);
-    EXPECT_EQ(levels[0].theme, Theme::DEFAULT);
-    EXPECT_EQ(levels[1].theme, "snow");
-    EXPECT_EQ(levels[2].theme, "snow");
-    EXPECT_EQ(levels[3].theme, "ember");
-}
-
 TEST(Level_Theme, EveryShippedThemeLoads) {
     std::set<std::string> themes;
-    for (const auto& info : loadLevelList(config::assetPath("levels/levels.txt"))) themes.insert(info.theme);
+    for (const auto& info : loadWorld(config::assetPath("world.ldtk"))) themes.insert(info.theme);
     EXPECT_GE(themes.size(), 5u);
     for (const auto& name : themes) {
         SCOPED_TRACE(name);
@@ -207,6 +154,16 @@ TEST(Level_Gems, AreReadFromTheFileAndTouched) {
     EXPECT_FALSE(lvl->gemAt({8.f, 8.f}, 11.f, 7.f).has_value());
     EXPECT_FALSE(lvl->gemAt({32.f, 8.f}, 11.f, 7.f).has_value()); // just touching its side
     EXPECT_EQ(lvl->gemAt({28.f, 8.f}, 11.f, 7.f), 0u);
+}
+
+TEST(Level_Benches, AreReadFromTheFile) {
+    auto lvl = Level::loadFromString(
+        "######\n"
+        "#S.B.#\n"
+        "######\n");
+    ASSERT_EQ(lvl->benches().size(), 1u);
+    EXPECT_EQ(lvl->benches()[0], sf::Vector2f(24.f, 8.f));
+    EXPECT_FALSE(lvl->isSolid(3, 1));
 }
 
 TEST(Level_IsDangerousSpace, OnlyThePointyHalfOfASpikeHurts) {

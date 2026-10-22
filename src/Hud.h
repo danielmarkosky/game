@@ -4,7 +4,7 @@
 #include <string>
 
 // A tiny 3x5 pixel font, so the HUD doesn't need a font file.
-// Supports A-Z, digits and : . - ! ? ' / ( ) < > and space. Lowercase 'x' is a small cross,
+// Supports A-Z, digits and : . , ; - ! ? ' " / ( ) < > + = % and space. Lowercase 'x' is a small cross,
 // used as the death counter's icon; other lowercase letters are drawn as capitals.
 namespace hud
 {

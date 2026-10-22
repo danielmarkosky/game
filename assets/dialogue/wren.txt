@@ -1,0 +1,21 @@
+# Wren, an old climber who lives at the bottom of The Cave, by where you start.
+
+--- !climbing_pick
+Wren: Oh! A climber, down here? Nobody comes this way anymore.
+You: I'm trying to get out. Up, I guess.
+Wren: Up is the only way out of this hole. Mind the spikes.
+Wren: That rope of yours only bites metal, you know. See the blocks with the yellow mark? Aim at one, shoot, and hold on.
+Wren: Bare rock is another story. You'd need a climbing pick for that.
+Wren: I lost mine down the corridor, years ago. If you find it, it's yours.
+
+--- !climbing_pick
+Wren: Still here? The corridor's that way. My pick's out there somewhere, past the second flag.
+
+--- climbing_pick
+Wren: Is that my old pick? Well, look at you!
+Wren: With that, your rope sticks to rock, not just metal. You can swing from anything now.
+You: Thanks. I'll take good care of it.
+Wren: Oh, and keep your eyes up. There's something shiny stuck in the ceiling, just along from here. Always wanted it, never could reach.
+
+--- climbing_pick
+Wren: Up and out, climber. And don't look down.

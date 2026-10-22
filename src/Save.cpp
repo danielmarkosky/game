@@ -1,108 +1,186 @@
 #include "Save.h"
-#include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 
-void SaveData::addResult(const std::string& level, float time, int deaths)
+namespace
 {
-    auto [it, isNew] = records.try_emplace(level, LevelRecord{time, deaths});
-    if (isNew) return;
-    it->second.bestTime = std::min(it->second.bestTime, time);
-    it->second.fewestDeaths = std::min(it->second.fewestDeaths, deaths);
-}
+    // Older saves named rooms after their text level files.
+    std::string roomName(std::string name)
+    {
+        if (name.size() > 4 && name.compare(name.size() - 4, 4, ".txt") == 0) name.resize(name.size() - 4);
+        return name;
+    }
 
-const LevelRecord* SaveData::record(const std::string& level) const
-{
-    auto it = records.find(level);
-    return it == records.end() ? nullptr : &it->second;
-}
+    std::string read(const std::string& path)
+    {
+        std::ifstream file(path);
+        std::stringstream buffer;
+        if (file) buffer << file.rdbuf();
+        return buffer.str();
+    }
 
-SaveData SaveData::parse(const std::string& text)
-{
-    SaveData data;
-    std::istringstream stream(text);
-    for (std::string line; std::getline(stream, line);) {
-        std::istringstream words(line);
-        std::string key;
-        if (!(words >> key)) continue;
+    void write(const std::string& path, const std::string& text)
+    {
+        std::error_code error;
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), error);
+        std::ofstream file(path);
+        if (file) file << text;
+    }
 
-        if (key == "window_scale") {
-            int scale;
-            if (words >> scale && scale >= 1 && scale <= 16) data.settings.windowScale = scale;
-        } else if (key == "fullscreen" || key == "screen_shake" || key == "show_timer") {
-            int on;
-            if (!(words >> on)) continue;
-            bool& flag = key == "fullscreen" ? data.settings.fullscreen
-                       : key == "screen_shake" ? data.settings.screenShake
-                       : data.settings.showTimer;
-            flag = on != 0;
-        } else if (key == "skin") {
-            words >> data.settings.skin;
-        } else if (key == "continue") {
-            words >> data.continueLevel;
-        } else if (key == "record") {
-            std::string level;
-            LevelRecord record;
-            if (words >> level >> record.bestTime >> record.fewestDeaths) data.records[level] = record;
-        } else if (key == "explored") {
-            std::string level;
-            if (words >> level) data.explored.insert(level);
-        } else if (key == "ability") {
-            std::string ability;
-            if (words >> ability) data.abilities.insert(ability);
-        } else if (key == "gem") {
-            std::string level;
-            int x, y;
-            if (words >> level >> x >> y) data.gems.insert(level + " " + std::to_string(x) + " " + std::to_string(y));
+    // Calls `line` with the first word of every line and a stream of the rest.
+    template <typename F>
+    void forEachLine(const std::string& text, F line)
+    {
+        std::istringstream stream(text);
+        for (std::string raw; std::getline(stream, raw);) {
+            std::istringstream words(raw);
+            std::string key;
+            if (words >> key) line(key, words);
         }
     }
-    return data;
 }
 
-std::string SaveData::serialize() const
+Settings Settings::parse(const std::string& text)
+{
+    Settings s;
+    forEachLine(text, [&](const std::string& key, std::istringstream& words) {
+        if (key == "window_scale") {
+            int scale;
+            if (words >> scale && scale >= 1 && scale <= 16) s.windowScale = scale;
+        } else if (key == "fullscreen" || key == "screen_shake" || key == "show_timer") {
+            int on;
+            if (!(words >> on)) return;
+            bool& flag = key == "fullscreen" ? s.fullscreen : key == "screen_shake" ? s.screenShake : s.showTimer;
+            flag = on != 0;
+        } else if (key == "skin") {
+            words >> s.skin;
+        } else if (key == "last_slot") {
+            int slot;
+            if (words >> slot && slot >= 0 && slot < SaveFiles::SLOTS) s.lastSlot = slot;
+        }
+    });
+    return s;
+}
+
+std::string Settings::serialize() const
 {
     std::ostringstream out;
-    out << "window_scale " << settings.windowScale << "\n";
-    out << "fullscreen " << settings.fullscreen << "\n";
-    out << "screen_shake " << settings.screenShake << "\n";
-    out << "show_timer " << settings.showTimer << "\n";
-    out << "skin " << settings.skin << "\n";
-    if (!continueLevel.empty()) out << "continue " << continueLevel << "\n";
-    for (const auto& [level, record] : records) {
-        out << "record " << level << " " << record.bestTime << " " << record.fewestDeaths << "\n";
-    }
-    for (const auto& level : explored) out << "explored " << level << "\n";
-    for (const auto& ability : abilities) out << "ability " << ability << "\n";
-    for (const auto& gem : gems) out << "gem " << gem << "\n";
+    out << "window_scale " << windowScale << "\n";
+    out << "fullscreen " << fullscreen << "\n";
+    out << "screen_shake " << screenShake << "\n";
+    out << "show_timer " << showTimer << "\n";
+    out << "skin " << skin << "\n";
+    out << "last_slot " << lastSlot << "\n";
     return out.str();
 }
 
-SaveData SaveData::load(const std::string& path)
+bool Progress::isEmpty() const
 {
-    std::ifstream file(path);
-    if (!file) return {};
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    return parse(buffer.str());
+    return explored.empty() && bench.empty() && playTime == 0.f;
 }
 
-void SaveData::save(const std::string& path) const
+Progress Progress::parse(const std::string& text)
 {
-    std::error_code error;
-    std::filesystem::create_directories(std::filesystem::path(path).parent_path(), error);
-    std::ofstream file(path);
-    if (file) file << serialize();
+    Progress p;
+    forEachLine(text, [&](const std::string& key, std::istringstream& words) {
+        std::string room;
+        int x, y;
+        if (key == "bench" || key == "found_bench") {
+            int number;
+            if (!(words >> room >> number)) return;
+            const std::string bench = room + " " + std::to_string(number);
+            if (key == "bench") p.bench = bench;
+            p.benches.insert(bench);
+        } else if (key == "explored") {
+            if (words >> room) p.explored.insert(roomName(room));
+        } else if (key == "ability") {
+            std::string ability;
+            if (words >> ability) p.abilities.insert(ability);
+        } else if (key == "gem") {
+            if (words >> room >> x >> y) p.gems.insert(roomName(room) + " " + std::to_string(x) + " " + std::to_string(y));
+        } else if (key == "talked") {
+            std::string dialogue;
+            if (words >> dialogue >> x) p.conversations.insert(dialogue + " " + std::to_string(x));
+        } else if (key == "play_time") {
+            words >> p.playTime;
+        } else if (key == "deaths") {
+            words >> p.deaths;
+        } else if (key == "finished") {
+            int on;
+            if (words >> on) p.finished = on != 0;
+        }
+    });
+    return p;
 }
 
-std::string SaveData::defaultPath()
+std::string Progress::serialize() const
+{
+    std::ostringstream out;
+    if (!bench.empty()) out << "bench " << bench << "\n";
+    for (const auto& b : benches) {
+        if (b != bench) out << "found_bench " << b << "\n";
+    }
+    for (const auto& room : explored) out << "explored " << room << "\n";
+    for (const auto& ability : abilities) out << "ability " << ability << "\n";
+    for (const auto& gem : gems) out << "gem " << gem << "\n";
+    for (const auto& conversation : conversations) out << "talked " << conversation << "\n";
+    out << "play_time " << playTime << "\n";
+    out << "deaths " << deaths << "\n";
+    out << "finished " << finished << "\n";
+    return out.str();
+}
+
+SaveFiles::SaveFiles(std::string folderPath) : folder(std::move(folderPath))
+{
+    // Before there were slots, everything was in save.txt: it becomes the settings and slot 1.
+    const std::string old = path("save.txt");
+    if (std::filesystem::exists(old) && !std::filesystem::exists(path("settings.txt"))) {
+        const std::string text = read(old);
+        write(path("settings.txt"), Settings::parse(text).serialize());
+        const Progress progress = Progress::parse(text);
+        if (!progress.isEmpty()) write(path("slot1.txt"), progress.serialize());
+    }
+}
+
+std::string SaveFiles::defaultFolder()
 {
 #ifdef _WIN32
     const char* home = std::getenv("USERPROFILE");
 #else
     const char* home = std::getenv("HOME");
 #endif
-    const std::filesystem::path folder = home ? std::filesystem::path(home) / ".celeste_like_game" : ".";
-    return (folder / "save.txt").string();
+    return (home ? std::filesystem::path(home) / ".celeste_like_game" : std::filesystem::path(".")).string();
+}
+
+std::string SaveFiles::path(const std::string& file) const
+{
+    return (std::filesystem::path(folder) / file).string();
+}
+
+Settings SaveFiles::loadSettings() const
+{
+    return Settings::parse(read(path("settings.txt")));
+}
+
+void SaveFiles::saveSettings(const Settings& settings) const
+{
+    write(path("settings.txt"), settings.serialize());
+}
+
+Progress SaveFiles::loadSlot(int slot) const
+{
+    return Progress::parse(read(path("slot" + std::to_string(slot + 1) + ".txt")));
+}
+
+void SaveFiles::saveSlot(int slot, const Progress& progress) const
+{
+    write(path("slot" + std::to_string(slot + 1) + ".txt"), progress.serialize());
+}
+
+void SaveFiles::eraseSlot(int slot) const
+{
+    std::error_code error;
+    std::filesystem::remove(path("slot" + std::to_string(slot + 1) + ".txt"), error);
 }

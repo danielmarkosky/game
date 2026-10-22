@@ -47,8 +47,9 @@ namespace
 
         // assets/gfx/items.png, 10x10 frames, in the order of ITEMS.
         constexpr int ITEM_SIZE = 10;
-        const char* const ITEMS[] = {"climbing_pick"};
         constexpr int GEM = 1;
+        // The frame of each ability's pickup.
+        const std::pair<const char*, int> ITEMS[] = {{"climbing_pick", 0}, {"long_rope", 2}};
     }
 
     // Spikes point away from the rock they're stuck to.
@@ -168,34 +169,73 @@ std::shared_ptr<Level> Level::loadFromString(const std::string& text)
     }
     while (!rows.empty() && rows.back().empty()) rows.pop_back();
 
-    auto level = std::make_shared<Level>(std::unordered_map<int, std::unordered_map<int, int>>{});
-    bool hasStart = false;
-    const int numRows = static_cast<int>(rows.size());
+    auto level = fromRows(rows);
+    if (!level->hasStart()) throw std::runtime_error("Level has no start position ('S')");
+    return level;
+}
 
+std::shared_ptr<Level> Level::fromRows(const std::vector<std::string>& rows)
+{
+    auto level = std::make_shared<Level>(std::unordered_map<int, std::unordered_map<int, int>>{});
+    const int numRows = static_cast<int>(rows.size());
     for (int row = 0; row < numRows; ++row) {
         // The first line of the file is the top of the level, and world y points up.
         const int y = numRows - 1 - row;
         for (int x = 0; x < static_cast<int>(rows[row].size()); ++x) {
-            const sf::Vector2f tilePos(x * TILE_SIZE, y * TILE_SIZE);
             switch (rows[row][x]) {
                 case '#': level->m_tileMap[x][y] = TILE_ROCK; break;
                 case '%': level->m_tileMap[x][y] = TILE_METAL; break;
                 case '^': level->m_tileMap[x][y] = TILE_SPIKES; break;
                 case 'x': level->m_tileMap[x][y] = TILE_CRYSTAL; break;
                 case '-': level->m_tileMap[x][y] = TILE_PLATFORM; break;
-                case 'S': level->m_startPos = tilePos; hasStart = true; break;
-                case 'C': level->m_checkpoints.push_back(tilePos); break;
-                case 'G': level->m_goal = tilePos; break;
-                case 'P': level->m_pickups.push_back({"climbing_pick", tilePos}); break;
-                case '*': level->m_gems.push_back(tilePos); break;
+                case 'S': level->setStart({x, y}); break;
+                case 'C': level->addCheckpoint({x, y}); break;
+                case 'G': level->setGoal({x, y}); break;
+                case 'P': level->addPickup("climbing_pick", {x, y}); break;
+                case '*': level->addGem({x, y}); break;
+                case 'N': level->addNpc("", "", {x, y}); break; // says nothing: the fields come from LDtk
+                case 'B': level->addBench({x, y}); break;
                 default: break;
             }
         }
     }
-    if (!hasStart) throw std::runtime_error("Level has no start position ('S')");
-
     level->computeBounds();
     return level;
+}
+
+void Level::setStart(sf::Vector2i tile)
+{
+    m_startPos = sf::Vector2f(tile) * TILE_SIZE;
+}
+
+void Level::addCheckpoint(sf::Vector2i tile)
+{
+    m_checkpoints.push_back(sf::Vector2f(tile) * TILE_SIZE);
+}
+
+void Level::setGoal(sf::Vector2i tile)
+{
+    m_goal = sf::Vector2f(tile) * TILE_SIZE;
+}
+
+void Level::addPickup(const std::string& ability, sf::Vector2i tile)
+{
+    m_pickups.push_back({ability, sf::Vector2f(tile) * TILE_SIZE});
+}
+
+void Level::addGem(sf::Vector2i tile)
+{
+    m_gems.push_back(sf::Vector2f(tile) * TILE_SIZE);
+}
+
+void Level::addNpc(const std::string& dialogue, const std::string& look, sf::Vector2i tile)
+{
+    m_npcs.push_back({dialogue, look, sf::Vector2f(tile) * TILE_SIZE});
+}
+
+void Level::addBench(sf::Vector2i tile)
+{
+    m_benches.push_back(sf::Vector2f(tile) * TILE_SIZE);
 }
 
 void Level::loadTextures()
@@ -203,6 +243,7 @@ void Level::loadTextures()
     m_theme = Theme::get(Theme::DEFAULT);
     m_objects.loadFromFile(config::assetPath("gfx/objects.png"));
     m_items.loadFromFile(config::assetPath("gfx/items.png"));
+    m_bench.loadFromFile(config::assetPath("gfx/bench.png"));
 }
 
 void Level::setTheme(std::shared_ptr<const Theme> theme)
@@ -317,8 +358,8 @@ void Level::drawPickups(sf::RenderTarget& target, sf::Vector2f centr, float time
     sf::Sprite sprite(m_items);
     for (const Pickup& pickup : m_pickups) {
         if (owned(pickup.ability)) continue;
-        const auto it = std::find_if(std::begin(sheet::ITEMS), std::end(sheet::ITEMS), [&](const char* name) { return pickup.ability == name; });
-        const int frame = static_cast<int>(it - std::begin(sheet::ITEMS));
+        const auto it = std::find_if(std::begin(sheet::ITEMS), std::end(sheet::ITEMS), [&](const auto& item) { return pickup.ability == item.first; });
+        const int frame = it == std::end(sheet::ITEMS) ? 0 : it->second;
         sprite.setTextureRect(sf::IntRect(frame * sheet::ITEM_SIZE, 0, sheet::ITEM_SIZE, sheet::ITEM_SIZE));
         // Floats in the middle of its tile, a pixel or two above the ground.
         const float bob = std::round(std::sin(time * 3.f) * 1.5f);
@@ -330,6 +371,25 @@ void Level::drawPickups(sf::RenderTarget& target, sf::Vector2f centr, float time
         halo.setPosition(std::floor(pos.x) + 5.f, std::floor(pos.y) + 5.f);
         halo.setFillColor(sf::Color(255, 220, 120, static_cast<sf::Uint8>(40.f + 40.f * glow)));
         target.draw(halo);
+        sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
+        target.draw(sprite);
+    }
+}
+
+void Level::drawBenches(sf::RenderTarget& target, sf::Vector2f centr, std::optional<size_t> glowing, float time) const
+{
+    sf::Sprite sprite(m_bench);
+    for (size_t ii = 0; ii < m_benches.size(); ++ii) {
+        // The sprite has a 1 px outline all round, and stands on the bottom of the tile.
+        auto pos = viewCoordinates(m_benches[ii] + sf::Vector2f(-1.f, sprite.getLocalBounds().height - 1.f), centr);
+        if (glowing == ii) {
+            const float glow = 0.5f + 0.5f * std::sin(time * 2.f);
+            sf::CircleShape halo(13.f);
+            halo.setOrigin(13.f, 13.f);
+            halo.setPosition(std::floor(pos.x) + 9.f, std::floor(pos.y) + 6.f);
+            halo.setFillColor(sf::Color(255, 210, 120, static_cast<sf::Uint8>(25.f + 25.f * glow)));
+            target.draw(halo);
+        }
         sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
         target.draw(sprite);
     }
@@ -440,6 +500,16 @@ std::optional<size_t> Level::gemAt(sf::Vector2f pos, float height, float width) 
     return std::nullopt;
 }
 
+const std::vector<Npc>& Level::npcs() const
+{
+    return m_npcs;
+}
+
+const std::vector<sf::Vector2f>& Level::benches() const
+{
+    return m_benches;
+}
+
 std::optional<Level::Side> Level::exitThrough(sf::Vector2f point) const
 {
     if (point.x < m_bounds.left) return Side::Left;
@@ -449,9 +519,15 @@ std::optional<Level::Side> Level::exitThrough(sf::Vector2f point) const
     return std::nullopt;
 }
 
+bool Level::hasStart() const
+{
+    return m_startPos.has_value();
+}
+
 sf::Vector2f Level::getStartPos() const
 {
-    return m_startPos;
+    // The test room made by Level() has none: somewhere inside it.
+    return m_startPos.value_or(sf::Vector2f(100.f, 100.f));
 }
 
 const std::vector<sf::Vector2f>& Level::checkpoints() const

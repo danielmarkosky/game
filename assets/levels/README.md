@@ -1,53 +1,97 @@
-# Level format
+# Making rooms
 
-A level is a plain text file. Each character is one 8x8 tile, and the first line is the top of
-the level. Lines don't need to be the same length.
+The world is one LDtk project: [`assets/world.ldtk`](../world.ldtk). Open it in
+[LDtk](https://ldtk.io), the free level editor, to change rooms or add new ones. Every LDtk level
+is a room of the game, and the world view (`F2`, or the zoomed-out view) is the game's map.
 
-| Char | Tile |
-|------|------|
-| `#`  | Solid rock (how it looks depends on the theme) |
-| `%`  | Metal hook block. Solid like `#`, but drawn so it stands out as something to hook |
-| `-`  | One-way platform: jump up through it, stand on top, hold down to drop through |
-| `^`  | Metal spikes, kill on touch |
-| `x`  | Crystal spikes, same as `^` but pink |
-| `S`  | Start position (required, exactly one) |
-| `C`  | Checkpoint. Put it in the empty tile right above the ground |
-| `G`  | Goal flag (optional). Touching it finishes the game |
-| `P`  | The climbing pick: after picking it up the rope sticks to rock too, not just to `%` |
-| `*`  | A gem, to collect. It can float in the air: touching it is enough |
-| anything else | Empty |
+## In LDtk
 
-**The world.** Every level is a room on one big map. Like in Celeste, you go from room to room by
-walking off the screen: through a gap in a room's outside wall into the room on the other side,
-and back again the same way. Rooms can join on any side, the bottom too (drop down a hole into
-the room below). A gap in the bottom with no room under it is a pit, and falling out of it kills.
-The only gap that may lead nowhere else is in the last room in `levels.txt`: that's the end of the
-game.
+Each room has two layers, 8 px to a tile:
 
-Spikes point away from the rock they're next to (rock below: up, rock above: down, rock on a
-side: sideways), and only that pointy half of the tile hurts. Grass, edges and decorations are
-picked automatically from the neighbouring tiles.
+| Tiles layer value | Tile |
+|-------------------|------|
+| `rock` | Solid rock (how it looks depends on the theme) |
+| `hook_block` | Metal hook block. Solid like rock, but drawn so it stands out as something to hook |
+| `platform` | One-way platform: jump up through it, stand on top, hold down to drop through |
+| `spikes` | Metal spikes, kill on touch |
+| `crystal` | Crystal spikes, same as spikes but pink |
 
-To add a level to the game, add a line to `levels.txt`: the file name, where it goes on the map,
-then the title shown the first time you go in. The position is in tiles, of the level's bottom-left
-tile, with x to the right and y up. Put it right next to the room it joins, so that the gaps in
-the two walls line up tile for tile. `game_tests` checks that they do, that no rooms overlap, and
-that every room can be reached (it doesn't check the jumps, so play it).
+| Entity | |
+|--------|---|
+| `Start` | Where the game starts, in the first room, and where `--room` starts a room (required, exactly one) |
+| `Checkpoint` | A flag. Put it in the empty tile right above the ground |
+| `Goal` | Touching it finishes the game (optional) |
+| `Pickup` | Gives an ability: its `ability` field says which. `climbing_pick` makes the rope stick to rock too, not just to hook blocks; `long_rope` makes it reach 150 px instead of 100 |
+| `Gem` | A gem, to collect. It can float in the air: touching it is enough |
+| `Bench` | Two tiles wide: sitting on it saves, and from it you can travel to any other bench sat on. Both tiles need ground under them |
+| `Npc` | Someone to talk to, standing on the bottom of the tile. `dialogue` names their file in [`assets/dialogue/`](../dialogue/README.md), `look` the player skin they wear |
 
-**Themes.** A `theme <name>` line in `levels.txt` sets the scenery of the levels below it, until
-the next `theme` line: `cave`, `garden`, `snow`, `ember` or `daylight` (the folders in
-`assets/gfx/themes/`). A theme only changes the looks, never how a tile behaves. Levels before any
-`theme` line, and levels played on their own from the command line, are in the cave.
+Each room also has two fields: its `title`, shown the first time you go in, and its `theme`:
+`cave`, `garden`, `snow`, `ember` or `daylight` (the folders in `assets/gfx/themes/`). A theme only
+changes the looks, never how a tile behaves. Grass, edges and decorations are picked automatically
+from the neighbouring tiles, and spikes point away from the rock they're next to (rock below: up,
+rock above: down, rock on a side: sideways). Only that pointy half of the tile hurts.
 
-Things to keep in mind when designing:
+The first room in the project is where a new game starts, and the last one has the way out at the
+end of the game.
+
+## The world
+
+Like in Celeste, you go from room to room by walking off the screen: through a gap in a room's
+outside wall into the room on the other side, and back again the same way. Rooms can join on any
+side, the bottom too (drop down a hole into the room below). A gap in the bottom with no room under
+it is a pit, and falling out of it kills. The only gap that may lead nowhere else is in the last
+room: that's the end of the game.
+
+Put rooms right next to each other in the world view, so that the gaps in the two walls line up
+tile for tile. `game_tests` checks that they do, that no rooms overlap, and that every room can be
+reached (it doesn't check the jumps, so play it).
+
+## As text
+
+[`tools/rooms.py`](../../tools/rooms.py) turns the project into one text file per room and back,
+for big edits with a script or a text editor:
+
+```sh
+python3 tools/rooms.py export assets/world.ldtk rooms/     # rooms/rooms.txt and a file per room
+python3 tools/rooms.py import rooms/rooms.txt assets/world.ldtk
+```
+
+Each character of a text room is one tile, and the first line is the top of the room:
+
+| Char | | Char | |
+|------|---|------|---|
+| `#` | rock | `S` | Start |
+| `%` | hook block | `C` | Checkpoint |
+| `-` | platform | `G` | Goal |
+| `^` | spikes | `P` | Pickup (`climbing_pick` unless rooms.txt says otherwise) |
+| `x` | crystal spikes | `*` | Gem |
+| `.` | empty | `N` | Npc (its fields in rooms.txt) |
+| | | `B` | Bench |
+
+`rooms.txt` lists the rooms in order: a `theme <name>` line sets the theme of the rooms below it,
+then each room is its file name, its position on the map (in tiles, of its bottom-left tile, x to
+the right and y up) and its title. `entity <room> <column> <row> name=value ...` lines give an
+entity's fields.
+
+`./build/Release/game some_room.txt` plays a single text room on its own, and
+`./build/Release/game --room <identifier>` starts the world in that room. Neither has a title
+screen, both give every ability and neither saves (in a text room on its own, any gap in it ends
+the game).
+
+## Designing
 
 - A running jump goes about **4 tiles up** and **6 tiles across**. Gaps of 3–5 tiles are jumps;
   anything wider needs the rope.
-- The rope reaches **100 px (12.5 tiles)** from the player's centre and only sticks to solid
-  rock (`#`, `%`), not to platforms or hazards. Until the player has the climbing pick it only
-  sticks to hook blocks (`%`), so anything before the pick has to be done without rock to swing
-  from. Starting a room from the level select gives the abilities picked up in the rooms above
-  it in `levels.txt`.
+- The rope reaches **100 px (12.5 tiles)** from the player's centre, **150 px (18.75 tiles)** with
+  the long rope, and only sticks to solid rock and hook blocks, not to platforms or hazards. Until
+  the player has the climbing pick it only sticks to hook blocks, so anything before the pick has
+  to be done without rock to swing from.
+- With the pick, a rock wall can be climbed: hook it high, reel in, let go, hook it higher. To make
+  something really out of reach, line the walls with crystal (the rope goes through crystal to the
+  rock behind, but hanging from there drags you into the spikes), like the Tall Hall. Its hook is
+  20 tiles above the floor: more than 12.5 tiles even from the top of a jump, less than 18.75
+  from the floor.
 - The rope wraps around outside corners of rock (and slides along flat walls), so a rope that
   swings past a pit's lip or a block's edge will catch on it. Platforms and hazards don't catch it.
 - A swing under a ceiling 9–10 tiles above the floor comfortably crosses 8–10 tiles.
@@ -57,6 +101,3 @@ Things to keep in mind when designing:
   about 3 tiles above the bottom of the room above, to land on.
 - Coming into a room, the first place the player stands becomes their checkpoint, until they reach
   a flag.
-
-Play a single level with `./game path/to/level.txt` (any gap in it ends the game). With no
-argument the game plays the world in `levels.txt`.

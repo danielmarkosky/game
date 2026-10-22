@@ -5,42 +5,30 @@
 #include "src/Menu.h"
 #include "src/Particles.h"
 #include "src/Player.h"
+#include "src/Dialogue.h"
 #include "src/Save.h"
 #include "src/Theme.h"
+#include "src/World.h"
 #include "src/WorldMap.h"
 #include <SFML/Graphics.hpp>
 #include <memory>
 #include <optional>
 #include <random>
-#include <set>
 #include <string>
 #include <vector>
-
-struct LevelInfo
-{
-    std::string path;
-    std::string title;
-    std::string theme = Theme::DEFAULT;
-    sf::Vector2i position{}; // on the world map, in tiles: where the level's bottom-left tile is
-};
-
-// Reads assets/levels/levels.txt style lists: one level per line, "file.txt x y Title of the level".
-// A "theme <name>" line sets the theme of the levels after it. Paths are relative to the list's
-// folder. Blank lines and lines starting with '#' are skipped.
-std::vector<LevelInfo> loadLevelList(const std::string& listPath);
 
 // Owns the window and runs the main loop: input once per frame, physics at a fixed rate,
 // then rendering at the game's low resolution scaled up to the window.
 class Game
 {
 public:
-    // With `testing` set (playing level files given on the command line) the game skips the title
-    // screen and doesn't record results.
-    explicit Game(std::vector<LevelInfo> levels, bool testing = false);
+    // With `testing` set (a level file or a room given on the command line), the game starts
+    // straight away in room `startRoom`, with every ability, and saves nothing but the settings.
+    explicit Game(std::vector<LevelInfo> levels, bool testing = false, size_t startRoom = 0);
     void run();
 
 private:
-    enum class Screen { Title, LevelSelect, Options, Playing, Paused, Complete, Map };
+    enum class Screen { Title, Slots, ConfirmErase, Options, Playing, Paused, Complete, Map, Talking };
 
     // Moving from one room into the next: the camera pans across from the old one.
     struct Transition
@@ -60,23 +48,17 @@ private:
     void applyWindowSettings();
     int maxWindowScale() const;
     bool inGame() const; // a level is being played, possibly paused
-    std::optional<size_t> continueIndex() const;
     std::string levelKey(size_t index) const;
     size_t skinIndex() const; // of the saved skin; the first one if the name is unknown
-    void writeSave();
+    std::string slotSummary(const Progress& p) const; // "THE CROSSROADS" and "1:02:03  5/22"
+    void saveSettings();
+    void saveProgress(); // to the slot being played, unless testing
 
     // Playing
-    enum class Start
-    {
-        New,      // from scratch: no abilities, nothing on the map
-        Continue, // with what the save has
-        From,     // from a room picked in the level select, with what the rooms before it give
-    };
-    void startGame(size_t index, Start how);
+    void startGame(int slot); // where that slot left off, or from the start if it's empty
     void loadLevel(size_t index);
     void spawnAtStart();
     void enterRoom(size_t index, Level::Side side);
-    void recordResult();
     void finishGame();
     // The room other than the current one that a point (in the current room's coordinates) is in.
     std::optional<size_t> roomAt(sf::Vector2f point) const;
@@ -87,14 +69,44 @@ private:
     void applyAbilities(); // to the player
     void collect(const Pickup& pickup);
     void showMessage(std::string title, std::string text);
+    void showNotice(std::string text); // a small line in the corner for a moment
     std::string gemKey(size_t room, size_t gem) const;
     bool gemFound(size_t room, size_t gem) const;
     int gemCount() const;     // in the whole world
     std::string gemTotal() const;            // "GEMS 5/20"
     std::string gemTally(size_t room) const; // "1/2", or empty if the room has none
 
+    // Talking
+    struct Page
+    {
+        std::string speaker;
+        std::vector<std::string> lines; // wrapped to fit the box
+    };
+    struct Talk
+    {
+        Npc npc;
+        size_t conversation = 0;
+        std::vector<Page> pages;
+        size_t page = 0;
+        float typed = 0.f; // characters of the page shown so far
+    };
+    void startTalk(const Npc& npc);
+    void advanceTalk();
+    void endTalk();
+    // Someone in the room close enough to talk to.
+    const Npc* npcInReach() const;
+
+    // Benches: sitting on one saves, and from one you can travel to any other you've sat on.
+    std::optional<size_t> benchInReach() const;
+    std::string benchKey(size_t room, size_t bench) const; // as in Progress
+    std::optional<std::pair<size_t, size_t>> findBench(const std::string& key) const; // room, bench
+    void sitDown(size_t bench); // on that bench of the current room
+    std::vector<std::string> travelDestinations() const; // the benches sat on, in room order
+    void travelTo(const std::string& key);
+
     // Map
-    void openMap();
+    void openMap(bool travel = false);
+    void chooseDestination(int step);
     void updateMap(float dt, sf::Vector2f mouseMove);
     void zoomMap(int steps); // + is closer
     std::vector<bool> exploredRooms() const;
@@ -122,11 +134,16 @@ private:
     void drawHud();
     void drawMenuScreen();
     void drawMap();
+    void drawTalk();
 
     std::vector<LevelInfo> levels;
     bool testing;
-    std::string savePath;
-    SaveData save;
+    SaveFiles files;
+    Settings settings;
+    Progress progress;      // of the slot being played
+    int slot = -1;          // being played, counting from 0; -1 when testing
+    bool erasing = false;   // on the slot screen, choosing one to erase
+    int slotToErase = -1;
     bool reapplyWindow = false; // window settings changed, recreate it once the events are handled
 
     std::shared_ptr<sf::RenderWindow> window;
@@ -134,7 +151,7 @@ private:
     InputManager input;
 
     Screen screen = Screen::Title;
-    Screen returnScreen = Screen::Title; // where Back goes from the level select and the options
+    Screen returnScreen = Screen::Title; // where Back goes from the options
     Menu menu;
     sf::Vector2f lastMouse;
 
@@ -146,6 +163,8 @@ private:
     sf::Vector2f mapCentre;                    // in world tiles
     int mapZoom = 1;                           // one of WorldMap::ZOOMS
     Screen mapReturn = Screen::Playing;        // where closing the map goes
+    bool travelling = false;                   // the map is open to choose a bench to travel to
+    size_t travelChoice = 0;                   // in travelDestinations()
     std::unique_ptr<Player> player;
     Particles particles;
     std::mt19937 rng{7};
@@ -154,7 +173,7 @@ private:
     sf::Vector2f camera;
     sf::Vector2f checkpoint;
     bool needsSpawnPoint = false; // just came into the room: where the player first lands becomes the checkpoint
-    float runTime = 0.f;
+    std::optional<size_t> sitting; // the bench in this room the player is sitting on
     float clockTime = 0.f;   // never stops, drives animations
     float deathTimer = 0.f;  // > 0 while dead, counting down to the respawn
     float deathFlash = 0.f;
@@ -163,13 +182,10 @@ private:
     std::string messageTitle, messageText; // shown in the middle of the screen for a while, instead of the level's title
     float messageTimer = 0.f;
     bool shownRockHint = false;
-    std::set<std::string> gems;  // found, by gemKey: the save's, except when testing a level
-    float gemCounterTimer = 0.f; // the count shows for a moment after finding one
-    int deaths = 0;
-    float totalTime = 0.f;   // over the rooms played since the game was started
-    int totalDeaths = 0;
-    size_t firstLevelPlayed = 0;
-    std::string lastResult;  // shown under the next level's title
+    std::optional<Talk> talk;
+    std::string notice;      // see showNotice
+    float noticeTimer = 0.f;
+    float fade = 0.f;        // > 0 while fading in after travelling
     bool ignoreInputThisFrame = false;   // right after a (re)start, so the key that started it doesn't jump
     bool ignorePressesThisFrame = false; // right after unpausing: held buttons count, new presses don't
 };

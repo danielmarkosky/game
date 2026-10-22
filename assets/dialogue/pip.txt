@@ -1,0 +1,20 @@
+# Pip, a mapmaker who camps in the Crossroads, the hub above The Well.
+
+--- !long_rope
+Pip: Oh, hello! A new face. Welcome to the Crossroads. I'm Pip, and I draw maps.
+Pip: Keep your own map handy, by the way: M or Tab. It fills itself in as you go.
+Pip: East of here is the Hook Garden. Lovely place, if you like spikes.
+Pip: And up there is the Tall Hall. The walls are all crystal, nothing to hold on to. And the only hook is way, way up.
+You: Too far for my rope?
+Pip: Far too far. But they say there's a coil of long rope at the very end of the garden. That would do it.
+
+--- !long_rope
+Pip: The garden's through the door to the east. The long rope should be at the far end of it.
+
+--- long_rope
+Pip: You found the long rope! Well, then the Tall Hall is yours.
+Pip: Aim for the hook block way up there, and reel yourself in. Then out the door at the top.
+Pip: Past the hall are the mountains. I've never been that far. Come back and tell me about it?
+
+--- long_rope
+Pip: Up through the Tall Hall, climber. I'll be here, drawing.
