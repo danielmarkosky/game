@@ -6,6 +6,7 @@
 #include <fstream>
 #include "src/Level.h"
 #include "src/Player.h"
+#include "src/Props.h"
 #include <cmath>
 #include <optional>
 #include <set>
@@ -265,5 +266,25 @@ TEST(World, GoingUpThroughAFloorLandsOnSomething) {
             EXPECT_TRUE(landed) << room.name << ": nothing to land on above the gap at column " << x - left;
             x = end;
         }
+    }
+}
+
+TEST(World, EveryPropIsInTheSheet) {
+    // Scenery names a picture in assets/gfx/props.txt (or is a light shaft): a typo would draw nothing.
+    ASSERT_FALSE(props::all().empty());
+    int count = 0;
+    for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
+        for (const Prop& prop : room.level->props()) {
+            EXPECT_TRUE(prop.kind == props::LIGHT_SHAFT || props::find(prop.kind)) << room.name << ": " << prop.kind;
+            ++count;
+        }
+    }
+    EXPECT_GT(count, 50);
+    // And every picture is in the sheet.
+    sf::Image sheet;
+    ASSERT_TRUE(sheet.loadFromFile(config::assetPath("gfx/props.png")));
+    for (const PropInfo& p : props::all()) {
+        EXPECT_LE(static_cast<unsigned>(p.rect.left + p.rect.width * p.frames), sheet.getSize().x) << p.name;
+        EXPECT_LE(static_cast<unsigned>(p.rect.top + p.rect.height), sheet.getSize().y) << p.name;
     }
 }

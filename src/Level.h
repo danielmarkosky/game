@@ -24,6 +24,13 @@ struct Npc
     sf::Vector2f position; // bottom-left of their tile: they stand on its bottom edge
 };
 
+// Scenery (see src/Props.h): `kind` is its name in props.txt.
+struct Prop
+{
+    std::string kind;
+    sf::Vector2f position; // bottom-left of its tile
+};
+
 class Level
 {
 public:
@@ -53,6 +60,7 @@ public:
     void addNpc(const std::string& dialogue, const std::string& look, sf::Vector2i tile);
     void addBench(sf::Vector2i tile);
     void addLever(sf::Vector2i tile);
+    void addProp(const std::string& kind, sf::Vector2i tile);
 
     // The tiles are drawn with the theme's tiles.png. New levels use Theme::DEFAULT.
     void setTheme(std::shared_ptr<const Theme> theme);
@@ -63,6 +71,8 @@ public:
     // The pickups whose ability `owned` says the player doesn't have yet, bobbing up and down.
     void drawPickups(sf::RenderTarget& target, sf::Vector2f centr, float time, const std::function<bool(const std::string&)>& owned) const;
     void drawLevers(sf::RenderTarget& target, sf::Vector2f centr) const;
+    // The scenery, behind everything but the tiles. Animated props move with `time`.
+    void drawProps(sf::RenderTarget& target, sf::Vector2f centr, float time) const;
     // The benches, the one at `glowing` (if any) lit up: where the game was saved last.
     void drawBenches(sf::RenderTarget& target, sf::Vector2f centr, std::optional<size_t> glowing, float time) const;
     // The gems, the ones `collected` says were found already as faint ghosts.
@@ -92,6 +102,7 @@ public:
     // The index of the gem the box touches, if any.
     std::optional<size_t> gemAt(sf::Vector2f pos, float height, float width) const;
     const std::vector<Npc>& npcs() const;
+    const std::vector<Prop>& props() const;
     // Benches to sit on, two tiles wide, each the bottom-left of its left tile.
     const std::vector<sf::Vector2f>& benches() const;
     // Gates ('=') are solid until a lever in the same room is pulled; then they all stay open.
@@ -119,6 +130,7 @@ private:
     std::vector<Pickup> m_pickups;
     std::vector<sf::Vector2f> m_gems;
     std::vector<Npc> m_npcs;
+    std::vector<Prop> m_props;
     std::vector<sf::Vector2f> m_benches;
     std::vector<sf::Vector2f> m_levers;
     bool m_gatesOpen = false;

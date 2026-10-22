@@ -43,6 +43,7 @@ ENTITIES = [
     ('Npc', 'N', '#D77BBA', False, [('dialogue', 'String'), ('look', 'String')]),
     ('Bench', 'B', '#B47C48', False, []),
     ('Lever', 'L', '#E8443A', False, []),
+    ('Prop', 'D', '#8A8AA0', False, [('kind', 'String')]),
 ]
 ENTITY_OF_CHAR = {char: ident for ident, char, *_ in ENTITIES}
 CHAR_OF_ENTITY = {ident: char for ident, char, *_ in ENTITIES}

@@ -65,6 +65,7 @@ namespace
             else if (kind == "Npc") level->addNpc(field(fields, "dialogue"), field(fields, "look"), tile);
             else if (kind == "Bench") level->addBench(tile);
             else if (kind == "Lever") level->addLever(tile);
+            else if (kind == "Prop") level->addProp(field(fields, "kind"), tile);
         }
         if (!level->hasStart()) throw std::runtime_error("Room " + data.at("identifier").get<std::string>() + " has no Start");
         return level;

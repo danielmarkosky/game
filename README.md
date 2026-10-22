@@ -190,6 +190,9 @@ and give it a song. What drifts in its air and how dark it is are in
 [src/Ambience.cpp](src/Ambience.cpp).
 
 Things to pick up are in `ITEMS`, drawn into `items.png`; the font for conversations is `FONT`.
+The scenery is in `PROPS`, drawn into `props.png`, with `props.txt` saying where each one is, how
+many frames it has, whether it hangs and what light it gives: the game reads that. Add a prop there,
+then place it in a room with `room.prop(x, y, 'name')` in `tools/make_world.py`.
 
 Player skins are drawn once, standing; the script makes the other poses (breathing, running, jumping,
 falling, swinging, sitting) from that and outlines them. To add a skin, add it to `SKINS` in the script

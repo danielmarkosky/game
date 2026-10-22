@@ -1445,6 +1445,313 @@ def make_ruins():
     c.save('themes/ruins/near.png')
 
 
+# ----------------------------------------------------------------------------------------------
+# Props: assets/gfx/props.png, the scenery in rooms (a Prop entity's `kind`), and
+# assets/gfx/props.txt, saying where each is in the sheet and how it's drawn, for the game:
+#   name x y width height frames fps hangs light_r light_g light_b light_radius
+# Standing props sit on the bottom of their tile, hanging ones hang from its top. Animated ones
+# have their frames side by side. Every prop gets a dark outline.
+# ----------------------------------------------------------------------------------------------
+
+PROP = {k: rgb(v) for k, v in {
+    'K': '#1a1614', 'k': '#2e2622', 'a': '#6a6460', 's': '#8a8a94', 'S': '#5a5a66',
+    'w': '#8a5a34', 'W': '#5a3a20', 'l': '#b47c48',
+    'g': '#4ac08a', 'G': '#2a8a5a', 'c': '#c8b890', 'C': '#9a8a64',
+    'r': '#c8443a', 'R': '#8a2a2a', 'o': '#ff9a3a', 'y': '#ffe07a', 'f': '#fff4d0',
+    'b': '#6ae0ff', 'B': '#2a8fb0', 'i': '#cfefff', 'I': '#8ab8d8',
+    'p': '#e87bd0', 'P': '#a04a90', 'm': '#e8dcc8',
+    'u': '#6a6080', 'U': '#4a4060', 't': '#5fd0b0', 'T': '#2a8a78',
+    'e': '#a8483a', 'n': '#3a5a9a', 'h': '#4a8a4a', 'x': '#e8dcc0',
+    'z': '#9aa6bc', 'Z': '#5a6478', 'q': '#2f6a4a', 'Q': '#1f4a34', 'v': '#f0f4ff',
+    'j': '#5a9a3a', 'J': '#3a6a2a', 'L': '#8ac850', 'd': '#e8c04a', 'D': '#4a7ac8',
+}.items()}
+PROP['#'] = OUTLINE
+
+
+def flame_frames(base, flames):
+    """Frames of a fire: the same `base` under each set of `flames` rows."""
+    return [f + base for f in flames]
+
+
+FIRE_BASE = ['...WwlwW....',
+             '..WwWlWwW...',
+             '.sSWwwwWsS..',
+             'sSsSsSsSsSs.']
+SIGNAL_BASE = ['.....WwlwWlwW.......',
+               '....WwWlWwWlWW......',
+               '...WwlWwWlwWwlW.....',
+               '.sSsWwwWwwWwwWsSs...',
+               'sSsSsSsSsSsSsSsSsS..',
+               'SsSsSsSsSsSsSsSsSsS.']
+
+PROPS = [
+    # name, frames, fps, hangs, light (r, g, b, radius)
+    ('cold_fire', [['....KK..K.....',
+                    '...kKkakKk....',
+                    '..kaakaakak...',
+                    '.sSsaaaaaasSs.',
+                    'sSsSsSsSsSsSsS']], 0, False, None),
+    ('pack', [['..CCCCCC..',
+               '.CccccccC.',
+               '.CGGGGGGC.',
+               '.CcgccgcC.',
+               '.CcgccgcC.',
+               'CCccccccCC',
+               'CcccCCcccC',
+               'CccCwwCccC',
+               'CccCwwCccC',
+               'CcccCCcccC',
+               '.CCCCCCCC.']], 0, False, None),
+    ('bedroll', [['...........RRR..',
+                  'rrrrrrrrrrRrrrR.',
+                  'rdrrrrdrrrRrRrR.',
+                  'RRRRRRRRRRRrrrR.',
+                  '...........RRR..']], 0, False, None),
+    ('fire', flame_frames(FIRE_BASE, [
+        ['.....y......', '....yo......', '....oyo..y..', '...oyfyo.o..', '..oyffyoo...', '..oyfffyo...', '...ofyfo....'],
+        ['......y.....', '.y...oy.....', '.o..oyo.....', '...oyfyo....', '..ooyfyoo...', '..oyfffyo...', '...ofyfo....'],
+        ['....y.......', '....oy...y..', '...oyo...o..', '...oyfyoo...', '..oyffyyo...', '..oyfffyo...', '...ofyfo....'],
+    ]), 8, False, (255, 160, 80, 52)),
+    ('tent', [['..............W...............',
+               '.............CcC..............',
+               '............CcccC.............',
+               '...........CcccccC............',
+               '..........CcccKcccC...........',
+               '.........CcccKKKcccC..........',
+               '........CcccKKKKKcccC.........',
+               '.......CcccKKKKKKKcccC........',
+               '......CcccKKKKKKKKKcccC.......',
+               '.....CcccKKKKKKKKKKKcccC......',
+               '....CcccKKKKKKKKKKKKKcccC.....',
+               '...CcccKKKKKKKKKKKKKKKcccC....',
+               '..CcccKKKKKKKKKKKKKKKKKcccC...',
+               '.CCCCCKKKKKKKKKKKKKKKKKCCCCC..']], 0, False, None),
+    ('lantern_post', [['..ZZZ..', '.ZyyyZ.', '.ZyfyZ.', '.ZyyyZ.', '..ZZZ..'] + ['...W...'] * 15 + ['..WWW..']],
+     0, False, (255, 190, 110, 40)),
+    ('hanging_lantern', [['...Z...', '...z...', '...Z...', '...z...', '...Z...', '...z...',
+                          '..ZZZ..', '.ZyyyZ.', '.ZyfyZ.', '.ZyyyZ.', '..ZZZ..', '...Z...']],
+     0, True, (255, 190, 110, 36)),
+    ('stalagmite', [['...s...', '...s...', '..sS...', '..ss...', '..sSs..', '.ssSs..',
+                     '.sssS..', '.sSssS.', 'ssSsssS', 'sSssSsS']], 0, False, None),
+    ('stalactites', [['sSssSsSsSsssSs',
+                      '.sSs.sSs.SsS..',
+                      '.sS..sS...sS..',
+                      '..s...S...s...',
+                      '..s.......s...',
+                      '..........s...']], 0, True, None),
+    ('bones', [['..xxx.........',
+                '.xKxKx..xx.xx.',
+                '.xxxxx...xxx..',
+                '..x.x...xx.xx.']], 0, False, None),
+    ('crystals', [['.....b......',
+                   '....bbB.....',
+                   '....bbB..b..',
+                   '.b..bbB.bbB.',
+                   'bbB.bbB.bbB.',
+                   'bbB.bbBbbbB.',
+                   'bbBbbbBbbB..',
+                   'BbBbBbBbB...',
+                   'SsSsSsSsSs..']], 0, False, (90, 200, 255, 30)),
+    ('mushrooms', [['..ppp.......',
+                    '.pPpPp...pp.',
+                    'pPpppPp.pPPp',
+                    '...m....pPPp',
+                    '...m.pp..m..',
+                    '...mpPPp.m..',
+                    '...m.m...m..',
+                    '..mm.m..mm..']], 0, False, (230, 110, 210, 26)),
+    ('broken_pillar', [['...uU.....',
+                        '..uuuUu...',
+                        '.uuUuuuUu.',
+                        'UuuuUuuuuU',
+                        '.uUuUuUuU.'] + ['.uUuUuUuU.', '.uUtUuUuU.', '.uUuUuTuU.', '.uUuUuUuU.'] * 4
+                       + ['UUUUUUUUUU', 'uuuuuuuuuu']], 0, False, None),
+    ('banner', [['zzzzzzzzzz',
+                 '.tttttttt.',
+                 '.tTttttTt.',
+                 '.tTtddtTt.',
+                 '.tTddddTt.',
+                 '.tTtddtTt.'] + ['.tTttttTt.'] * 10 + ['.tt.tt.tt.', '.t...t..t.']], 0, True, None),
+    ('bookshelf', [['WWWWWWWWWWWWWWWWWWWWWW',
+                    'WwwwwwwwwwwwwwwwwwwwwW',
+                    'WennhexehnneehxnhenneW',
+                    'WennhexehnneehxnhenneW',
+                    'WennhexehnneehxnhenneW',
+                    'WwwwwwwwwwwwwwwwwwwwwW',
+                    'WhnexeenhhenxnehenheeW',
+                    'WhnexeenhhenxnehenheeW',
+                    'WhnexeenhhenxnehenheeW',
+                    'WwwwwwwwwwwwwwwwwwwwwW',
+                    'WnehhxennehxxnnehenxhW',
+                    'WnehhxennehxxnnehenxhW',
+                    'WnehhxennehxxnnehenxhW',
+                    'WwwwwwwwwwwwwwwwwwwwwW',
+                    'WxxneehnhexnnehhenxxeW',
+                    'WxxneehnhexnnehhenxxeW',
+                    'WxxneehnhexnnehhenxxeW',
+                    'WWWWWWWWWWWWWWWWWWWWWW']], 0, False, None),
+    ('candles', [['.y...y....',
+                  '.o...o..y.',
+                  '.x...x..o.',
+                  '.x.y.x..x.',
+                  '.x.o.x..x.',
+                  '.x.x.x..x.',
+                  'zzzzzzzzzz']], 0, False, (255, 200, 120, 30)),
+    ('statue', [['....uuu.....',
+                 '...uUuuU....',
+                 '...uKKKu....',
+                 '...uKtKu....',
+                 '...uUuuU....',
+                 '..uuUuuUu...',
+                 '.uuUuuuuUu..',
+                 '.uUuuuuuuUu.',
+                 '.uUuuUuuuUu.',
+                 '.uUuuUuuuUu.',
+                 '.uUuuUuuuUu.',
+                 '.uUuuUuuuUu.',
+                 '.uUuuUuuuUu.',
+                 '.uUuuUuuuUu.',
+                 '..uUuUuuUu..',
+                 '..uUuUuuUu..',
+                 '.UUUUUUUUUU.',
+                 'uuuuuuuuuuuu',
+                 'UUUUUUUUUUUU']], 0, False, None),
+    ('signpost', [['..llllllll..',
+                   '.lwwwwwwwwl.',
+                   'lwwwwwwwwwl.',
+                   '.llllWlllll.',
+                   '.....W......',
+                   '..llllllll..',
+                   '..lwwwwwwwwl',
+                   '..lwwwwwwwwwl'[:12],
+                   '..lllllWlll.',
+                   '.....W......',
+                   '.....W......',
+                   '.....W......',
+                   '.....W......',
+                   '....WWW.....']], 0, False, None),
+    ('map_table', [['..xxxxxxxxxxxxxx..',
+                    '.xxdxxDxxxxhxxxxx.',
+                    '.xhxxxxxxDxxxdxxx.',
+                    'WWWWWWWWWWWWWWWWWW',
+                    'wwwwwwwwwwwwwwwwww',
+                    '.W..............W.',
+                    '.W..............W.',
+                    '.W..............W.',
+                    '.W..............W.']], 0, False, None),
+    ('flowers', [['.d....r.....',
+                  'dyd..rdr..p.',
+                  '.d.L..r..pyp',
+                  '.L.L..L...p.',
+                  'jLjLjjLjjjLj']], 0, False, None),
+    ('vine', [['jJj....', '.jJ....', '.jJL...', '..jJ...', '..jJ...', '.LjJ...', '..jJ...',
+               '...jJ..', '...jJL.', '..jJ...', '.LjJ...', '..jJ...', '..jJ...', '...jJ..',
+               '...jJL.', '..jJ...', '..j....', '..L....']], 0, True, None),
+    ('pine', [['.......v.......',
+               '......vqv......',
+               '.....vqqqv.....',
+               '....vqqQqqv....',
+               '......qQq......',
+               '....vqqQqqv....',
+               '...vqqqQqqqv...',
+               '..vqqqqQqqqqv..',
+               '.....qqQqq.....',
+               '...vqqqQqqqv...',
+               '..vqqqqQqqqqv..',
+               '.vqqqqqQqqqqqv.',
+               'vqqqqqqQqqqqqqv',
+               '....qqqQqqq....',
+               '...qqqqQqqqq...',
+               '..qqqqqQqqqqq..',
+               '.qqqqqqQqqqqqq.',
+               'QQQQQQQwQQQQQQQ',
+               '.......w.......',
+               '.......w.......',
+               '......WwW......']], 0, False, None),
+    ('flags', [['W............................W',
+                'Wrr.dd..DD..gg..rr..dd..DD..gW',
+                'WRr.dD..DD..gG..Rr..dD..DD..gW',
+                'W.r..d...D...g...r...d...D...W',
+                'W............................W',
+                'W............................W',
+                'W............................W',
+                'W............................W',
+                'W............................W',
+                'WW..........................WW']], 0, False, None),
+    ('brazier', flame_frames(['.zZzZzZzZ.', '..zZzZzZ..', '...Z..Z...', '..Z....Z..', '.Z......Z.'], [
+        ['....y.....', '...oy.....', '..oyfo.y..', '..yffyoo..'],
+        ['.....y....', '..y.yo....', '..oofyo...', '..oyffyo..'],
+        ['...y......', '...yo..y..', '..oyfo.o..', '..oyffyo..'],
+    ]), 9, False, (255, 140, 60, 44)),
+    ('chains', [['.Z.', 'z.z', '.Z.', 'z.z', '.Z.', 'z.z', '.Z.', 'z.z', '.Z.', 'z.z', '.Z.', 'z.z',
+                 '.Z.', 'z.z', '.Z.', 'z.z', '.Z.', 'z.z', '.Z.', 'z.z', '.Z.', 'ZZZ']], 0, True, None),
+    ('signal_fire', flame_frames(SIGNAL_BASE, [
+        ['.........y..........', '........yo..........', '.......oyo...y......', '......oyfyo..o......',
+         '.....oyffyoyo.......', '....oyfffffyo.......', '....oyfffffyoo......', '...ooyfffffyo.......',
+         '....oyfyfyfo........'],
+        ['..........y.........', '...y.....oy.........', '...o....oyo.........', '.......oyfyo........',
+         '......oyffyoo.......', '....ooyfffffyo......', '...oyyfffffyo.......', '...ooyfffffyoo......',
+         '....oyfyfyfo........'],
+        ['........y...........', '........oy....y.....', '.......oyo....o.....', '......oyfyoo........',
+         '.....oyffyyo........', '....oyfffffyo.......', '...ooyfffffyo.......', '....oyfffffyoo......',
+         '....oyfyfyfo........'],
+    ]), 7, False, (255, 170, 90, 80)),
+    ('cairn', [['...sSs....',
+                '..sSsSs...',
+                '...sSs....',
+                '..sSssSs..',
+                '.sSsSsSsS.',
+                '..sSsSsS..',
+                '.sSsSsSsSs',
+                'sSsSsSsSsS']], 0, False, None),
+    ('icicles', [['iiIiiIiiIiiIii',
+                  '.iI.iI..iI.iI.',
+                  '.iI.i...iI..I.',
+                  '..I.i....I..I.',
+                  '..I......I....',
+                  '.........I....']], 0, True, None),
+]
+
+
+def make_props():
+    sheet_w = 256
+    placed, x, y, row_h = [], 0, 0, 0
+    for name, frames, fps, hangs, light in PROPS:
+        width = max(len(r) for r in frames[0])
+        grids = [outlined_prop([r.ljust(width, '.') for r in f]) for f in frames]
+        fw, fh = len(grids[0][0]), len(grids[0])
+        if x + fw * len(grids) > sheet_w:
+            x, y, row_h = 0, y + row_h, 0
+        placed.append((name, x, y, fw, fh, grids, fps, hangs, light))
+        x += fw * len(grids)
+        row_h = max(row_h, fh)
+    c = Canvas(sheet_w, y + row_h)
+    lines = ['# What each prop in props.png is: name x y width height frames fps hangs light_r light_g light_b light_radius',
+             '# Made by tools/make_art.py with props.png.']
+    for name, px, py, fw, fh, grids, fps, hangs, light in placed:
+        for i, g in enumerate(grids):
+            c.blit(g, PROP, px + i * fw, py)
+        r, gr, b, radius = light or (0, 0, 0, 0)
+        lines.append(f'{name} {px} {py} {fw} {fh} {len(grids)} {fps} {int(hangs)} {r} {gr} {b} {radius}')
+    c.save('props.png')
+    with open(os.path.join(OUT, 'props.txt'), 'w') as f:
+        f.write('\n'.join(lines) + '\n')
+    print('  props:', ', '.join(p[0] for p in placed))
+
+
+def outlined_prop(grid):
+    """A 1px outline round the drawing, which grows by a pixel on every side."""
+    w = len(grid[0])
+    g = ['.' * (w + 2)] + ['.' + r + '.' for r in grid] + ['.' * (w + 2)]
+    out = [list(r) for r in g]
+    for yy in range(len(g)):
+        for xx in range(w + 2):
+            if g[yy][xx] == '.' and any(0 <= xx + dx < w + 2 and 0 <= yy + dy < len(g) and g[yy + dy][xx + dx] != '.'
+                                        for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                out[yy][xx] = '#'
+    return [''.join(r) for r in out]
+
+
 THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight, make_ruins]
 
 
@@ -1456,3 +1763,4 @@ if __name__ == '__main__':
     make_items()
     make_font()
     make_bench()
+    make_props()

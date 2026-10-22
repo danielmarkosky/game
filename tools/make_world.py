@@ -42,6 +42,17 @@ class Room:
             self.fields[(x, y)] = fields
         return self
 
+    def prop(self, x, y, kind):
+        """Scenery (a prop in assets/gfx/props.txt, or light_shaft), in an empty tile: standing on
+        its bottom, or hanging from its top."""
+        assert self.g[y][x] == '.', (self.name, x, y, kind, 'not empty')
+        return self.put(x, y, 'D', kind=kind)
+
+    def props(self, *placed):
+        for x, y, kind in placed:
+            self.prop(x, y, kind)
+        return self
+
     def door(self, side, start, length=4):
         """A gap in an outside wall: L and R count `start` up from the bottom, T and B from the left."""
         for i in range(length):
@@ -380,6 +391,54 @@ for x, y in [(27, 13), (27, 19), (27, 25), (27, 31)]:
     daylight.put(x, y, '%')
 daylight.door('T', 18)
 daylight.put(6, 15, 'S')
+
+# ----------------------------------------------------------------------------------------------
+# Scenery
+# ----------------------------------------------------------------------------------------------
+
+# The Crevasse: dark rock, a crack of daylight far above where you fell, and Ash's cold camp.
+a.props((18, 20, 'light_shaft'), (10, 17, 'stalactites'), (28, 17, 'stalactites'),
+        (24, 5, 'stalagmite'), (33, 5, 'crystals'))
+b.props((8, 16, 'stalactites'), (20, 16, 'stalactites'), (14, 5, 'stalagmite'), (35, 8, 'crystals'))
+c.props((14, 15, 'stalactites'), (33, 15, 'stalactites'), (24, 5, 'bones'), (38, 5, 'stalagmite'))
+d.props((6, 5, 'cold_fire'), (12, 5, 'pack'), (1, 5, 'bedroll'),
+        (18, 18, 'stalactites'), (40, 18, 'stalactites'), (30, 6, 'crystals'), (44, 6, 'stalagmite'))
+e.props((36, 16, 'stalactites'), (34, 5, 'stalagmite'), (40, 5, 'crystals'))
+f.props((35, 18, 'stalactites'), (6, 5, 'bones'), (30, 5, 'stalagmite'), (44, 5, 'crystals'))
+
+# The Cave: Wren's fire and lantern by the bench. The Well: an old chain, a lamp at the top.
+cave.props((10, 5, 'fire'), (4, 15, 'hanging_lantern'), (26, 15, 'stalactites'), (35, 15, 'stalactites'),
+           (34, 5, 'stalagmite'), (45, 5, 'crystals'))
+well.props((20, 36, 'chains'), (4, 36, 'hanging_lantern'), (8, 5, 'stalagmite'), (22, 10, 'crystals'))
+
+# The Crossroads: Pip's camp, a signpost, flowers, vines from the rim above.
+hub.props((23, 5, 'map_table'), (34, 5, 'tent'), (4, 5, 'signpost'), (40, 5, 'lantern_post'),
+          (45, 5, 'flowers'), (52, 5, 'flowers'), (2, 30, 'vine'), (57, 30, 'vine'))
+
+# The ruins: broken pillars, statues, banners, glowing mushrooms; the Archive's books and candles.
+gate.props((8, 5, 'broken_pillar'), (41, 5, 'statue'), (10, 17, 'banner'), (33, 17, 'banner'), (24, 5, 'mushrooms'))
+hollow.props((28, 10, 'mushrooms'), (15, 15, 'mushrooms'), (38, 5, 'broken_pillar'), (30, 32, 'banner'), (6, 25, 'statue'))
+archive.props((20, 5, 'bookshelf'), (27, 5, 'bookshelf'), (25, 10, 'candles'), (8, 15, 'candles'), (12, 24, 'candles'),
+              (30, 26, 'hanging_lantern'), (2, 26, 'banner'))
+
+# The garden: flowers and vines; Curtains, curtains of vines.
+garden.props((4, 5, 'flowers'), (45, 10, 'flowers'), (5, 18, 'vine'), (21, 18, 'vine'), (36, 18, 'vine'),
+             (55, 18, 'vine'), (52, 5, 'lantern_post'))
+curtains.props((8, 26, 'vine'), (24, 26, 'vine'), (32, 26, 'vine'), (38, 26, 'vine'), (20, 10, 'flowers'), (36, 10, 'flowers'))
+
+# The mountains: ice, pines, Juniper's camp, cairns on the way up.
+hall.props((16, 7, 'icicles'), (5, 14, 'icicles'), (16, 21, 'icicles'), (12, 33, 'icicles'), (16, 3, 'cairn'))
+summit.props((9, 5, 'tent'), (17, 5, 'fire'), (1, 5, 'pine'), (43, 5, 'pine'), (46, 5, 'flags'), (32, 5, 'cairn'))
+stones.props((5, 16, 'pine'), (12, 23, 'icicles'), (32, 23, 'icicles'), (52, 23, 'icicles'), (56, 5, 'cairn'))
+
+# The ember chimney and the pendulums: braziers and chains.
+chimney.props((5, 13, 'brazier'), (11, 21, 'brazier'), (5, 29, 'brazier'), (12, 37, 'brazier'))
+pendulums.props((26, 24, 'chains'), (35, 24, 'chains'), (44, 24, 'chains'), (16, 5, 'brazier'), (56, 5, 'brazier'))
+
+# Daylight: prayer flags and cairns, and at the top Ash's signal fire.
+backtrack.props((8, 5, 'flags'), (34, 15, 'cairn'), (12, 5, 'flowers'), (26, 5, 'signpost'))
+windy.props((7, 15, 'cairn'), (24, 15, 'flags'), (45, 15, 'cairn'))
+daylight.props((40, 23, 'signal_fire'), (3, 15, 'flags'), (20, 17, 'cairn'))
 
 # ----------------------------------------------------------------------------------------------
 # How they join: (room, side, which door of that side) to (room, side, which door).

@@ -34,6 +34,7 @@ Each room has two layers, 8 px to a tile:
 | `Lever` | Pulling it (W next to it) opens the room's gates, and the save remembers |
 | `Bench` | Two tiles wide: sitting on it saves, and from it you can travel to any other bench sat on. Both tiles need ground under them |
 | `Npc` | Someone to talk to, standing on the bottom of the tile. `dialogue` names their file in [`assets/dialogue/`](../dialogue/README.md), `look` the player skin they wear |
+| `Prop` | Scenery: its `kind` is a prop in [`assets/gfx/props.txt`](../gfx/props.txt) (a cold fire, a tent, bookshelves, braziers, a signal fire...). It stands on the bottom of its tile, or hangs from its top (banners, vines, chains, lanterns, icicles). Some glow, some flicker. `light_shaft` is a shaft of light falling from its tile to the ground below. Nothing to touch: it's only looks |
 
 Each room also has two fields: its `title`, shown the first time you go in, and its `theme`:
 `cave`, `garden`, `snow`, `ember` or `daylight` (the folders in `assets/gfx/themes/`). A theme only

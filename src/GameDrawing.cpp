@@ -2,6 +2,7 @@
 #include "Game.h"
 #include "src/GameShared.h"
 #include "src/Hud.h"
+#include "src/Props.h"
 #include "src/Text.h"
 #include "src/utils.h"
 #include <algorithm>
@@ -70,6 +71,35 @@ void Game::drawAir(sf::Vector2f cam)
         lights.push_back({viewCoordinates(player->centre(), cam), 46.f, sf::Color(90, 85, 110, static_cast<sf::Uint8>(160.f * ambience.darkness()))});
     }
     ambience.drawLight(canvas, lights);
+    drawBeams();
+}
+
+void Game::drawBeams()
+{
+    // Soft light falling through a crack: widening as it goes down, fading out, swaying a little,
+    // with dust drifting in it. Added on, so it brightens what it falls on.
+    const sf::RenderStates add(sf::BlendAdd);
+    for (const Beam& beam : beams) {
+        const float sway = std::sin(clockTime * 0.4f + beam.seed) * 3.f;
+        const sf::Vector2f top = beam.top, bottom = beam.top + sf::Vector2f(sway, beam.length);
+        const float topHalf = 5.f, bottomHalf = 14.f;
+        const sf::Color bright(255, 238, 200, 70), none(255, 238, 200, 0);
+        const sf::Vertex quad[] = {{top + sf::Vector2f(-topHalf, 0.f), bright}, {top + sf::Vector2f(topHalf, 0.f), bright},
+                                   {bottom + sf::Vector2f(bottomHalf, 0.f), none}, {bottom + sf::Vector2f(-bottomHalf, 0.f), none}};
+        canvas.draw(quad, 4, sf::Quads, add);
+        // A narrower, brighter core.
+        const sf::Vertex core[] = {{top + sf::Vector2f(-2.f, 0.f), bright}, {top + sf::Vector2f(2.f, 0.f), bright},
+                                   {bottom + sf::Vector2f(6.f, 0.f), none}, {bottom + sf::Vector2f(-6.f, 0.f), none}};
+        canvas.draw(core, 4, sf::Quads, add);
+        for (int i = 0; i < 12; ++i) {
+            const float along = std::fmod(clockTime * (4.f + i % 3) + i * 23.7f + beam.seed, beam.length);
+            const float t = along / beam.length;
+            const float half = topHalf + (bottomHalf - topHalf) * t;
+            const float x = top.x + sway * t + std::sin(clockTime * 0.6f + i * 1.7f) * half * 0.8f;
+            const auto alpha = static_cast<sf::Uint8>(150.f * (1.f - t) * (0.5f + 0.5f * std::sin(clockTime * 1.3f + i)));
+            hud::fillRect(canvas, {std::floor(x), std::floor(top.y + along), 1.f, 1.f}, sf::Color(255, 240, 210, alpha));
+        }
+    }
 }
 
 void Game::drawRooms(sf::Vector2f cam)
@@ -107,12 +137,14 @@ void Game::drawRooms(sf::Vector2f cam)
     }
     ambience.drawFar(canvas);
     lights.clear();
+    beams.clear();
     auto owned = [this](const std::string& ability) { return hasAbility(ability); };
     for (const Visible& v : visible) {
         std::optional<sf::Vector2f> flag;
         if (v.index == levelIndex) flag = checkpoint;
         else if (transition && v.index == transition->from) flag = transition->fromCheckpoint;
         rooms[v.index]->draw(canvas, v.cam);
+        rooms[v.index]->drawProps(canvas, v.cam, clockTime);
         rooms[v.index]->drawMarkers(canvas, v.cam, flag, clockTime);
         std::optional<size_t> saved;
         for (size_t bench = 0; bench < rooms[v.index]->benches().size(); ++bench) {
@@ -122,8 +154,27 @@ void Game::drawRooms(sf::Vector2f cam)
         rooms[v.index]->drawLevers(canvas, v.cam);
         rooms[v.index]->drawPickups(canvas, v.cam, clockTime, owned);
         rooms[v.index]->drawGems(canvas, v.cam, clockTime, [&](size_t gem) { return gemFound(v.index, gem); });
-        // What shines: gems still to find, things to pick up, benches.
+        // What shines: lamps and fires, gems still to find, things to pick up, benches.
         const Level& room = *rooms[v.index];
+        for (const Prop& prop : room.props()) {
+            if (prop.kind == props::LIGHT_SHAFT) {
+                // Down from its tile to the first rock under it.
+                int x = static_cast<int>(prop.position.x / Level::TILE_SIZE), y = static_cast<int>(prop.position.y / Level::TILE_SIZE);
+                int floor = y;
+                while (floor > y - 40 && !room.isSolid(x, floor - 1)) --floor;
+                const sf::Vector2f top = viewCoordinates(prop.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, Level::TILE_SIZE), v.cam);
+                beams.push_back({top, static_cast<float>(y + 1 - floor) * Level::TILE_SIZE, prop.position.x});
+                continue;
+            }
+            const PropInfo* info = props::find(prop.kind);
+            if (!info || info->lightRadius <= 0.f) continue;
+            const float h = static_cast<float>(info->rect.height);
+            const sf::Vector2f middle = prop.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, info->hangs ? Level::TILE_SIZE - h * 0.6f : h * 0.5f);
+            const float flicker = info->fps > 0.f ? 1.f + 0.07f * std::sin(clockTime * 11.f + prop.position.x) : 1.f;
+            sf::Color colour = info->light;
+            colour.a = 150;
+            lights.push_back({viewCoordinates(middle, v.cam), info->lightRadius * flicker, colour});
+        }
         for (size_t gem = 0; gem < room.gems().size(); ++gem) {
             if (!gemFound(v.index, gem)) lights.push_back({viewCoordinates(room.gems()[gem] + sf::Vector2f(4.f, 4.f), v.cam), 16.f, sf::Color(60, 150, 170, 150)});
         }

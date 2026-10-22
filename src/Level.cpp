@@ -1,4 +1,5 @@
 #include "Level.h"
+#include "src/Props.h"
 #include "Config.h"
 #include "utils.h"
 #include <algorithm>
@@ -251,6 +252,11 @@ void Level::addLever(sf::Vector2i tile)
     m_levers.push_back(sf::Vector2f(tile) * TILE_SIZE);
 }
 
+void Level::addProp(const std::string& kind, sf::Vector2i tile)
+{
+    m_props.push_back({kind, sf::Vector2f(tile) * TILE_SIZE});
+}
+
 const std::vector<sf::Vector2f>& Level::levers() const
 {
     return m_levers;
@@ -274,6 +280,24 @@ void Level::drawLevers(sf::RenderTarget& target, sf::Vector2f centr) const
     for (const sf::Vector2f& lever : m_levers) {
         auto pos = viewCoordinates(lever + sf::Vector2f(-1.f, TILE_SIZE + 1.f), centr);
         sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
+        target.draw(sprite);
+    }
+}
+
+void Level::drawProps(sf::RenderTarget& target, sf::Vector2f centr, float time) const
+{
+    sf::Sprite sprite(props::texture());
+    for (const Prop& prop : m_props) {
+        const PropInfo* info = props::find(prop.kind);
+        if (!info) continue;
+        // Animated ones not all in step.
+        const int frame = info->frames > 1 ? static_cast<int>(time * info->fps + prop.position.x * 0.13f) % info->frames : 0;
+        sprite.setTextureRect({info->rect.left + frame * info->rect.width, info->rect.top, info->rect.width, info->rect.height});
+        // Standing on the bottom of the tile, or hanging from its top; the outline is outside both.
+        const float w = static_cast<float>(info->rect.width), h = static_cast<float>(info->rect.height);
+        sprite.setOrigin(std::floor(w * 0.5f), info->hangs ? 1.f : h - 1.f);
+        const sf::Vector2f at = viewCoordinates(prop.position + sf::Vector2f(TILE_SIZE * 0.5f, info->hangs ? TILE_SIZE : 0.f), centr);
+        sprite.setPosition(std::floor(at.x), std::floor(at.y));
         target.draw(sprite);
     }
 }
@@ -552,6 +576,11 @@ std::optional<size_t> Level::gemAt(sf::Vector2f pos, float height, float width) 
 const std::vector<Npc>& Level::npcs() const
 {
     return m_npcs;
+}
+
+const std::vector<Prop>& Level::props() const
+{
+    return m_props;
 }
 
 const std::vector<sf::Vector2f>& Level::benches() const

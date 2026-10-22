@@ -154,6 +154,7 @@ private:
     void drawWorld(sf::Vector2f cam, bool withPlayer = true);
     void drawRooms(sf::Vector2f cam); // the current room and any others on screen
     void drawAir(sf::Vector2f cam);   // what's in front: near motes, the dark and the lights
+    void drawBeams();                 // light shafts (see props::LIGHT_SHAFT)
     void drawTransition();
     void drawBackground(const Theme& theme, float scrollX);
     // Where a rope shot now would go (in the world): at the mouse, or along the stick.
@@ -181,6 +182,13 @@ private:
     Audio audio;
     Ambience ambience;
     std::vector<Ambience::Light> lights; // gathered while drawing the rooms
+    struct Beam
+    {
+        sf::Vector2f top; // screen pixels
+        float length;
+        float seed;       // so they don't all sway together
+    };
+    std::vector<Beam> beams;             // the same
     sf::Vector2f lastCamera;             // world position, to move the motes along with it
     float talkBlips = 0.f; // letters typed since the last talking sound
 
