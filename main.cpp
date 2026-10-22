@@ -1,11 +1,13 @@
 #include "src/Config.h"
 #include "src/Game.h"
+#include "src/Physics.h"
 #include <algorithm>
 #include <exception>
 #include <iostream>
 
 int main(int argc, char** argv) {
     try {
+        for (const std::string& problem : loadPhysics(config::assetPath("physics.txt"))) std::cerr << "physics.txt: " << problem << std::endl;
         // ./game                  the world, from the title screen
         // ./game room.txt         one text room on its own
         // ./game --room <name>    the world, starting in that room with every ability (for testing)

@@ -16,6 +16,7 @@
 // Prints the route it found and exits with 0, or prints a map of where it got to and exits with 1.
 #include "src/Config.h"
 #include "src/Level.h"
+#include "src/Physics.h"
 #include "src/Player.h"
 #include "src/World.h"
 #include <cmath>
@@ -216,6 +217,8 @@ namespace
 
 int main(int argc, char** argv)
 {
+    // Moving as in the game.
+    for (const std::string& problem : loadPhysics(config::assetPath("physics.txt"))) std::cerr << "physics.txt: " << problem << "\n";
     if (argc < 2) {
         std::cerr << "usage: levelbot <room> [--start COL ROW] [--goal L|R|T|B|pickup|gem N] [--abilities a,b] [--explore]\n";
         return 2;
@@ -265,7 +268,7 @@ int main(int argc, char** argv)
     Bot bot(level, goal);
     Player& player = bot.player;
     player.setCanHookRock(abilities.count("climbing_pick") > 0);
-    player.setRopeRange(abilities.count("long_rope") ? Player::LONG_ROPE_RANGE : Player::ROPE_RANGE);
+    player.setRopeRange(abilities.count("long_rope") ? physics().longRopeRange : physics().ropeRange);
     player.setCanDoubleJump(abilities.count("double_jump") > 0);
     const bool doubleJump = abilities.count("double_jump") > 0;
 

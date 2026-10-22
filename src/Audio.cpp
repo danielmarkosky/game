@@ -26,7 +26,6 @@ namespace
             case Audio::Sfx::Jump: return tone(Wave::Square, 260.f, 520.f, 0.12f, 0.002f, 0.08f, 0.22f);
             case Audio::Sfx::AirJump: return tone(Wave::Pulse, 420.f, 900.f, 0.18f, 0.002f, 0.12f, 0.2f, 0.35f);
             case Audio::Sfx::Land: return tone(Wave::Noise, 300.f, 120.f, 0.09f, 0.001f, 0.07f, 0.3f);
-            case Audio::Sfx::RopeShot: return tone(Wave::Noise, 2400.f, 900.f, 0.08f, 0.001f, 0.06f, 0.18f);
             case Audio::Sfx::RopeClink: return tone(Wave::Square, 2300.f, 1900.f, 0.07f, 0.001f, 0.06f, 0.16f);
             case Audio::Sfx::Death: return tone(Wave::Saw, 420.f, 60.f, 0.45f, 0.002f, 0.3f, 0.32f, 0.5f);
             case Audio::Sfx::Respawn: return tone(Wave::Sine, 520.f, 520.f, 0.32f, 0.01f, 0.15f, 0.3f, 0.f, {0, 4, 7, 12});
@@ -39,6 +38,10 @@ namespace
             case Audio::Sfx::MenuPick: return tone(Wave::Square, 600.f, 900.f, 0.09f, 0.001f, 0.05f, 0.14f);
             case Audio::Sfx::Talk: return tone(Wave::Square, 330.f, 330.f, 0.035f, 0.001f, 0.02f, 0.08f);
             case Audio::Sfx::Door: return tone(Wave::Noise, 160.f, 70.f, 0.5f, 0.02f, 0.3f, 0.3f);
+            case Audio::Sfx::Throw: return tone(Wave::Noise, 900.f, 2600.f, 0.14f, 0.03f, 0.08f, 0.12f);  // a whoosh
+            case Audio::Sfx::Hooked: return tone(Wave::Square, 1500.f, 700.f, 0.06f, 0.001f, 0.05f, 0.14f, 0.3f); // a bite into the wall
+            case Audio::Sfx::Grab: return tone(Wave::Noise, 500.f, 250.f, 0.06f, 0.002f, 0.05f, 0.18f);    // a hand slapping rock
+            case Audio::Sfx::Count: break;
         }
         return {};
     }
@@ -64,7 +67,7 @@ std::vector<std::string> Audio::songNames()
 
 Audio::Audio()
 {
-    for (int s = 0; s <= static_cast<int>(Sfx::Door); ++s) effects[static_cast<Sfx>(s)] = buffer(synth::render(effect(static_cast<Sfx>(s))));
+    for (int s = 0; s < static_cast<int>(Sfx::Count); ++s) effects[static_cast<Sfx>(s)] = buffer(synth::render(effect(static_cast<Sfx>(s))));
     music.setLoop(true);
     // The songs: a few seconds of work, so not holding up the start.
     maker = std::thread([this] {

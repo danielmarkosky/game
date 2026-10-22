@@ -86,20 +86,22 @@ the game).
 
 ## Designing
 
-- A running jump goes about **4 tiles up** and **6 tiles across**. Gaps of 3–5 tiles are jumps;
+- The numbers below come from [`assets/physics.txt`](../physics.txt): change those and they change.
+  A running jump goes about **3.5 tiles up** and **4.5 tiles across**. Gaps of 3–4 tiles are jumps;
   anything wider needs the rope.
 - The rope reaches **100 px (12.5 tiles)** from the player's centre, **150 px (18.75 tiles)** with
   the long rope, and only sticks to solid rock and hook blocks, not to platforms or hazards. Until
   the player has the climbing pick it only sticks to hook blocks, so anything before the pick has
   to be done without rock to swing from.
-- With the pick, a rock wall can be climbed: hook it high, reel in, let go, hook it higher. And
-  jumping off the rope is a full jump, so anything the rope can hook works like a double jump. To
+- With the pick, a rock wall can be climbed: hook it high, reel in, let go, hook it higher. Jumping
+  on the rope only lets go, with no jump of its own: height and distance come from the swing. To
   make something really out of reach, use slick stone, or line the walls with crystal (the rope goes
   through crystal to the rock behind, but hanging from there drags you into the spikes), like the
   Tall Hall. Its hook is 20 tiles above the floor: more than 12.5 tiles even from the top of a jump,
   less than 18.75 from the floor.
-- The double jump adds about 3 tiles of height, most of all at the top of a jump: a running jump
-  with it crosses about 10 tiles. The Windy Ledge's gaps are 7 and 8.
+- The double jump adds about 3 tiles of height, most of all at the top of a jump. (This and the
+  swing distance below were measured with the old, faster physics: to be measured again once the
+  feel is settled.) The Windy Ledge's gaps are 7 and 8.
 - `python3 tools/check_world.py` checks every room can be got through, both ways, and every gate
   holds without its ability: add your room's routes to it.
 - The rope wraps around outside corners of rock (and slides along flat walls), so a rope that

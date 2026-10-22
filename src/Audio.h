@@ -18,8 +18,9 @@ class Audio
 public:
     enum class Sfx
     {
-        Jump, AirJump, Land, RopeShot, RopeClink, Death, Respawn, Gem, Pickup, Checkpoint,
-        Bench, Travel, MenuMove, MenuPick, Talk, Door,
+        Jump, AirJump, Land, RopeClink, Death, Respawn, Gem, Pickup, Checkpoint,
+        Bench, Travel, MenuMove, MenuPick, Talk, Door, Throw, Hooked, Grab,
+        Count // not a sound
     };
 
     Audio();

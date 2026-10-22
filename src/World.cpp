@@ -110,7 +110,7 @@ LevelInfo loadSingleLevel(const std::string& textPath)
 {
     LevelInfo info;
     info.name = std::filesystem::path(textPath).stem().string();
-    info.title = "CUSTOM LEVEL";
+    info.title = info.name; // "playground"
     info.level = Level::loadFromFile(textPath);
     return info;
 }

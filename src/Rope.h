@@ -60,6 +60,8 @@ public:
     void update(sf::Vector2f attachPos, float dt);
     void draw(sf::RenderTarget& target, sf::Vector2f centr) const;
     const std::vector<RopeNode>& getNodes() const;
+    // Where the rope lies, from the anchor round the corners and down the chain to the player.
+    std::vector<sf::Vector2f> path() const;
 
 private:
     bool isBlocked(sf::Vector2f from, sf::Vector2f to) const;

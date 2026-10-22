@@ -1,0 +1,46 @@
+# How the player moves. Change a number, press F5 in the game, and try it: no compiling.
+#
+# Distances are in pixels (8 to a tile, the screen is 320 x 180), speeds in pixels a second,
+# accelerations in pixels a second each second, times in seconds. Anything left out, or broken,
+# is the default from src/Physics.h, and the game says what was wrong (in the corner, and in the
+# terminal). levelbot reads this file too, so the room checks move the same way.
+
+# --- Running ---
+run_speed 70                # top speed on the ground
+run_acceleration 300        # 70 / 300: a quarter of a second to top speed
+run_deceleration 450        # letting go: a short slide to a stop (turning round brakes too)
+air_acceleration 220        # less grip in the air
+air_deceleration 60         # nothing held in the air: you mostly drift on
+fling_deceleration 140      # in the air faster than running, after letting go of a swing
+
+# --- Jumping and falling ---
+gravity 800
+jump_speed 215              # jump height is jump_speed^2 / (2 * gravity): about 29 px, 3.6 tiles
+jump_release_gravity 3      # letting go of jump early falls this many times faster: short hops
+max_fall_speed 300
+coyote_time 0.1             # a jump still works this long after running off a ledge
+jump_buffer_time 0.1        # and when pressed this long before landing
+air_jump_speed 195          # the updraft feather's jump
+
+# --- The rope ---
+# It's thrown, flies out and catches or comes back; let go of it and it comes back too. It can only
+# be thrown again once it's back in your hand, so the wait is however far it has to come.
+rope_range 64               # how far a throw from the ground reaches, from your middle
+long_rope_range 104         # with the long rope
+air_throw_range 0.75        # a throw in the air reaches this much as far: nothing to push off
+throw_windup 0.3            # swinging it round before throwing, until you can throw in the air
+throw_speed 320             # flying out: 64 px takes 0.2 s
+rope_return_speed 120       # coming back, slower: 64 px of rope takes 0.53 s, 104 px 0.87 s
+swing_push 140              # holding left / right on the rope: only below where it hangs from
+max_swing_speed 210
+reel_speed 60               # up / down on the rope
+rope_jump_speed 0           # jumping on the rope lets go of it with this much upward speed. 0: just lets go
+
+# --- Climbing walls with your hands (the chalk bag) ---
+# Push into a wall in the air to grab it; up / down climb, jump leaps off. Not slick stone.
+climb_speed 40              # up
+climb_down_speed 70
+climb_stamina 4             # seconds of holding on, climbing up uses it twice as fast. Back on the ground
+wall_slide_speed 40         # sliding down when it's gone
+wall_jump_push 110          # leaping off: away from the wall this fast, and up like a jump
+climb_over_speed 150        # climbing over the top: a hop up onto it

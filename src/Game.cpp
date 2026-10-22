@@ -1,16 +1,27 @@
 #include "Game.h"
 #include "src/GameShared.h"
 #include "src/Hud.h"
+#include "src/Physics.h"
 #include "src/Text.h"
 #include "src/utils.h"
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 using namespace game_detail;
 
 namespace
 {
-    constexpr float CAMERA_FOLLOW = 8.f;    // higher = camera catches up faster
+    constexpr float CAMERA_FOLLOW = 6.f;    // higher = camera catches up faster
+    // The camera looks ahead of where you're going: this many seconds of your speed, up to LOOK_AHEAD
+    // pixels, easing over at LOOK_AHEAD_FOLLOW.
+    constexpr float LOOK_AHEAD_TIME = 0.5f;
+    constexpr float LOOK_AHEAD = 56.f;
+    constexpr float LOOK_AHEAD_FOLLOW = 2.5f;
+    // Up and down it stays at the height you last stood (or held on to a wall) at, unless you go
+    // further above it than a jump or further below it than this: jumps don't bob the screen.
+    constexpr float RISE_ROOM = 34.f;
+    constexpr float DROP_ROOM = 20.f;
     constexpr float FALL_OUT_MARGIN = 64.f; // how far below the level counts as falling out
     constexpr float TALK_REACH = 12.f;      // how close to someone the player has to be to talk to them
     constexpr float BENCH_REACH = 12.f;     // the same for benches and levers
@@ -22,9 +33,13 @@ namespace
         const char* name;
         const char* text;
     };
+    // In the order they're found, more or less: in a test room, the keys 1 to 6 switch them.
     const AbilityInfo ABILITIES[] = {
+        {"rope", "THE ROPE", "HOLD TO THROW IT, STANDING. KEEP HOLDING TO SWING"},
+        {"long_rope", "LONG ROPE", "YOUR ROPE REACHES FURTHER"},
         {"climbing_pick", "CLIMBING PICK", "YOUR ROPE STICKS TO ROCK NOW, NOT JUST METAL"},
-        {"long_rope", "LONG ROPE", "YOUR ROPE REACHES HALF AS FAR AGAIN"},
+        {"wall_climb", "CHALK BAG", "PUSH INTO A WALL TO GRAB IT. UP CLIMBS, JUMP LEAPS OFF"},
+        {"air_throw", "THROWING HAND", "THROW THE ROPE IN MID-AIR TOO"},
         {"double_jump", "UPDRAFT FEATHER", "JUMP AGAIN IN THE AIR"},
     };
 }
@@ -52,8 +67,12 @@ Game::Game(std::vector<LevelInfo> levelList, Options options)
     for (size_t ii = 0; ii < rooms.size(); ++ii) mapRooms.push_back({rooms[ii], levels[ii].position});
     mapScreen = std::make_unique<MapScreen>(std::move(mapRooms));
 
+    for (const auto& room : rooms) {
+        for (const Pickup& pickup : room->pickups()) offered.insert(pickup.ability);
+    }
     applyGates();
     if (testing) {
+        for (const AbilityInfo& info : ABILITIES) progress.abilities.insert(info.id);
         loadLevel(std::min(startRoom, levels.size() - 1));
         visited.assign(levels.size(), false);
         visited[levelIndex] = true;
@@ -174,8 +193,10 @@ sf::Vector2f Game::roomOrigin(size_t index) const
 
 bool Game::hasAbility(const std::string& ability) const
 {
-    // A level played on its own from the command line has everything.
-    return testing || progress.abilities.count(ability) > 0;
+    if (progress.abilities.count(ability)) return true;
+    // What no room gives, everyone starts with: the world doesn't need it to be found. (In a test
+    // room it's all given at the start, and the keys 1 to 6 switch it.)
+    return !testing && !offered.count(ability);
 }
 
 bool Game::hasFact(const std::string& fact) const
@@ -188,9 +209,22 @@ bool Game::hasFact(const std::string& fact) const
 
 void Game::applyAbilities()
 {
+    player->setHasRope(hasAbility("rope"));
+    player->setRopeRange(hasAbility("long_rope") ? physics().longRopeRange : physics().ropeRange);
     player->setCanHookRock(hasAbility("climbing_pick"));
-    player->setRopeRange(hasAbility("long_rope") ? Player::LONG_ROPE_RANGE : Player::ROPE_RANGE);
+    player->setCanClimb(hasAbility("wall_climb"));
+    player->setCanThrowInAir(hasAbility("air_throw"));
     player->setCanDoubleJump(hasAbility("double_jump"));
+}
+
+void Game::toggleAbility(size_t index)
+{
+    if (index >= std::size(ABILITIES)) return;
+    const AbilityInfo& info = ABILITIES[index];
+    const bool had = progress.abilities.erase(info.id) > 0;
+    if (!had) progress.abilities.insert(info.id);
+    applyAbilities();
+    showNotice(std::string(info.name) + (had ? " OFF" : " ON"));
 }
 
 void Game::collect(const Pickup& pickup)
@@ -613,6 +647,10 @@ void Game::handlePress(const InputManager::Press& press)
         rebind(press);
         return;
     }
+    if (press.key == sf::Keyboard::F5) {
+        reloadPhysics();
+        return;
+    }
     if (screen == Screen::Playing) {
         const bool interact = has(A::Interact) || has(A::Up);
         if (has(A::Pause)) openScreen(Screen::Paused);
@@ -621,6 +659,7 @@ void Game::handlePress(const InputManager::Press& press)
         else if (interact && !sitting && benchInReach()) sitDown(*benchInReach());
         else if (interact && leverInReach()) pullLever();
         else if (has(A::Restart) && !transition && deathTimer <= 0.f) killPlayer(); // back to the checkpoint
+        else if (testing && press.key >= sf::Keyboard::Num1 && press.key <= sf::Keyboard::Num6) toggleAbility(size_t(press.key - sf::Keyboard::Num1));
         return;
     }
     if (screen == Screen::Talking) {
@@ -667,6 +706,14 @@ PlayerInput Game::playerInput()
     in.ropeHeld = input.isMousePressed() || input.isHeld(A::Rope);
     in.aim = aimPoint();
     return in;
+}
+
+void Game::reloadPhysics()
+{
+    const std::vector<std::string> problems = loadPhysics(config::assetPath("physics.txt"));
+    for (const std::string& problem : problems) std::cerr << "physics.txt: " << problem << std::endl;
+    applyAbilities(); // the rope's reach
+    showNotice(problems.empty() ? "PHYSICS RELOADED" : "PHYSICS.TXT: " + hud::upper(problems.front()));
 }
 
 sf::Vector2f Game::aimPoint() const
@@ -858,8 +905,19 @@ void Game::showEffects(const std::vector<PlayerEvent>& events)
             case PlayerEvent::Type::Stepped:
                 particles.spawn(e.position, {.count = 2, .speed = 12.f, .spread = 1.5f, .life = 0.3f, .gravity = 10.f, .colors = dust});
                 break;
+            case PlayerEvent::Type::WallJumped:
+                audio.play(Audio::Sfx::Jump, 1.1f);
+                particles.spawn(e.position, {.count = 6, .speed = 30.f, .spread = 2.5f, .life = 0.3f, .gravity = 20.f, .colors = dust});
+                break;
+            case PlayerEvent::Type::Grabbed:
+                audio.play(Audio::Sfx::Grab);
+                particles.spawn(e.position, {.count = 3, .speed = 15.f, .spread = 3.f, .life = 0.25f, .gravity = 40.f, .colors = dust});
+                break;
+            case PlayerEvent::Type::RopeThrown:
+                audio.play(Audio::Sfx::Throw);
+                break;
             case PlayerEvent::Type::RopeAttached:
-                audio.play(Audio::Sfx::RopeShot);
+                audio.play(Audio::Sfx::Hooked);
                 particles.spawn(e.position, {.count = 8, .speed = 50.f, .life = 0.25f, .gravity = 100.f, .colors = sparks});
                 break;
             case PlayerEvent::Type::RopeWrapped:
@@ -880,7 +938,17 @@ void Game::showEffects(const std::vector<PlayerEvent>& events)
 
 void Game::updateCamera(float dt, bool snap)
 {
-    sf::Vector2f target = player->centre();
+    const sf::Vector2f you = player->centre();
+    if (snap) {
+        lookAhead = 0.f;
+        standingY = you.y;
+    }
+    const float ahead = std::clamp(player->getVelocity().x * LOOK_AHEAD_TIME, -LOOK_AHEAD, LOOK_AHEAD);
+    lookAhead += (ahead - lookAhead) * (1.f - std::exp(-LOOK_AHEAD_FOLLOW * dt));
+    if (player->isGrounded() || player->isClinging()) standingY = you.y;
+    const float y = std::clamp(standingY, you.y - RISE_ROOM, you.y + DROP_ROOM);
+
+    const sf::Vector2f target(you.x + lookAhead, y);
     if (snap) camera = target;
     else camera += (target - camera) * (1.f - std::exp(-CAMERA_FOLLOW * dt));
     camera = clampToLevel(camera);

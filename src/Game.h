@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 #include <random>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -92,6 +93,7 @@ private:
     bool hasAbility(const std::string& ability) const;
     bool hasFact(const std::string& fact) const; // an ability, or a flag set in a conversation
     void applyAbilities(); // to the player
+    void toggleAbility(size_t index); // in a test room: on or off, by its number in the list
     void collect(const Pickup& pickup);
     void showMessage(std::string title, std::string text);
     void showNotice(std::string text); // a small line in the corner for a moment
@@ -125,6 +127,8 @@ private:
     std::string songNow() const; // what should be playing
     MapScreen::Marks mapMarks() const; // what to show on it
     void handlePress(const InputManager::Press& press);
+    // F5: assets/physics.txt again, for tuning how it moves while playing.
+    void reloadPhysics();
     // Controls: choosing an action in the menu waits for its new key or button, the next press.
     void rebind(const InputManager::Press& press);
     // What to press for an action, on the keyboard or the gamepad, whichever was used last: "W", "A".
@@ -165,6 +169,7 @@ private:
     SaveFiles files;
     Settings settings;
     Progress progress;      // of the slot being played
+    std::set<std::string> offered; // the abilities some room gives
     int slot = -1;          // being played, counting from 0; -1 when testing
     bool erasing = false;   // on the slot screen, choosing one to erase
     int slotToErase = -1;
@@ -197,6 +202,8 @@ private:
     std::optional<Transition> transition;
 
     sf::Vector2f camera;
+    float lookAhead = 0.f; // how far ahead of you the camera is looking, see updateCamera
+    float standingY = 0.f; // the height you last stood at
     sf::Vector2f checkpoint;
     bool needsSpawnPoint = false; // just came into the room: where the player first lands becomes the checkpoint
     std::optional<size_t> sitting; // the bench in this room the player is sitting on

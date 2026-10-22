@@ -28,5 +28,9 @@ float dot(sf::Vector2f a, sf::Vector2f b);
 // Marches from `from` towards `to` and returns the last empty point before the first solid tile,
 // i.e. a point on the surface of the wall. Nothing is returned if no wall is hit within
 // `maxDistance`, or if the wall is closer than `minDistance`.
+// A point that's ended up inside rock (or any solid tile) moved out through the nearest face of its
+// tile that isn't covered by more rock. False if it wasn't in rock.
+bool pushOutOfRock(const Level& level, sf::Vector2f& point);
+
 std::optional<sf::Vector2f> nearestSolidPoint(sf::Vector2f from, sf::Vector2f to, std::shared_ptr<const Level> level,
                                               float minDistance = 8.f, float maxDistance = 100.f);

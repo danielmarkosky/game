@@ -31,6 +31,26 @@ sf::FloatRect canvasRect(sf::Vector2u windowSize)
     return {std::floor((windowSize.x - w) * 0.5f), std::floor((windowSize.y - h) * 0.5f), w, h};
 }
 
+bool pushOutOfRock(const Level& level, sf::Vector2f& point)
+{
+    const auto [tx, ty] = tailNumbers(point);
+    if (!level.isSolid(tx, ty)) return false;
+    const float T = config::TILE_SIZE;
+    const sf::Vector2f p = point;
+    float best = 1e9f;
+    const auto consider = [&](bool open, float dist, sf::Vector2f target) {
+        if (open && dist < best) {
+            best = dist;
+            point = target;
+        }
+    };
+    consider(!level.isSolid(tx, ty + 1), (ty + 1) * T - p.y, {p.x, (ty + 1) * T + 0.05f});
+    consider(!level.isSolid(tx, ty - 1), p.y - ty * T, {p.x, ty * T - 0.05f});
+    consider(!level.isSolid(tx - 1, ty), p.x - tx * T, {tx * T - 0.05f, p.y});
+    consider(!level.isSolid(tx + 1, ty), (tx + 1) * T - p.x, {(tx + 1) * T + 0.05f, p.y});
+    return true;
+}
+
 std::pair<int, int> tailNumbers(sf::Vector2f pos)
 {
     int x = static_cast<int>(std::floor(pos.x / config::TILE_SIZE));

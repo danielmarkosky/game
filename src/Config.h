@@ -12,8 +12,8 @@ namespace config
 
     constexpr float TILE_SIZE = 8.f;
 
-    // World units are pixels per second (squared). World y points up.
-    constexpr float GRAVITY = 890.f;
+    // World units are pixels and seconds, and world y points up. How the player moves (gravity
+    // too) is in physics(), src/Physics.h.
 
     // Physics runs at a fixed rate, independent of the frame rate.
     constexpr float FIXED_DT = 1.f / 120.f;

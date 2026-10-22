@@ -219,6 +219,16 @@ void Game::drawHud()
         hud::drawText(canvas, "x" + std::to_string(progress.deaths), {4.f, 11.f}, hud::RED);
     }
 
+    // Holding on to a wall: how much strength is left, a bar over your head that goes red at the end.
+    if (screen == Screen::Playing && (player->isClinging() || (player->staminaLeft() < 1.f && !player->isGrounded()))) {
+        const float left = player->staminaLeft();
+        const sf::Vector2f p = viewCoordinates(player->centre() + sf::Vector2f(0.f, 10.f), drawCamera());
+        const sf::FloatRect bar(std::floor(p.x) - 5.f, std::floor(p.y), 10.f, 2.f);
+        hud::fillRect(canvas, {bar.left - 1.f, bar.top - 1.f, bar.width + 2.f, bar.height + 2.f}, sf::Color(14, 14, 22, 200));
+        const bool flash = left < 0.25f && std::fmod(clockTime, 0.3f) < 0.15f;
+        hud::fillRect(canvas, {bar.left, bar.top, std::round(bar.width * left), bar.height}, left < 0.25f ? (flash ? hud::WHITE : hud::RED) : hud::GOLD);
+    }
+
     // Someone to talk to, or a bench to sit on: a little bubble above saying which key.
     std::optional<sf::Vector2f> bubbleAt;
     if (screen == Screen::Playing) {

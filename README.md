@@ -29,7 +29,7 @@ cmake --build --preset conan-release
 A climber falls into a crevasse at the foot of a mountain, following the trail of an older sister,
 Ash, who set off for the top three winters ago and never came back. The only way out is up.
 
-*Tether* (a working title: it's `TITLE` in [src/Game.cpp](src/Game.cpp)) is a 2D platformer about a
+*Tether* (a working title: it's `TITLE` in [src/GameShared.h](src/GameShared.h)) is a 2D platformer about a
 rope, in a connected world like Hollow Knight's and with Celeste's quick, precise rooms: a pixel
 art world of seventeen rooms, abilities that open up the places you've already been, people to talk
 to, and an ending that depends on what you tell them.
@@ -39,8 +39,9 @@ to, and an ending that depends on what you tell them.
 | Input | Action |
 |-------|--------|
 | A / D (or arrows) | Run |
-| Space | Jump (hold for a higher jump). On the rope: jump off it, a full jump. With the feather, again in the air |
-| Left mouse or Shift | Shoot the rope at the crosshair, hold to keep it, release to let go |
+| Space | Jump (hold for a higher jump). On the rope: let go of it. On a wall: leap off it. With the feather, again in the air |
+| Left mouse or Shift | Throw the rope at the crosshair, hold to keep it, release to let go |
+| Towards a wall, in the air (with the chalk bag) | Grab it. W / S climb, jump leaps off |
 | W / S (on the rope) | Reel in / let out |
 | S (on a platform) | Drop through it |
 | W / Up / E | Talk to someone, sit on a bench, pull a lever: a bubble shows when you're close enough |
@@ -61,14 +62,26 @@ The buttons can be changed in CONTROLS too. The pad that was pressed last is the
 
 ## Abilities
 
-- **The rope** reaches 100 px from you and at first only sticks to the metal hook blocks. The
-  crosshair shows a white dot where it'll stick, and a dim red one where it would bounce off. After
-  letting go it can be shot again after 0.3 s, after jumping off it after 0.55 s. It wraps around
-  corners, so swinging past an edge pivots you around it. Nothing sticks to slick, wind-polished
-  stone.
-- **The climbing pick**, early in The Cave: the rope sticks to rock too.
-- **The long rope**, at the end of the garden: the rope reaches half as far again, 150 px.
-- **The updraft feather**, in the ruins: one more jump in the air, until you land or catch the rope.
+- **The rope** is thrown: it flies out with the rope paying out behind it, and catches or falls.
+  Let go of it (or jump) and it falls too. A loose rope lies on the ground and drapes over edges,
+  and it's reeled back in hand over hand, sliding the way it lies: it takes as long as the rope is
+  long. It can only be thrown again once it's back in your hand, so a short throw is ready again
+  sooner than a long miss. Where you fly after letting go is down to how you swung and
+  when you let go. It wraps around corners, so swinging past an edge pivots you around it. The
+  crosshair shows a white dot where it'll stick, and a dim red one where it would bounce off.
+  Nothing sticks to slick, wind-polished stone.
+- At first it's only thrown standing (or holding on to a wall), swung round over your head first,
+  reaches 64 px, and only sticks to the metal hook blocks.
+- **The long rope**: it reaches 104 px.
+- **The climbing pick**: the rope sticks to rock too.
+- **The chalk bag**: push into a wall in the air to grab it, climb up and down, leap off it. Your
+  grip lasts a few seconds (the bar over your head), and comes back on the ground. Not slick stone.
+- **The throwing hand**: the rope can be thrown in the air too, straight away, but reaches less far
+  there (three quarters): there's nothing to push off.
+- **The updraft feather**: one more jump in the air, until you land or catch the rope.
+
+The numbers are all in [assets/physics.txt](assets/physics.txt). An ability no room gives yet is
+yours from the start, so the world can be built up an ability at a time.
 
 ## The world
 
@@ -130,6 +143,15 @@ your own, in LDtk or as text.
 For trying rooms out: `./build/Release/game --room tall_hall` starts straight in that room (any
 room's identifier), and `./build/Release/game some_room.txt` plays a single text room. Both skip the
 title screen, give every ability and don't save anything.
+
+**How it moves.** Every number behind the feel (run speed, how quickly you speed up and slow down,
+gravity, the jump, how hard you can push a swing, how far a fling carries) is in
+[assets/physics.txt](assets/physics.txt), each with what it does. Change one and press **F5** while
+playing: no compiling. `./build/Release/game assets/levels/playground.txt` is a room for trying it
+out: steps 1 to 4 tiles high, gaps 3 to 7 wide, a pit to swing across, a long flat floor to see how
+far a fling carries, a slick wall to get over and a tall one to climb. A test room starts with every
+ability, and the keys **1 to 6** switch them off and on: the rope, the long rope, the pick, the chalk
+bag, the throwing hand and the feather.
 
 **Checking the world can be played.** `python3 tools/check_world.py` sends the level bot
 ([tools/levelbot.cpp](tools/levelbot.cpp), built with the game) through every room both ways, through

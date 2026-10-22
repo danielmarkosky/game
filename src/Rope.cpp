@@ -1,4 +1,5 @@
 #include "Rope.h"
+#include "src/Physics.h"
 #include "Config.h"
 #include "utils.h"
 #include <algorithm>
@@ -211,7 +212,7 @@ void Rope::update(sf::Vector2f attachPos, float dt)
         sf::Vector2f velocity = node.position - node.previousPosition;
         node.previousPosition = node.position;
         node.position += velocity * damping;
-        node.position.y -= config::GRAVITY * dt * dt;
+        node.position.y -= physics().gravity * dt * dt;
     }
 
     for (int it = 0; it < iterations; ++it) {
@@ -238,26 +239,10 @@ void Rope::update(sf::Vector2f attachPos, float dt)
 
 void Rope::pushChainOutOfWalls()
 {
-    const float T = Level::TILE_SIZE;
     for (size_t ii = 1; ii + 1 < nodes.size(); ii++) {
         RopeNode& node = nodes[ii];
-        auto [tx, ty] = tailNumbers(node.position);
-        if (!m_level->isSolid(tx, ty)) continue;
-
-        // Out through the nearest face that isn't covered by more rock.
-        const sf::Vector2f p = node.position;
-        float bestDist = 1e9f;
-        sf::Vector2f out = p;
-        auto consider = [&](bool open, float dist, sf::Vector2f target) {
-            if (open && dist < bestDist) { bestDist = dist; out = target; }
-        };
-        consider(!m_level->isSolid(tx, ty + 1), (ty + 1) * T - p.y, {p.x, (ty + 1) * T + 0.05f});
-        consider(!m_level->isSolid(tx, ty - 1), p.y - ty * T, {p.x, ty * T - 0.05f});
-        consider(!m_level->isSolid(tx - 1, ty), p.x - tx * T, {tx * T - 0.05f, p.y});
-        consider(!m_level->isSolid(tx + 1, ty), (tx + 1) * T - p.x, {(tx + 1) * T + 0.05f, p.y});
-
-        node.position = out;
-        node.previousPosition = out; // resting on the surface: no sliding momentum
+        // Resting on the surface: no sliding momentum.
+        if (pushOutOfRock(*m_level, node.position)) node.previousPosition = node.position;
     }
 }
 
@@ -283,3 +268,10 @@ void Rope::draw(sf::RenderTarget& target, sf::Vector2f centr) const
 }
 
 const std::vector<RopeNode>& Rope::getNodes() const { return nodes; }
+
+std::vector<sf::Vector2f> Rope::path() const
+{
+    std::vector<sf::Vector2f> points(m_pivots);
+    for (size_t ii = nodes.size() - 1; ii-- > 0;) points.push_back(nodes[ii].position);
+    return points;
+}

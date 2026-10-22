@@ -258,7 +258,7 @@ def make_tiles(name, tiles):
 # ----------------------------------------------------------------------------------------------
 # Player: assets/gfx/player.png, one row per look (the skins, then the people you meet), 12x14
 # frames. The order of both is mirrored in src/Player.h and .cpp: idle (2), run (4), jump, fall,
-# swing, sitting.
+# swing, sitting, climbing (2, facing the wall, hands up on it).
 # ----------------------------------------------------------------------------------------------
 
 FRAME_W, FRAME_H = 12, 14
@@ -303,6 +303,8 @@ PLAYER_FRAMES = [
     frame(HEAD_WIND, BODY, ['..h...h..', '..h...h..']),                 # 7 fall
     frame(HEAD_WIND, BODY, ['...hhh...', '...h.h...']),                 # 8 swing
     frame(HEAD, ['.gyggggg.'] + BODY[2:], ['...hhhh..'], drop=2),       # 9 sitting
+    frame(HEAD, ['...gggyy.'] + BODY[1:], ['...h.h...', '..hh..h..']),  # 10 climbing
+    frame(HEAD, ['...ggg.yy'] + BODY[1:], ['...hh.h..', '....h.hh.']),  # 11 climbing, the other foot up
 ]
 
 
@@ -456,6 +458,8 @@ LEGS = {
     'fall': ['..L...L...', '..F...F...'],
     'swing': ['...LL.....', '...FF.....'],
     'sit': ['-', '..LLLLFF..'],
+    'climb_a': ['...LL.L...', '...F...F..'],
+    'climb_b': ['..L.LL....', '..F..F....'],
 }
 
 
@@ -491,7 +495,8 @@ def outlined(fill):
 def skin_frames(skin):
     poses = [pose(skin, 'idle'), pose(skin, 'idle', breathe=True),
              pose(skin, 'run_a'), pose(skin, 'pass_a'), pose(skin, 'run_b'), pose(skin, 'pass_b'),
-             pose(skin, 'jump'), pose(skin, 'fall'), pose(skin, 'swing', hand_up=True), pose(skin, 'sit')]
+             pose(skin, 'jump'), pose(skin, 'fall'), pose(skin, 'swing', hand_up=True), pose(skin, 'sit'),
+             pose(skin, 'climb_a', hand_up=True), pose(skin, 'climb_b', hand_up=True)]
     return [outlined(p) for p in poses]
 
 
@@ -576,9 +581,9 @@ def make_player():
         palette = {k: rgb(v) for k, v in skin['palette'].items()}
         palette['#'] = OUTLINE
         rows.append((skin['name'], palette, skin_frames(skin)))
-    c = Canvas(FRAME_W * 10, FRAME_H * len(rows))
+    c = Canvas(FRAME_W * 12, FRAME_H * len(rows))
     for r, (name, palette, frames) in enumerate(rows):
-        assert len(frames) == 10, name
+        assert len(frames) == 12, name
         for i, f in enumerate(frames):
             assert len(f) == FRAME_H and all(len(row) == FRAME_W for row in f), f'{name} frame {i} is not {FRAME_W}x{FRAME_H}'
             c.blit(f, palette, i * FRAME_W, r * FRAME_H)

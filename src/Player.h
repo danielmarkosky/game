@@ -2,6 +2,7 @@
 
 #include "src/Level.h"
 #include "src/Rope.h"
+#include "src/ThrownRope.h"
 #include <SFML/Graphics.hpp>
 #include <array>
 #include <memory>
@@ -23,7 +24,7 @@ struct PlayerInput
 // Something that happened during an update, so the game can show an effect for it.
 struct PlayerEvent
 {
-    enum class Type { Jumped, AirJumped, Landed, Stepped, RopeAttached, RopeWrapped, RopeBounced };
+    enum class Type { Jumped, AirJumped, WallJumped, Landed, Stepped, Grabbed, RopeThrown, RopeAttached, RopeWrapped, RopeBounced };
     Type type;
     sf::Vector2f position;
     float strength = 0.f; // Landed: how fast the player was falling
@@ -53,7 +54,8 @@ public:
     // Sitting on a bench: drawn sitting, until moving again.
     void setSitting(bool sit);
 
-    // Once per rendered frame: reacts to button presses (shooting and releasing the rope, buffering jumps).
+    // Once per rendered frame: takes the buttons held and pressed (a rope press waits to be thrown,
+    // a jump press is buffered).
     void handleInput(const PlayerInput& input);
     // Once per fixed physics step.
     void update(float dt);
@@ -73,16 +75,25 @@ public:
     bool isGrounded() const;
     bool isTouchingDanger() const;
     const Rope* getRope() const;
-    // Where a rope shot towards `aim` would attach, if anywhere.
+    // Where a rope thrown towards `aim` now would catch, if anywhere: within reach(), not on slick
+    // stone, and on rock only with the pick.
     std::optional<sf::Vector2f> ropeTarget(sf::Vector2f aim) const;
+    // How far a throw now would reach: less in the air.
+    float reach() const;
     // Where to aim to shoot the rope in `direction` (y up), with a gamepad's stick: at whatever
     // it would stick to nearest that direction, within AIM_ASSIST either side, since a stick can't
     // point as exactly as a mouse. If there's nothing, straight that way.
     sf::Vector2f aimAlong(sf::Vector2f direction) const;
     bool isFacingLeft() const;
-    // Without the climbing pick the rope only sticks to hook blocks ('%'); a shot at rock misses.
+    // The abilities. Without the rope there's nothing to throw. Until it can be thrown in the air,
+    // it's only thrown standing (or holding on to a wall), and swung round first. Without the
+    // climbing pick it only sticks to hook blocks ('%'); a throw at rock bounces off. With the chalk
+    // bag, walls can be climbed.
+    void setHasRope(bool has);
+    void setCanThrowInAir(bool can);
     void setCanHookRock(bool can);
-    // How far the rope reaches: ROPE_RANGE, or LONG_ROPE_RANGE with the long rope.
+    void setCanClimb(bool can);
+    // How far the rope reaches: physics().ropeRange, or longRopeRange with the long rope.
     void setRopeRange(float range);
     // With the updraft feather: one more jump in the air, until landing or catching the rope.
     void setCanDoubleJump(bool can);
@@ -90,8 +101,11 @@ public:
     // Where a rope shot towards `aim` would hit something and bounce off: rock without the pick,
     // or slick stone.
     std::optional<sf::Vector2f> ropeBounce(sf::Vector2f aim) const;
-    // False during the cooldown after leaving the rope.
+    // The rope's in your hand and you're where it can be thrown from.
     bool canShootRope() const;
+    // Holding on to a wall, and how much strength is left for it (0 to 1).
+    bool isClinging() const;
+    float staminaLeft() const;
     // Events since the last call.
     std::vector<PlayerEvent> takeEvents();
 
@@ -99,37 +113,14 @@ public:
     static constexpr float WIDTH = 7.f;
     static constexpr float HEIGHT = 11.f;
 
-    // Movement physics
-    static constexpr float RUN_ACCELERATION = 800.f;
-    static constexpr float MAX_RUN_SPEED = 90.f;
-    static constexpr float JUMP_SPEED = 235.f;
-    static constexpr float MAX_FALL_SPEED = 380.f;
-    static constexpr float JUMP_RELEASE_GRAVITY = 3.f;  // gravity multiplier when jump is let go early
-    static constexpr float COYOTE_TIME = 0.1f;          // can still jump this long after leaving a ledge
-    static constexpr float JUMP_BUFFER_TIME = 0.1f;     // a jump pressed this long before landing still counts
-    static constexpr float AIR_JUMP_SPEED = 215.f;      // the double jump: a little lower than from the ground
+    // How it moves is in physics() (src/Physics.h), read from assets/physics.txt.
 
-    // Damping per 1/60 s, applied the same at any frame rate
-    static constexpr float GROUND_DRAG = 0.85f;         // stops quickly on ground
-    static constexpr float AIR_DRAG = 0.98f;            // slowly loses momentum in air
-    static constexpr float OVERSPEED_AIR_DRAG = 0.995f; // above run speed (after a swing) momentum lasts longer
-
-    // Rope
-    static constexpr float ROPE_RANGE = 100.f;
-    static constexpr float LONG_ROPE_RANGE = 150.f;
-    static constexpr float SWING_ACCELERATION = 300.f;
-    static constexpr float MAX_SWING_SPEED = 320.f;
-    static constexpr float REEL_SPEED = 70.f;
-    static constexpr float AIM_ASSIST = 0.4f; // radians, about 23 degrees
-    static constexpr float ROPE_JUMP_SPEED = JUMP_SPEED; // jumping off the rope is a full jump
-    static constexpr float ROPE_JUMP_GRACE = 0.1f;       // ...even just after letting go of it
-    // After leaving the rope it can't be shot again for a moment. After a rope jump that's as long
-    // as the jump takes to come back down, so shooting and jumping over and over can't climb walls.
-    static constexpr float ROPE_COOLDOWN = 0.3f;
-    static constexpr float ROPE_JUMP_COOLDOWN = 0.55f;
-
-    // Going up into a room above, the player moves up at least this fast.
-    static constexpr float ROOM_ENTRY_LIFT = JUMP_SPEED;
+    // The stick's aim reaches this far either side of where it points, in radians (about 23 degrees).
+    static constexpr float AIM_ASSIST = 0.4f;
+    // A jump just after letting go of the rope still counts as jumping off it.
+    static constexpr float ROPE_JUMP_GRACE = 0.1f;
+    // After leaping off a wall, it can't be grabbed again for this long.
+    static constexpr float REGRAB_TIME = 0.2f;
 
     // How far the player gets nudged sideways around a corner instead of bonking into it.
     static constexpr int CORNER_CORRECTION = 4;
@@ -142,6 +133,13 @@ private:
     void moveY(float amount);
     bool fits(sf::Vector2f pos) const;
     sf::Vector2f exactCentre() const;
+    // The rope, when it isn't hooked.
+    void updateThrow(float dt, bool grounded);
+    void throwRope();
+    void letGoOfRope(); // it falls from where it was hooked, and is reeled back in
+    // Climbing: what's to grab on `side` (-1 left, 1 right) at hand height, and holding on.
+    bool wallToGrab(int side) const;
+    void updateClimbing(float dt, bool grounded);
 
     sf::Vector2f position;   // whole pixels
     sf::Vector2f remainder;  // sub-pixel movement not applied yet
@@ -156,12 +154,30 @@ private:
     float jumpBufferTimer = 0.f;
     float dropThroughTimer = 0.f;
     float ropeJumpTimer = 0.f; // time left to jump off a rope that was just let go of
-    float ropeCooldownTimer = 0.f;
-    bool ropeShotQueued = false; // clicked during the cooldown: shoots when it ends, if still held
+    bool ropeShotQueued = false; // pressed: thrown as soon as it can be, if still held
+
+    // The rope when it isn't hooked: in your hand, being swung round to throw, flying out to where
+    // it'll catch or bounce off, or being reeled back in. Out and Back, `loose` is where it lies.
+    enum class Hook { InHand, WindingUp, Out, Back };
+    Hook hook = Hook::InHand;
+    std::optional<ThrownRope> loose;
+    float windUp = 0.f;           // time left swinging it round
+    sf::Vector2f hookHead;        // where the hook is, flying Out
+    sf::Vector2f hookTarget;      // where it's flying to
+    bool hookCatches = false;     // and whether it'll stick there
+    bool hookBounces = false;     // or hit something it won't stick to
+    bool hasRope = true;
+    bool throwsInAir = true;
+
+    // Climbing
+    bool canClimb = false;
+    int clinging = 0;             // the side of the wall held on to: -1 left, 1 right, 0 none
+    float stamina = 0.f;
+    float regrabTimer = 0.f;
     bool jumping = false;
     bool facingLeft = false;
     bool hooksRock = true;
-    float ropeRange = ROPE_RANGE;
+    float ropeRange = 100.f;
     bool canDoubleJump = false;
     bool sitting = false;
     bool airJumped = false; // used the double jump since last on the ground or the rope

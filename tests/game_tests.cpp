@@ -131,7 +131,7 @@ TEST(GameFlow, PullingTheSummitLeverOpensTheDrop) {
     Game game(world(), {.testing = true, .startRoom = summit, .headless = true, .saveFolder = freshSaves("game_flow_lever")});
     game.advance(0.5f);
     // The lever is just left of the start.
-    game.advance(0.2f, walking(-1.f));
+    game.advance(0.3f, walking(-1.f));
     game.advance(0.3f);
     game.pressKey(sf::Keyboard::W);
     EXPECT_TRUE(game.state().flags.count("open_level5"));
