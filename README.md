@@ -158,7 +158,9 @@ bag, the throwing hand and the feather.
 every gate with and without its ability, and to every gem, and says if anything's changed. It takes a
 few minutes. When you change a room, add its routes to the list at the top of the script.
 `./build/Release/levelbot <room> --goal R` tries one room and prints how it got through, or a map of
-where it got stuck.
+where it got stuck. `./build/Release/levelbot --measure` prints how far a jump, a throw, a climb and a
+swing reach with the physics as they are, for designing rooms (see the table in
+[assets/levels/README.md](assets/levels/README.md)).
 
 **Tests.** `game_tests` checks the rules (physics, rope, rooms joining up, saves, dialogue, music),
 and plays the game without a window: the slots, benches, travel, talking, levers and the ending. It

@@ -5,13 +5,16 @@
 //
 // usage: levelbot <room> [--start COL ROW] [--goal L|R|T|B | --goal pickup | --goal gem N]
 //                        [--abilities a,b,...] [--explore]
+//        levelbot --measure
 //   <room>       a room's identifier in assets/world.ldtk, or a text room file
 //   --start      where to start: the tile to stand in, column and row from the top-left
 //                (default: the room's Start)
 //   --goal       which way out counts (default: any), or touching a pickup, or gem N
-//   --abilities  the ones the player has (default: all). "none" for none.
+//   --abilities  the ones the player has (default: all). "none" for none. In the world, as in the
+//                game, the abilities no room gives are had anyway.
 //   --explore    don't stop at the goal: list every spot that can be stood on
 //   --open       with the room's gates open, as if its lever had been pulled
+//   --measure    how far the moves reach with the physics in assets/physics.txt, for designing rooms
 //
 // Prints the route it found and exits with 0, or prints a map of where it got to and exits with 1.
 #include "src/Config.h"
@@ -56,17 +59,30 @@ namespace
         float airJumpAt;  // < 0: no second jump
     };
 
-    // Maybe a jump first, then the rope shot at an angle, swung on for a while, let go of.
+    // Maybe a jump first, then the rope thrown at an angle, swung on for a while once it catches,
+    // let go of.
     struct Swing
     {
         bool jumpFirst;
         float angle, push;
         bool reel;
         float hold;
-        bool jumpOff;
+        bool jumpOff;     // let go by jumping: only different when the physics give that a kick
         float steer;
         bool airJump;
     };
+
+    // Up against a wall (with the chalk bag): run and jump at it holding towards it until it's
+    // grabbed, climb for a while (over the top, if it's long enough), then leap off or let go.
+    struct Climb
+    {
+        float dir;     // the wall's side
+        float time;    // climbing up
+        bool leap;
+        float steer;
+    };
+
+    constexpr float THROW_WAIT = 1.5f; // the longest a throw is waited on to catch
 
     class Bot
     {
@@ -130,14 +146,21 @@ namespace
                 }
             }
             PlayerInput rope;
-            rope.moveX = s.push;
-            rope.moveY = s.reel ? 1.f : 0.f;
             rope.ropePressed = rope.ropeHeld = true;
             rope.jumpHeld = s.jumpFirst;
             rope.aim = player.centre() + sf::Vector2f(std::cos(s.angle), std::sin(s.angle)) * 200.f;
-            player.handleInput(rope);
+            if (!player.canShootRope() || !player.ropeTarget(rope.aim)) return {Out::Missed, {}};
+            // Thrown (swung round first, early on), and flying there. Standing still meanwhile, or
+            // in the air steering on.
+            rope.moveX = s.jumpFirst ? s.push : 0.f;
+            for (int i = 0; i < int(THROW_WAIT / DT) && !player.getRope(); ++i) {
+                if (auto o = step(rope)) return {*o, player.getPosition()};
+                rope.ropePressed = false;
+            }
             if (!player.getRope()) return {Out::Missed, {}};
             rope.ropePressed = false;
+            rope.moveX = s.push;
+            rope.moveY = s.reel ? 1.f : 0.f;
             for (int i = 0; i < int(s.hold / DT); ++i) {
                 if (auto o = step(rope)) return {*o, player.getPosition()};
             }
@@ -157,6 +180,35 @@ namespace
                 }
             }
             return settle(s.steer, true);
+        }
+
+        Result climb(sf::Vector2f spot, const Climb& c)
+        {
+            player.respawn(spot);
+            PlayerInput at;
+            at.moveX = c.dir;
+            at.moveY = 1.f; // grabs it from the ground too
+            at.jumpPressed = at.jumpHeld = true;
+            for (int i = 0; i < int(1.2f / DT) && !player.isClinging(); ++i) {
+                if (auto o = step(at)) return {*o, player.getPosition()};
+                at.jumpPressed = false;
+            }
+            if (!player.isClinging()) return {Out::Missed, {}};
+            PlayerInput up;
+            up.moveX = c.dir;
+            up.moveY = 1.f;
+            for (int i = 0; i < int(c.time / DT) && player.isClinging(); ++i) {
+                if (auto o = step(up)) return {*o, player.getPosition()};
+            }
+            if (!player.isClinging()) return settle(c.dir, true); // over the top
+            PlayerInput off;
+            off.moveX = c.steer;
+            if (c.leap) off.jumpPressed = off.jumpHeld = true;
+            for (int i = 0; i < int(0.3f / DT); ++i) {
+                if (auto o = step(off)) return {*o, player.getPosition()};
+                off.jumpPressed = false;
+            }
+            return settle(c.steer, true);
         }
 
     private:
@@ -205,13 +257,160 @@ namespace
         return b;
     }
 
+    std::string describe(const Climb& c)
+    {
+        char b[160];
+        std::snprintf(b, sizeof b, "climb the wall to the %s for %.2fs, %s steering %+.0f", c.dir < 0.f ? "left" : "right", c.time,
+                      c.leap ? "leap off" : "let go", c.steer);
+        return b;
+    }
+
     std::string describe(const Swing& s)
     {
         char b[160];
-        std::snprintf(b, sizeof b, "rope%s at %.0f deg, push %+.0f%s for %.2fs, %s steering %+.0f%s", s.jumpFirst ? " mid-jump" : "",
+        std::snprintf(b, sizeof b, "rope%s at %.0f deg, push %+.0f%s for %.2fs once it catches, %s steering %+.0f%s", s.jumpFirst ? " mid-jump" : "",
                       s.angle * 57.2958f, s.push, s.reel ? " reeling in" : "", s.hold, s.jumpOff ? "jump off" : "let go", s.steer,
                       s.airJump ? ", jump again" : "");
         return b;
+    }
+}
+
+namespace
+{
+    const std::set<std::string> ALL_ABILITIES = {"rope", "long_rope", "climbing_pick", "wall_climb", "air_throw", "double_jump"};
+
+    void giveAbilities(Player& player, const std::set<std::string>& abilities)
+    {
+        player.setHasRope(abilities.count("rope") > 0);
+        player.setRopeRange(abilities.count("long_rope") ? physics().longRopeRange : physics().ropeRange);
+        player.setCanHookRock(abilities.count("climbing_pick") > 0);
+        player.setCanClimb(abilities.count("wall_climb") > 0);
+        player.setCanThrowInAir(abilities.count("air_throw") > 0);
+        player.setCanDoubleJump(abilities.count("double_jump") > 0);
+    }
+
+    // An empty room `width` tiles wide with a floor, the start near its left, and `ceiling` empty
+    // rows above the floor under a ceiling of hook blocks (none: open to the top of 40 rows).
+    // `wall`: a wall that high at column 20.
+    std::shared_ptr<Level> testRoom(int width, int ceiling = 0, int wall = 0)
+    {
+        const int rows = ceiling > 0 ? ceiling : 40;
+        std::string text = std::string(width, ceiling > 0 ? '%' : '.') + "\n";
+        for (int r = rows; r >= 1; --r) {
+            std::string row(width, '.');
+            if (wall >= r) row[20] = '#';
+            if (r == 1) row[10] = 'S';
+            text += row + "\n";
+        }
+        text += std::string(width, '#') + "\n";
+        return Level::loadFromString(text);
+    }
+
+    // Steps `player` with `in` (presses only at first) for up to `seconds`, calling `each` after
+    // every step until it says stop.
+    template <typename F>
+    void run(Player& player, PlayerInput in, float seconds, F each)
+    {
+        for (int i = 0; i < int(seconds / DT); ++i) {
+            player.handleInput(in);
+            player.update(DT);
+            in.jumpPressed = in.ropePressed = false;
+            if (!each()) return;
+        }
+    }
+
+    // A jump on an open floor: standing or at full speed, maybe jumping again at the top. How high
+    // the feet get and how far it lands, in tiles.
+    std::pair<float, float> measureJump(bool running, bool again)
+    {
+        auto level = testRoom(200);
+        Player player(level);
+        giveAbilities(player, ALL_ABILITIES);
+        const float floor = player.getPosition().y;
+        PlayerInput in;
+        in.moveX = running ? 1.f : 0.f;
+        run(player, in, 1.f, [] { return true; });
+        const float from = player.getPosition().x;
+        in.jumpPressed = in.jumpHeld = true;
+        float top = floor;
+        bool secondDone = !again;
+        run(player, in, 3.f, [&] {
+            top = std::max(top, player.getPosition().y);
+            if (!secondDone && player.getVelocity().y <= 0.f) {
+                PlayerInput twice = in;
+                twice.jumpPressed = true;
+                player.handleInput(twice);
+                secondDone = true;
+            }
+            return !player.isGrounded() || player.getPosition().y > floor;
+        });
+        return {(top - floor) / Level::TILE_SIZE, (player.getPosition().x - from) / Level::TILE_SIZE};
+    }
+
+    // Climbing a high wall from the ground until the grip runs out: how high the feet get, in tiles.
+    float measureClimb()
+    {
+        auto level = testRoom(40, 0, 38);
+        Player player(level);
+        giveAbilities(player, ALL_ABILITIES);
+        const float floor = player.getPosition().y;
+        PlayerInput in;
+        in.moveX = 1.f;
+        in.moveY = 1.f;
+        float top = floor;
+        run(player, in, 8.f, [&] {
+            top = std::max(top, player.getPosition().y);
+            return player.staminaLeft() > 0.f || player.isClinging();
+        });
+        return (top - floor) / Level::TILE_SIZE;
+    }
+
+    // The furthest one swing carries along a flat floor, landing on it, from under a ceiling of hook
+    // blocks `ceiling` tiles above it, in tiles. Tries what the room search tries.
+    float measureSwing(int ceiling, bool longRope)
+    {
+        auto level = testRoom(200, ceiling);
+        Bot bot(level, Goal{});
+        std::set<std::string> abilities = ALL_ABILITIES;
+        if (!longRope) abilities.erase("long_rope");
+        abilities.erase("double_jump");
+        giveAbilities(bot.player, abilities);
+        bot.player.respawn(level->getStartPos());
+        run(bot.player, {}, 0.5f, [] { return true; });
+        const sf::Vector2f spot = bot.player.getPosition();
+        float furthest = 0.f;
+        for (bool jumpFirst : {false, true}) {
+            for (int deg = 30; deg <= 90; deg += 5) {
+                for (bool reel : {false, true}) {
+                    for (float hold = 0.2f; hold < 2.5f; hold += 0.05f) {
+                        const Result r = bot.swing(spot, {jumpFirst, deg / 57.2958f, 1.f, reel, hold, false, 1.f, false});
+                        if (r.out == Out::Landed) furthest = std::max(furthest, r.pos.x - spot.x);
+                    }
+                }
+            }
+        }
+        return furthest / Level::TILE_SIZE;
+    }
+
+    int measure()
+    {
+        const Physics& p = physics();
+        std::printf("With the physics in assets/physics.txt (in tiles of 8 px):\n");
+        const auto [standing, standingAcross] = measureJump(false, false);
+        const auto [running, across] = measureJump(true, false);
+        const auto [twice, twiceAcross] = measureJump(true, true);
+        std::printf("  jump: %.1f up standing; at a run %.1f up, %.1f across\n", standing, running, across);
+        std::printf("  with the feather, again at the top: %.1f up, %.1f across\n", twice, twiceAcross);
+        (void)standingAcross;
+        std::printf("  rope: reaches %.1f standing, %.1f in the air; long rope %.1f and %.1f\n", p.ropeRange / 8.f,
+                    p.ropeRange * p.airThrowRange / 8.f, p.longRopeRange / 8.f, p.longRopeRange * p.airThrowRange / 8.f);
+        std::printf("  climbing: up %.1f from the ground before the grip runs out\n", measureClimb());
+        std::printf("  one swing along the floor under a ceiling of hooks (rope / long rope):\n");
+        for (int ceiling : {5, 7, 9, 11}) {
+            std::printf("    ceiling %2d up: %4.1f / %4.1f across\n", ceiling, measureSwing(ceiling, false), measureSwing(ceiling, true));
+        }
+        std::fflush(stdout);
+        std::_Exit(0);
     }
 }
 
@@ -219,6 +418,7 @@ int main(int argc, char** argv)
 {
     // Moving as in the game.
     for (const std::string& problem : loadPhysics(config::assetPath("physics.txt"))) std::cerr << "physics.txt: " << problem << "\n";
+    if (argc >= 2 && std::string(argv[1]) == "--measure") return measure();
     if (argc < 2) {
         std::cerr << "usage: levelbot <room> [--start COL ROW] [--goal L|R|T|B|pickup|gem N] [--abilities a,b] [--explore]\n";
         return 2;
@@ -226,7 +426,7 @@ int main(int argc, char** argv)
     const std::string roomArg = argv[1];
     std::optional<sf::Vector2i> startTile;
     Goal goal;
-    std::set<std::string> abilities = {"climbing_pick", "long_rope", "double_jump"};
+    std::set<std::string> abilities = ALL_ABILITIES;
     bool explore = false, openGates = false;
     for (int i = 2; i < argc; ++i) {
         const std::string a = argv[i];
@@ -255,8 +455,14 @@ int main(int argc, char** argv)
     if (roomArg.size() > 4 && roomArg.substr(roomArg.size() - 4) == ".txt") {
         level = loadSingleLevel(roomArg).level;
     } else {
+        std::set<std::string> offered;
         for (auto& room : loadWorld(config::assetPath("world.ldtk"))) {
             if (room.name == roomArg) level = room.level;
+            for (const Pickup& pickup : room.level->pickups()) offered.insert(pickup.ability);
+        }
+        // As in the game: what no room gives, everyone has.
+        for (const std::string& ability : ALL_ABILITIES) {
+            if (!offered.count(ability)) abilities.insert(ability);
         }
     }
     if (!level) {
@@ -267,10 +473,12 @@ int main(int argc, char** argv)
     level->setGatesOpen(openGates);
     Bot bot(level, goal);
     Player& player = bot.player;
-    player.setCanHookRock(abilities.count("climbing_pick") > 0);
-    player.setRopeRange(abilities.count("long_rope") ? physics().longRopeRange : physics().ropeRange);
-    player.setCanDoubleJump(abilities.count("double_jump") > 0);
+    giveAbilities(player, abilities);
     const bool doubleJump = abilities.count("double_jump") > 0;
+    const bool rope = abilities.count("rope") > 0;
+    const bool airThrow = abilities.count("air_throw") > 0;
+    const bool climbs = abilities.count("wall_climb") > 0;
+    const bool ropeJumpKick = physics().ropeJumpSpeed > 0.f;
 
     const sf::FloatRect b = level->bounds();
     const int rows = static_cast<int>(b.height / Level::TILE_SIZE);
@@ -298,11 +506,13 @@ int main(int argc, char** argv)
     for (float steer : {-1.f, 0.f, 1.f}) jumps.push_back({0.f, 0.1f, 0.f, steer, true, -1.f});
     std::vector<Swing> swings;
     for (bool jumpFirst : {false, true}) {
+        if (!rope || (jumpFirst && !airThrow)) continue; // thrown standing only, until the throwing hand
         for (int deg = 25; deg <= 155; deg += 10) {
             for (float push : {-1.f, 1.f}) {
                 for (bool reel : {false, true}) {
                     for (float hold : {0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.8f, 2.2f}) {
                         for (bool jumpOff : {false, true}) {
+                            if (jumpOff && !ropeJumpKick) continue; // jumping only lets go, like letting go
                             for (float steer : {push, 0.f, -push}) {
                                 swings.push_back({jumpFirst, deg / 57.2958f, push, reel, hold, jumpOff, steer, false});
                                 if (doubleJump && steer == push) swings.push_back({jumpFirst, deg / 57.2958f, push, reel, hold, jumpOff, steer, true});
@@ -312,6 +522,16 @@ int main(int argc, char** argv)
                 }
             }
         }
+    }
+
+    std::vector<Climb> climbing;
+    for (float dir : {-1.f, 1.f}) {
+        if (!climbs) continue;
+        for (float time : {0.f, 0.4f, 0.8f, 1.2f, 1.7f}) {
+            for (float steer : {-dir, 0.f, dir}) climbing.push_back({dir, time, true, steer});
+            for (float steer : {-dir, 0.f}) climbing.push_back({dir, time, false, steer});
+        }
+        climbing.push_back({dir, 5.f, false, 0.f}); // as high as it goes: over the top
     }
 
     // Best-first, furthest from the start first: where the goal is isn't known.
@@ -358,6 +578,18 @@ int main(int argc, char** argv)
         bool done = false;
         for (const Jump& j : jumps) {
             if ((done = handle(bot.jump(spot, j), describe(j)))) break;
+        }
+        if (done) break;
+        // No wall to grab on one side from here: nothing more to try that way.
+        std::set<float> noWall;
+        for (const Climb& c : climbing) {
+            if (noWall.count(c.dir)) continue;
+            const Result r = bot.climb(spot, c);
+            if (r.out == Out::Missed) {
+                noWall.insert(c.dir);
+                continue;
+            }
+            if ((done = handle(r, describe(c)))) break;
         }
         if (done) break;
         // Once the rope misses at an angle from here, it'll miss whatever else is tried with it.

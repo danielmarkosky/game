@@ -87,26 +87,29 @@ the game).
 ## Designing
 
 - The numbers below come from [`assets/physics.txt`](../physics.txt): change those and they change.
-  A running jump goes about **3.5 tiles up** and **4.5 tiles across**. Gaps of 3–4 tiles are jumps;
-  anything wider needs the rope.
-- The rope reaches **100 px (12.5 tiles)** from the player's centre, **150 px (18.75 tiles)** with
-  the long rope, and only sticks to solid rock and hook blocks, not to platforms or hazards. Until
-  the player has the climbing pick it only sticks to hook blocks, so anything before the pick has
-  to be done without rock to swing from.
+  `./build/Release/levelbot --measure` measures them again. In tiles:
+
+  | Move | Reach |
+  |------|-------|
+  | Jump | 3.8 up, standing or running; 4.8 across at a run. Gaps of 3–4 are jumps, wider ones need more |
+  | Double jump (the feather), again at the top | 6.8 up, 7.9 across |
+  | Rope throw | 8 from the ground, 6 in the air (with the throwing hand); the long rope 13 and 9.8 |
+  | Climbing (the chalk bag) | about 10 up a wall from the ground before the grip runs out |
+  | One swing along the floor, ceiling of hooks 5 / 7 / 9 up | 12.8 / 14.8 / 9.6 across; with the long rope 15.4 / 21.5 / 20.4, and 19.2 under 11 |
+
+- The rope only sticks to solid rock and hook blocks, not to platforms or hazards. Until the player
+  has the climbing pick it only sticks to hook blocks, so anything before the pick has to be done
+  without rock to swing from. Until the throwing hand it's only thrown standing (or holding a wall).
 - With the pick, a rock wall can be climbed: hook it high, reel in, let go, hook it higher. Jumping
   on the rope only lets go, with no jump of its own: height and distance come from the swing. To
-  make something really out of reach, use slick stone, or line the walls with crystal (the rope goes
-  through crystal to the rock behind, but hanging from there drags you into the spikes), like the
-  Tall Hall. Its hook is 20 tiles above the floor: more than 12.5 tiles even from the top of a jump,
-  less than 18.75 from the floor.
-- The double jump adds about 3 tiles of height, most of all at the top of a jump. (This and the
-  swing distance below were measured with the old, faster physics: to be measured again once the
-  feel is settled.) The Windy Ledge's gaps are 7 and 8.
+  make something really out of reach, use slick stone (no rope, no hands), or line the walls with
+  crystal (the rope goes through crystal to the rock behind, but hanging from there drags you into
+  the spikes), like the Tall Hall.
+- The Windy Ledge's gaps are 7 and 8: they need the feather.
 - `python3 tools/check_world.py` checks every room can be got through, both ways, and every gate
   holds without its ability: add your room's routes to it.
 - The rope wraps around outside corners of rock (and slides along flat walls), so a rope that
   swings past a pit's lip or a block's edge will catch on it. Platforms and hazards don't catch it.
-- A swing under a ceiling 9–10 tiles above the floor comfortably crosses 8–10 tiles.
 - Rooms can be walked through both ways, so make sure the way back works too.
 - For a way up into the room above, put something to stand on 2-3 tiles below the gap. Going up
   into a room gives the player a lift of a full jump, so put a ledge or a one-way platform within
