@@ -36,7 +36,7 @@ void Game::renderCanvas()
     } else {
         if (screen == Screen::Paused) drawHud();
         drawMenuScreen();
-        drawCrosshair(hud::GREY);
+        if (!input.usingPad()) drawCrosshair(input.mousePosition(), hud::GREY);
     }
     if (fade > 0.f) hud::dim(canvas, static_cast<sf::Uint8>(255.f * fade / FADE_TIME));
     canvas.display();
@@ -169,33 +169,35 @@ void Game::drawBackground(const Theme& theme, float scrollX)
 
 void Game::drawAim()
 {
+    const bool pad = input.usingPad();
     const sf::Vector2f mouse = input.mousePosition();
-    if (pauseButton().contains(mouse)) {
-        drawCrosshair(hud::GREY);
+    if (!pad && pauseButton().contains(mouse)) {
+        drawCrosshair(mouse, hud::GREY);
         return;
     }
-    const sf::Vector2f mouseWorld = worldCoordinates(mouse, drawCamera());
+    const sf::Vector2f aim = aimPoint();
 
-    // Show where the rope would stick, so you know before you click.
-    bool canHook = false;
+    // Show where the rope would stick, so you know before you shoot. With the stick the crosshair
+    // goes there too, or as far as the rope reaches.
+    std::optional<sf::Vector2f> hook;
     if (!player->getRope() && player->canShootRope()) {
-        if (auto target = player->ropeTarget(mouseWorld)) {
-            canHook = true;
-            sf::Vector2f p = viewCoordinates(*target, drawCamera());
+        if ((hook = player->ropeTarget(aim))) {
+            sf::Vector2f p = viewCoordinates(*hook, drawCamera());
             hud::fillRect(canvas, {std::floor(p.x) - 1.f, std::floor(p.y) - 1.f, 2.f, 2.f}, sf::Color(255, 255, 255, 200));
-        } else if (auto bounce = player->ropeBounce(mouseWorld)) {
+        } else if (auto bounce = player->ropeBounce(aim)) {
             // Rock in range, but no pick yet: a dim red dot where the rope would bounce off.
             sf::Vector2f p = viewCoordinates(*bounce, drawCamera());
             hud::fillRect(canvas, {std::floor(p.x) - 1.f, std::floor(p.y) - 1.f, 2.f, 2.f}, sf::Color(230, 90, 90, 150));
         }
     }
-    drawCrosshair(canHook ? sf::Color(255, 255, 255) : sf::Color(150, 150, 170, 180));
+    if (pad && player->getRope()) return; // swinging: the stick reels, it doesn't aim
+    const sf::Vector2f at = pad ? viewCoordinates(hook ? *hook : aim, drawCamera()) : mouse;
+    drawCrosshair(at, hook ? sf::Color(255, 255, 255) : sf::Color(150, 150, 170, 180));
 }
 
-void Game::drawCrosshair(sf::Color color)
+void Game::drawCrosshair(sf::Vector2f at, sf::Color color)
 {
-    const sf::Vector2f mouse = input.mousePosition();
-    const float mx = std::floor(mouse.x), my = std::floor(mouse.y);
+    const float mx = std::floor(at.x), my = std::floor(at.y);
     // With a dark shadow, so it shows up on the bright daylight sky too.
     for (auto [offset, c] : {std::pair{1.f, sf::Color(0, 0, 0, 140)}, std::pair{0.f, color}}) {
         hud::fillRect(canvas, {mx - 3.f + offset, my + offset, 2.f, 1.f}, c);
@@ -227,14 +229,18 @@ void Game::drawHud()
     if (bubbleAt) {
         const float bob = std::round(std::sin(clockTime * 4.f));
         const sf::Vector2f p = viewCoordinates(*bubbleAt + sf::Vector2f(0.f, bob), drawCamera());
-        const sf::FloatRect bubble(std::floor(p.x) - 5.f, std::floor(p.y), 11.f, 9.f);
+        // Up works too, but on the gamepad the button is easier.
+        const std::string key = input.usingPad() ? hint(controls::Action::Interact) : hint(controls::Action::Up);
+        const float width = hud::textWidth(key) + 8.f;
+        const sf::FloatRect bubble(std::floor(p.x - width * 0.5f), std::floor(p.y), width, 9.f);
         hud::fillRect(canvas, {bubble.left, bubble.top, bubble.width, bubble.height}, sf::Color(14, 14, 22, 220));
         hud::frame(canvas, bubble, hud::withAlpha(hud::WHITE, 160));
-        hud::drawText(canvas, "W", {bubble.left + 4.f, bubble.top + 2.f}, hud::WHITE);
+        hud::drawText(canvas, key, {bubble.left + 4.f, bubble.top + 2.f}, hud::WHITE);
     }
     if (sitting && screen == Screen::Playing) {
-        const std::string hint = travelDestinations().size() > 1 ? "M - TRAVEL    MOVE - GET UP" : "MOVE - GET UP";
-        hud::drawCentred(canvas, hint, HALF_W, 168.f, hud::GREY);
+        const std::string getUp = "MOVE - GET UP";
+        const std::string text = travelDestinations().size() > 1 ? hint(controls::Action::Map) + " - TRAVEL    " + getUp : getUp;
+        hud::drawCentred(canvas, text, HALF_W, 168.f, hud::GREY);
     }
 
     // A note for a moment (saved, or how many gems now), and the gem count while paused.
@@ -248,7 +254,7 @@ void Game::drawHud()
 
     // Pause button in the top right corner.
     const sf::FloatRect button = pauseButton();
-    const bool hovered = screen == Screen::Playing && button.contains(input.mousePosition());
+    const bool hovered = screen == Screen::Playing && !input.usingPad() && button.contains(input.mousePosition());
     const sf::Color barColor = hovered ? hud::WHITE : hud::GREY;
     for (float x : {button.left + 3.f, button.left + 7.f}) {
         hud::fillRect(canvas, {x + 1.f, button.top + 4.f, 2.f, 6.f}, sf::Color(0, 0, 0, 160));

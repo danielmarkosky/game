@@ -1,5 +1,6 @@
 #pragma once
 
+#include "src/Controls.h"
 #include <set>
 #include <string>
 
@@ -14,6 +15,7 @@ struct Settings
     int lastSlot = 0;        // the slot played last: its room drifts by behind the title screen
     int musicVolume = 6;     // 0 to 10
     int soundVolume = 8;
+    controls::Bindings controls;
 
     // Unknown or broken lines are skipped, so an old or hand-edited file never stops the game.
     static Settings parse(const std::string& text);

@@ -39,6 +39,7 @@ Game::Game(std::vector<LevelInfo> levelList, Options options)
       input(window)
 {
     const size_t startRoom = options.startRoom;
+    input.setBindings(settings.controls);
     if (!headless) applyWindowSettings();
     audio.setVolumes(headless ? 0 : settings.musicVolume, headless ? 0 : settings.soundVolume);
     canvas.create(config::GAME_WIDTH, config::GAME_HEIGHT);
@@ -432,6 +433,14 @@ MapScreen::Marks Game::mapMarks() const
         const std::string tally = gemTally(room);
         return hud::upper(levels[room].title) + (tally.empty() ? "" : "  GEMS " + tally);
     };
+    using A = controls::Action;
+    const bool pad = input.usingPad();
+    if (mapScreen && mapScreen->travelling()) {
+        marks.hint = std::string(pad ? "STICK" : "LEFT / RIGHT / CLICK") + " - CHOOSE    " + hint(A::Confirm) + " - GO    " + hint(A::Back) + " - STAY";
+    } else {
+        marks.hint = std::string(pad ? "STICK" : "ARROWS / DRAG") + " - MOVE    " + hint(A::Zoom) + (pad ? "" : " / WHEEL") + " - ZOOM    " +
+                     hint(A::Map) + " - CLOSE";
+    }
     return marks;
 }
 
@@ -442,13 +451,12 @@ void Game::run()
         input.newFrame();
         sf::Event event;
         while (window->pollEvent(event)) {
-            input.handleEvent(event);
             if (event.type == sf::Event::Closed) {
                 if (inGame()) saveProgress();
                 window->close();
             }
             if (event.type == sf::Event::LostFocus && screen == Screen::Playing) openScreen(Screen::Paused);
-            if (event.type == sf::Event::KeyPressed) handleKey(event.key.code);
+            if (auto press = input.handleEvent(event)) handlePress(*press);
         }
         if (reapplyWindow) {
             reapplyWindow = false;
@@ -487,6 +495,8 @@ void Game::frame(float frameTime, std::optional<PlayerInput> scripted)
         } else if (screen == Screen::Talking) {
             talk->pointAt(mouse, input.wasMouseClicked());
             if (talk->finished()) endTalk();
+        } else if (rebinding) {
+            if (input.wasMouseClicked()) rebinding.reset(); // clicking away: never mind
         } else {
             const size_t before = menu.selected();
             if (auto choice = menu.handleMouse(mouse, mouseMoved, input.wasMouseClicked())) {
@@ -524,7 +534,22 @@ void Game::frame(float frameTime, std::optional<PlayerInput> scripted)
 
 void Game::pressKey(sf::Keyboard::Key key)
 {
-    handleKey(key);
+    sf::Event event{};
+    event.type = sf::Event::KeyPressed;
+    event.key.code = key;
+    if (auto press = input.handleEvent(event)) handlePress(*press);
+    event.type = sf::Event::KeyReleased;
+    input.handleEvent(event);
+}
+
+void Game::pressButton(int button)
+{
+    sf::Event event{};
+    event.type = sf::Event::JoystickButtonPressed;
+    event.joystickButton.button = static_cast<unsigned>(button);
+    if (auto press = input.handleEvent(event)) handlePress(*press);
+    event.type = sf::Event::JoystickButtonReleased;
+    input.handleEvent(event);
 }
 
 void Game::advance(float seconds, const PlayerInput& held)
@@ -550,6 +575,7 @@ std::string Game::screenName() const
         case Screen::Slots: return "slots";
         case Screen::ConfirmErase: return "erase";
         case Screen::Options: return "options";
+        case Screen::Controls: return "controls";
         case Screen::Playing: return "playing";
         case Screen::Paused: return "paused";
         case Screen::Complete: return "complete";
@@ -579,40 +605,46 @@ sf::Vector2f Game::playerPosition() const
     return player->getPosition();
 }
 
-void Game::handleKey(sf::Keyboard::Key key)
+void Game::handlePress(const InputManager::Press& press)
 {
-    using K = sf::Keyboard;
+    using A = controls::Action;
+    const auto has = [&](A action) { return press.actions[controls::index(action)]; };
+    if (rebinding) {
+        rebind(press);
+        return;
+    }
     if (screen == Screen::Playing) {
-        if (key == K::Escape || key == K::P) openScreen(Screen::Paused);
-        else if (key == K::M || key == K::Tab) openMap(sitting && travelDestinations().size() > 1);
-        else if ((key == K::W || key == K::Up || key == K::E) && npcInReach()) startTalk(*npcInReach());
-        else if ((key == K::W || key == K::Up || key == K::E) && !sitting && benchInReach()) sitDown(*benchInReach());
-        else if ((key == K::W || key == K::Up || key == K::E) && leverInReach()) pullLever();
-        else if (key == K::R && !transition && deathTimer <= 0.f) killPlayer(); // back to the checkpoint
+        const bool interact = has(A::Interact) || has(A::Up);
+        if (has(A::Pause)) openScreen(Screen::Paused);
+        else if (has(A::Map)) openMap(sitting && travelDestinations().size() > 1);
+        else if (interact && npcInReach()) startTalk(*npcInReach());
+        else if (interact && !sitting && benchInReach()) sitDown(*benchInReach());
+        else if (interact && leverInReach()) pullLever();
+        else if (has(A::Restart) && !transition && deathTimer <= 0.f) killPlayer(); // back to the checkpoint
         return;
     }
     if (screen == Screen::Talking) {
-        if (key == K::Escape) back();
-        else if (key == K::Up || key == K::W) talk->moveChoice(-1);
-        else if (key == K::Down || key == K::S) talk->moveChoice(1);
-        else if (key == K::Space || key == K::Enter || key == K::E) talk->advance();
+        if (has(A::Pause)) back();
+        else if (has(A::Up)) talk->moveChoice(-1);
+        else if (has(A::Down)) talk->moveChoice(1);
+        else if (has(A::Confirm) || has(A::Jump) || has(A::Interact)) talk->advance();
         if (talk && talk->finished()) endTalk();
         return;
     }
     if (screen == Screen::Map) {
-        switch (mapScreen->handleKey(key, mapMarks())) {
+        switch (mapScreen->handle(press.actions, mapMarks())) {
             case MapScreen::Action::Close: back(); break;
             case MapScreen::Action::Travel: travelTo(travelDestinations()[mapScreen->destination()]); break;
             case MapScreen::Action::None: break;
         }
         return;
     }
-    if (key == K::Escape || (key == K::P && screen == Screen::Paused)) {
+    if (has(A::Back) || (has(A::Pause) && screen == Screen::Paused)) {
         back();
         return;
     }
     const size_t before = menu.selected();
-    if (auto choice = menu.handleKey(key)) {
+    if (auto choice = menu.handle(press.actions)) {
         audio.play(Audio::Sfx::MenuPick);
         onMenuChoice(*choice);
     } else if (menu.selected() != before) {
@@ -622,19 +654,58 @@ void Game::handleKey(sf::Keyboard::Key key)
 
 PlayerInput Game::playerInput()
 {
-    using K = sf::Keyboard;
-    auto held = [this](K::Key a, K::Key b) { return input.isKeyPressed(a) || input.isKeyPressed(b); };
+    using A = controls::Action;
+    const auto held = [this](A action) { return input.isHeld(action) ? 1.f : 0.f; };
 
     PlayerInput in;
-    in.moveX = (held(K::D, K::Right) ? 1.f : 0.f) - (held(K::A, K::Left) ? 1.f : 0.f);
-    in.moveY = (held(K::W, K::Up) ? 1.f : 0.f) - (held(K::S, K::Down) ? 1.f : 0.f);
-    in.jumpPressed = input.wasKeyJustPressed(K::Space);
-    in.jumpHeld = input.isKeyPressed(K::Space);
-    // Shift works like the mouse button, for trackpads that can't hold a click.
-    in.ropePressed = input.wasMouseClicked() || input.wasKeyJustPressed(K::LShift) || input.wasKeyJustPressed(K::RShift);
-    in.ropeHeld = input.isMousePressed() || held(K::LShift, K::RShift);
-    in.aim = worldCoordinates(input.mousePosition(), drawCamera());
+    in.moveX = held(A::Right) - held(A::Left);
+    in.moveY = held(A::Up) - held(A::Down);
+    in.jumpPressed = input.wasPressed(A::Jump);
+    in.jumpHeld = input.isHeld(A::Jump);
+    // The rope's key works like the mouse button, for trackpads that can't hold a click.
+    in.ropePressed = input.wasMouseClicked() || input.wasPressed(A::Rope);
+    in.ropeHeld = input.isMousePressed() || input.isHeld(A::Rope);
+    in.aim = aimPoint();
     return in;
+}
+
+sf::Vector2f Game::aimPoint() const
+{
+    if (!input.usingPad()) return worldCoordinates(input.mousePosition(), drawCamera());
+    // Where the stick points, or with it let go, up and ahead.
+    sf::Vector2f direction = input.padDirection();
+    if (direction == sf::Vector2f()) direction = {player->isFacingLeft() ? -1.f : 1.f, 1.f};
+    return player->aimAlong(direction);
+}
+
+std::string Game::hint(controls::Action action) const
+{
+    using A = controls::Action;
+    using controls::PadButton;
+    const controls::Bindings& b = settings.controls;
+    if (input.usingPad()) {
+        const controls::PadLayout layout = input.padLayout();
+        switch (action) {
+            case A::Left:
+            case A::Right:
+            case A::Up:
+            case A::Down: return "STICK";
+            case A::Pause: return controls::buttonName(controls::buttonNumber(PadButton::Start, layout), layout);
+            case A::Confirm: return controls::buttonName(controls::buttonNumber(PadButton::South, layout), layout);
+            case A::Back: return controls::buttonName(controls::buttonNumber(PadButton::East, layout), layout);
+            case A::Zoom:
+                return controls::buttonName(controls::buttonNumber(PadButton::LeftShoulder, layout), layout) + " / " +
+                       controls::buttonName(controls::buttonNumber(PadButton::RightShoulder, layout), layout);
+            default: return controls::buttonName(b.button(action, layout), layout);
+        }
+    }
+    switch (action) {
+        case A::Pause:
+        case A::Back: return "ESC";
+        case A::Confirm: return "ENTER";
+        case A::Zoom: return "Z";
+        default: return controls::keyName(b.keys[controls::index(action)][0]);
+    }
 }
 
 sf::FloatRect Game::pauseButton() const

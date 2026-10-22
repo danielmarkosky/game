@@ -70,12 +70,11 @@ void MapScreen::zoom(int steps)
 
 MapScreen::Action MapScreen::update(float dt, const InputManager& input, sf::Vector2f mouseMove, const Marks& marks)
 {
-    using K = sf::Keyboard;
-    auto held = [&](K::Key a, K::Key b) { return input.isKeyPressed(a) || input.isKeyPressed(b); };
+    using C = controls::Action;
+    auto held = [&](C action) { return input.isHeld(action) ? 1.f : 0.f; };
     // In travel mode left and right choose a bench instead.
     if (!travel) {
-        const sf::Vector2f keys((held(K::D, K::Right) ? 1.f : 0.f) - (held(K::A, K::Left) ? 1.f : 0.f),
-                                (held(K::W, K::Up) ? 1.f : 0.f) - (held(K::S, K::Down) ? 1.f : 0.f));
+        const sf::Vector2f keys(held(C::Right) - held(C::Left), held(C::Up) - held(C::Down));
         centre += keys * PAN_SPEED * dt * float(zoomLevel);
     }
     // Dragging with the mouse moves the map with it. Screen y points down, the map's up.
@@ -97,16 +96,17 @@ MapScreen::Action MapScreen::update(float dt, const InputManager& input, sf::Vec
     return Action::None;
 }
 
-MapScreen::Action MapScreen::handleKey(sf::Keyboard::Key key, const Marks& marks)
+MapScreen::Action MapScreen::handle(controls::Actions actions, const Marks& marks)
 {
-    using K = sf::Keyboard;
-    if (key == K::Escape || key == K::M || key == K::Tab) return Action::Close;
+    using C = controls::Action;
+    const auto has = [&](C action) { return actions[controls::index(action)]; };
+    if (has(C::Pause) || has(C::Back) || has(C::Map)) return Action::Close;
     if (travel) {
         const int count = static_cast<int>(marks.benches.size());
-        if (key == K::Left || key == K::A) choice = static_cast<size_t>((static_cast<int>(choice) + count - 1) % count);
-        if (key == K::Right || key == K::D) choice = static_cast<size_t>((static_cast<int>(choice) + 1) % count);
-        if (key == K::Enter || key == K::Space || key == K::E) return Action::Travel;
-    } else if (key == K::Z) {
+        if (has(C::Left)) choice = static_cast<size_t>((static_cast<int>(choice) + count - 1) % count);
+        if (has(C::Right)) choice = static_cast<size_t>((static_cast<int>(choice) + 1) % count);
+        if (has(C::Confirm) || has(C::Jump) || has(C::Interact)) return Action::Travel;
+    } else if (has(C::Zoom)) {
         zoom(zoomLevel == WorldMap::ZOOMS.back() ? -int(WorldMap::ZOOMS.size()) : -1); // further out, then all the way in
     }
     return Action::None;
@@ -157,7 +157,7 @@ void MapScreen::draw(sf::RenderTarget& target, const Marks& marks, sf::Vector2f 
     if (travel) {
         const size_t where = marks.benchRooms[choice];
         hud::drawCentred(target, "TRAVEL TO " + marks.describe(where) + (where == marks.currentRoom ? "  (YOU ARE HERE)" : ""), HALF_W, below, hud::WHITE);
-        hud::drawCentred(target, "LEFT / RIGHT / CLICK - CHOOSE    ENTER - GO    ESC - STAY", HALF_W, 171.f, hud::GREY);
+        hud::drawCentred(target, marks.hint, HALF_W, 171.f, hud::GREY);
         return;
     }
     // The name of the explored room under the mouse, or else the one you're in.
@@ -166,5 +166,5 @@ void MapScreen::draw(sf::RenderTarget& target, const Marks& marks, sf::Vector2f 
         if (auto hovered = map.roomAt(map.toWorld(mouse, v)); hovered && marks.explored[*hovered]) shown = *hovered;
     }
     hud::drawCentred(target, marks.describe(shown) + (shown == marks.currentRoom ? "  (YOU ARE HERE)" : ""), HALF_W, below, hud::WHITE);
-    hud::drawCentred(target, "ARROWS / DRAG - MOVE    Z / WHEEL - ZOOM    M - CLOSE", HALF_W, 171.f, hud::GREY);
+    hud::drawCentred(target, marks.hint, HALF_W, 171.f, hud::GREY);
 }

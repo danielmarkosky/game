@@ -101,3 +101,32 @@ TEST(SaveFiles, TurnTheOldSaveIntoSettingsAndTheFirstSlot) {
     EXPECT_EQ(files.loadSlot(0).explored, std::set<std::string>{"level1"});
     std::filesystem::remove_all(folder);
 }
+
+TEST(Settings, KeepOnlyTheControlsThatWereChanged) {
+    Settings s;
+    EXPECT_EQ(s.serialize().find("key "), std::string::npos);
+    s.controls.bindKey(controls::Action::Jump, sf::Keyboard::C);
+    s.controls.bindKey(controls::Action::Left, sf::Keyboard::Comma);
+    s.controls.bindButton(controls::Action::Rope, 5, controls::PadLayout::Xbox);
+    const Settings loaded = Settings::parse(s.serialize());
+    EXPECT_EQ(loaded.controls, s.controls);
+    EXPECT_NE(s.serialize().find("key jump C\n"), std::string::npos);
+    EXPECT_NE(s.serialize().find("button rope 5\n"), std::string::npos);
+    // Nonsense, or the keys that work the menus, leave the defaults.
+    const Settings broken = Settings::parse("key jump ESCAPE\nkey nothing A\nkey up\nbutton jump many\n");
+    EXPECT_EQ(broken.controls, controls::Bindings{});
+}
+
+TEST(SaveFiles, SavingReplacesTheFileWhole) {
+    const auto folder = freshFolder("game_test_safe_save");
+    SaveFiles files(folder.string());
+    Progress p;
+    p.deaths = 1;
+    files.saveSlot(0, p);
+    p.deaths = 2;
+    files.saveSlot(0, p);
+    EXPECT_EQ(files.loadSlot(0).deaths, 2);
+    // Nothing left lying around from the swap.
+    for (const auto& entry : std::filesystem::directory_iterator(folder)) EXPECT_EQ(entry.path().extension(), ".txt") << entry.path();
+    std::filesystem::remove_all(folder);
+}

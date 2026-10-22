@@ -10,6 +10,12 @@ namespace
         return menu;
     }
 
+    // A key, as it works with the usual bindings.
+    std::optional<MenuChoice> press(Menu& menu, sf::Keyboard::Key key)
+    {
+        return menu.handle(controls::Bindings{}.forKey(key));
+    }
+
     // Middle of the item shown `row` lines from the top.
     sf::Vector2f rowCentre(const Menu& menu, int row)
     {
@@ -20,25 +26,25 @@ namespace
 TEST(Menu, ArrowsMoveAndWrapAround) {
     Menu menu = makeMenu();
     EXPECT_EQ(menu.selected(), 0u);
-    menu.handleKey(sf::Keyboard::Down);
+    press(menu, sf::Keyboard::Down);
     EXPECT_EQ(menu.selected(), 1u);
-    menu.handleKey(sf::Keyboard::S);
-    menu.handleKey(sf::Keyboard::Down);
+    press(menu, sf::Keyboard::S);
+    press(menu, sf::Keyboard::Down);
     EXPECT_EQ(menu.selected(), 0u);
-    menu.handleKey(sf::Keyboard::Up);
+    press(menu, sf::Keyboard::Up);
     EXPECT_EQ(menu.selected(), 2u);
 }
 
 TEST(Menu, EnterPicksAndSidewaysOnlyChangesSettings) {
     Menu menu = makeMenu();
-    auto picked = menu.handleKey(sf::Keyboard::Enter);
+    auto picked = press(menu, sf::Keyboard::Enter);
     ASSERT_TRUE(picked.has_value());
     EXPECT_EQ(picked->id, 1);
     EXPECT_EQ(picked->direction, 0);
-    EXPECT_FALSE(menu.handleKey(sf::Keyboard::Right).has_value());
+    EXPECT_FALSE(press(menu, sf::Keyboard::Right).has_value());
 
-    menu.handleKey(sf::Keyboard::Down);
-    auto changed = menu.handleKey(sf::Keyboard::Left);
+    press(menu, sf::Keyboard::Down);
+    auto changed = press(menu, sf::Keyboard::Left);
     ASSERT_TRUE(changed.has_value());
     EXPECT_EQ(changed->id, 2);
     EXPECT_EQ(changed->direction, -1);
@@ -73,7 +79,7 @@ TEST(Menu, ScrollsToKeepTheSelectionVisible) {
 
 TEST(Menu, KeepsTheSelectionWhenItemsAreRefreshed) {
     Menu menu = makeMenu();
-    menu.handleKey(sf::Keyboard::Down);
+    press(menu, sf::Keyboard::Down);
     menu.setItems({{1, "PLAY", "", false}, {2, "VOLUME", "6", true}, {3, "QUIT", "", false}});
     EXPECT_EQ(menu.selected(), 1u);
     menu.setItems({{1, "PLAY", "", false}});

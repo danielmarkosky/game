@@ -50,6 +50,15 @@ to, and an ending that depends on what you tell them.
 | Esc / P, or click the pause button in the top right | Pause |
 | Arrows or W/S, Enter / Space, or the mouse | Use the menus (left / right change a setting) |
 
+These are the usual keys: every one but Esc and Enter can be changed in OPTIONS, CONTROLS.
+
+**With a gamepad** (Xbox or PlayStation; others are taken to be laid out like an Xbox pad): the
+left stick or d-pad runs, reels and chooses; A / cross jumps and picks in menus; X / square shoots
+the rope; B / circle talks, sits and pulls levers, and goes back in menus; Y / triangle is the map;
+Back / Share is retry; Start / Options pauses. The rope goes where the stick points, to whatever it
+would catch nearest that way (with the stick let go, up and ahead), and the crosshair shows where.
+The buttons can be changed in CONTROLS too. The pad that was pressed last is the one listened to.
+
 ## Abilities
 
 - **The rope** reaches 100 px from you and at first only sticks to the metal hook blocks. The
@@ -107,8 +116,10 @@ PLAY on the title screen shows three save slots, each with where it'll carry on,
 its gems (a `*` once it's been finished). An empty one starts a new game. ERASE A SLOT, then a slot,
 asks before erasing it. Options has the window size, fullscreen, screen shake, the timer (play time
 and deaths, in the corner), the player's skin (ten to choose from, previewed running under the menu)
-and the music and sound volumes. Everything is saved in `~/.celeste_like_game/`: `settings.txt`, and
-`slot1.txt` to `slot3.txt`.
+and the music and sound volumes, and CONTROLS: choose an action and press its new key or button.
+Everything is saved in `~/.celeste_like_game/`: `settings.txt`, and `slot1.txt` to `slot3.txt`. Each
+file is written next to the old one and then swapped in, so a crash while saving can't leave half a
+save.
 
 ## Making it
 

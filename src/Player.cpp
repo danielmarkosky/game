@@ -418,6 +418,27 @@ std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
     return hit;
 }
 
+sf::Vector2f Player::aimAlong(sf::Vector2f direction) const
+{
+    const sf::Vector2f from = exactCentre();
+    const float straight = std::atan2(direction.y, direction.x);
+    const auto along = [&](float angle) { return from + sf::Vector2f(std::cos(angle), std::sin(angle)) * ropeRange; };
+    // Out from the straight line both ways at once, so the nearest wins.
+    constexpr int STEPS = 16;
+    for (int step = 0; step <= STEPS; ++step) {
+        for (float side : {1.f, -1.f}) {
+            const sf::Vector2f aim = along(straight + side * AIM_ASSIST * float(step) / STEPS);
+            if (ropeTarget(aim)) return aim;
+        }
+    }
+    return along(straight);
+}
+
+bool Player::isFacingLeft() const
+{
+    return facingLeft;
+}
+
 std::optional<sf::Vector2f> Player::ropeBounce(sf::Vector2f aim) const
 {
     if (ropeTarget(aim)) return std::nullopt;

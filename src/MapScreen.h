@@ -25,6 +25,7 @@ public:
         std::vector<size_t> benchRooms;    // the room of each
         size_t benchHere = 0;              // in `benches`: the one sat on now
         std::function<std::string(size_t room)> describe; // e.g. "THE CROSSROADS  GEMS 1/2"
+        std::string hint; // which keys or buttons do what, along the bottom
     };
 
     explicit MapScreen(std::vector<WorldMap::Room> rooms);
@@ -36,10 +37,11 @@ public:
     bool travelling() const;
 
     enum class Action { None, Close, Travel };
-    // Moves the map with held keys or the mouse, zooms with the wheel, and in travel mode a click
-    // on a bench chooses it, a second one goes there.
+    // Moves the map with the held directions or the mouse, zooms with the wheel, and in travel
+    // mode a click on a bench chooses it, a second one goes there.
     Action update(float dt, const InputManager& input, sf::Vector2f mouseMove, const Marks& marks);
-    Action handleKey(sf::Keyboard::Key key, const Marks& marks);
+    // A key or button press (see InputManager::Press).
+    Action handle(controls::Actions actions, const Marks& marks);
     // In travel mode: the bench chosen, as an index into Marks::benches.
     size_t destination() const;
 

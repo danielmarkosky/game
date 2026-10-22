@@ -16,8 +16,9 @@ namespace
     {
         PLAY, OPTIONS, QUIT, ERASE, ERASE_YES, ERASE_NO,
         RESUME, RETRY, MAIN_MENU, BACK, MAP,
-        WINDOW_SIZE, FULLSCREEN, SCREEN_SHAKE, TIMER, SKIN, MUSIC, SOUND,
-        FIRST_SLOT = 1000, // + slot number
+        WINDOW_SIZE, FULLSCREEN, SCREEN_SHAKE, TIMER, SKIN, MUSIC, SOUND, CONTROLS, RESET_CONTROLS,
+        FIRST_SLOT = 1000,   // + slot number
+        FIRST_ACTION = 2000, // + controls::Action, in the controls
     };
 
     MenuItem button(int id, std::string label)
@@ -44,7 +45,8 @@ void Game::openScreen(Screen next)
         case Screen::Title: menu.top = 92.f; menu.maxVisible = 9; break;
         case Screen::Slots: menu.top = 54.f; menu.maxVisible = 9; break;
         case Screen::ConfirmErase: menu.top = 92.f; menu.maxVisible = 9; break;
-        case Screen::Options: menu.top = 60.f; menu.maxVisible = 9; break;
+        case Screen::Options: menu.top = 54.f; menu.maxVisible = 9; break;
+        case Screen::Controls: menu.top = 44.f; menu.maxVisible = 10; break;
         case Screen::Paused: menu.top = 78.f; menu.maxVisible = 9; break;
         case Screen::Complete: menu.top = 132.f; menu.maxVisible = 9; break;
         case Screen::Playing:
@@ -94,6 +96,22 @@ void Game::refreshMenu()
             items.push_back({SKIN, "SKIN", hud::upper(Player::SKINS[skinIndex()]), true});
             items.push_back({MUSIC, "MUSIC", std::to_string(s.musicVolume), true});
             items.push_back({SOUND, "SOUNDS", std::to_string(s.soundVolume), true});
+            items.push_back({CONTROLS, "CONTROLS", " ", false});
+            items.push_back({BACK, "BACK", " ", false});
+            break;
+        }
+        case Screen::Controls: {
+            // Each action's keys, and its button on the gamepad (in the layout of the one used last).
+            const controls::PadLayout layout = input.padLayout();
+            for (size_t a = 0; a < controls::BINDABLE; ++a) {
+                const auto action = static_cast<controls::Action>(a);
+                const int button = settings.controls.button(action, layout);
+                const std::string pad = button >= 0 ? controls::buttonName(button, layout) : "STICK";
+                const bool waiting = rebinding == action;
+                items.push_back({FIRST_ACTION + static_cast<int>(a), controls::actionLabel(action), waiting ? "PRESS A KEY" : settings.controls.keysName(action),
+                                 false, waiting ? "OR BUTTON" : pad});
+            }
+            items.push_back({RESET_CONTROLS, "RESET ALL", " ", false});
             items.push_back({BACK, "BACK", " ", false});
             break;
         }
@@ -130,6 +148,13 @@ void Game::onMenuChoice(MenuChoice choice)
             break;
         case ERASE_NO: back(); break;
         case OPTIONS: openScreen(Screen::Options); break;
+        case CONTROLS: openScreen(Screen::Controls); break;
+        case RESET_CONTROLS:
+            settings.controls = {};
+            input.setBindings(settings.controls);
+            saveSettings();
+            refreshMenu();
+            break;
         case QUIT: window->close(); break;
         case RESUME: openScreen(Screen::Playing); break;
         case MAP: openMap(); break;
@@ -153,7 +178,10 @@ void Game::onMenuChoice(MenuChoice choice)
             changeSetting(choice.id, choice.direction == 0 ? 1 : choice.direction);
             break;
         default:
-            if (choice.id >= FIRST_SLOT) {
+            if (choice.id >= FIRST_ACTION) {
+                rebinding = static_cast<controls::Action>(choice.id - FIRST_ACTION);
+                refreshMenu();
+            } else if (choice.id >= FIRST_SLOT) {
                 const int chosen = choice.id - FIRST_SLOT;
                 if (!erasing) {
                     startGame(chosen);
@@ -170,6 +198,7 @@ void Game::back()
 {
     switch (screen) {
         case Screen::Options: openScreen(returnScreen); break;
+        case Screen::Controls: openScreen(Screen::Options); break;
         case Screen::Slots: openScreen(Screen::Title); break;
         case Screen::ConfirmErase: openScreen(Screen::Slots); break;
         case Screen::Paused: openScreen(Screen::Playing); break;
@@ -218,6 +247,24 @@ void Game::changeSetting(int id, int direction)
     refreshMenu();
 }
 
+void Game::rebind(const InputManager::Press& press)
+{
+    const controls::Action action = *rebinding;
+    // Escape or Start: never mind. The stick and d-pad stay the directions.
+    if (press.key != sf::Keyboard::Unknown && press.key != sf::Keyboard::Escape) {
+        if (!settings.controls.bindKey(action, press.key)) return; // Enter: works the menus, try another
+    } else if (press.button >= 0) {
+        settings.controls.bindButton(action, press.button, input.padLayout());
+    } else if (press.key != sf::Keyboard::Escape) {
+        return;
+    }
+    rebinding.reset();
+    input.setBindings(settings.controls);
+    saveSettings();
+    refreshMenu();
+    audio.play(Audio::Sfx::MenuPick);
+}
+
 void Game::applyWindowSettings()
 {
     const Settings& s = settings;
@@ -249,7 +296,8 @@ bool Game::inGame() const
         case Screen::Complete:
         case Screen::Map:
         case Screen::Talking: return true;
-        case Screen::Options: return returnScreen == Screen::Paused;
+        case Screen::Options:
+        case Screen::Controls: return returnScreen == Screen::Paused;
         case Screen::Title:
         case Screen::Slots:
         case Screen::ConfirmErase: return false;
@@ -286,6 +334,7 @@ void Game::saveProgress()
 
 void Game::drawMenuScreen()
 {
+    const auto chooseHint = [this] { return std::string(input.usingPad() ? "STICK" : "ARROWS / MOUSE") + " - CHOOSE"; };
     switch (screen) {
         case Screen::Title: {
             hud::dim(canvas, 110);
@@ -297,13 +346,13 @@ void Game::drawMenuScreen()
             player->drawFigure(canvas, skinIndex(), {std::round(feet.x), std::round(feet.y)}, std::cos(clockTime * 1.7f) < 0.f, clockTime);
             hud::drawCentred(canvas, hud::upper(TITLE), HALF_W, 46.f, hud::GOLD, 4.f);
             hud::drawCentred(canvas, "SWING. CLIMB. DON'T LOOK DOWN.", HALF_W, 72.f, hud::GREY);
-            hud::drawCentred(canvas, "ARROWS / MOUSE - CHOOSE    ENTER - OK", HALF_W, 168.f, hud::GREY);
+            hud::drawCentred(canvas, chooseHint() + "    " + hint(controls::Action::Confirm) + " - OK", HALF_W, 168.f, hud::GREY);
             break;
         }
         case Screen::Slots:
             hud::dim(canvas, 170);
             hud::drawCentred(canvas, erasing ? "ERASE WHICH?" : "CHOOSE A SLOT", HALF_W, 24.f, erasing ? hud::RED : hud::GOLD, 2.f);
-            hud::drawCentred(canvas, "ARROWS / MOUSE - CHOOSE    ENTER - OK    ESC - BACK", HALF_W, 168.f, hud::GREY);
+            hud::drawCentred(canvas, chooseHint() + "    " + hint(controls::Action::Confirm) + " - OK    " + hint(controls::Action::Back) + " - BACK", HALF_W, 168.f, hud::GREY);
             break;
         case Screen::ConfirmErase:
             hud::dim(canvas, 190);
@@ -312,9 +361,21 @@ void Game::drawMenuScreen()
             break;
         case Screen::Options:
             hud::dim(canvas, 170);
-            hud::drawCentred(canvas, "OPTIONS", HALF_W, 24.f, hud::GOLD, 2.f);
+            hud::drawCentred(canvas, "OPTIONS", HALF_W, 20.f, hud::GOLD, 2.f);
             player->drawPreview(canvas, {HALF_W, 158.f}, 2.f, clockTime);
-            hud::drawCentred(canvas, "LEFT / RIGHT - CHANGE    ESC - BACK", HALF_W, 168.f, hud::GREY);
+            hud::drawCentred(canvas, std::string(input.usingPad() ? "STICK" : "LEFT / RIGHT") + " - CHANGE    " + hint(controls::Action::Back) + " - BACK", HALF_W, 168.f, hud::GREY);
+            break;
+        case Screen::Controls:
+            hud::dim(canvas, 170);
+            hud::drawCentred(canvas, "CONTROLS", HALF_W, 14.f, hud::GOLD, 2.f);
+            {
+                const float right = Menu::RIGHT - Menu::EXTRA_WIDTH * 0.5f;
+                hud::drawText(canvas, "KEYS", {right - hud::textWidth("KEYS"), menu.top - 12.f}, hud::GREY);
+                hud::drawText(canvas, "PAD", {right + 12.f, menu.top - 12.f}, hud::GREY);
+            }
+            hud::drawCentred(canvas, rebinding ? "PRESS THE NEW ONE    ESC - KEEP THE OLD ONE"
+                                               : hint(controls::Action::Confirm) + " - CHANGE    " + hint(controls::Action::Back) + " - BACK",
+                             HALF_W, 168.f, hud::GREY);
             break;
         case Screen::Paused:
             hud::dim(canvas, 140);

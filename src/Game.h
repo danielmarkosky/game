@@ -38,9 +38,10 @@ public:
     Game(std::vector<LevelInfo> levels, Options options);
     void run();
 
-    // Driving the game without a window: keys, time passing (with `held` as the player's input
-    // the whole while), and pictures of what it looks like.
+    // Driving the game without a window: keys and gamepad buttons pressed and let go, time
+    // passing (with `held` as the player's input the whole while), and pictures of what it looks like.
     void pressKey(sf::Keyboard::Key key);
+    void pressButton(int button);
     void advance(float seconds, const PlayerInput& held = {});
     sf::Image screenshot();
     // What tests look at.
@@ -51,7 +52,7 @@ public:
     sf::Vector2f playerPosition() const;
 
 private:
-    enum class Screen { Title, Slots, ConfirmErase, Options, Playing, Paused, Complete, Map, Talking };
+    enum class Screen { Title, Slots, ConfirmErase, Options, Controls, Playing, Paused, Complete, Map, Talking };
 
     // Moving from one room into the next: the camera pans across from the old one.
     struct Transition
@@ -123,7 +124,11 @@ private:
     void openMap(bool travel = false);
     std::string songNow() const; // what should be playing
     MapScreen::Marks mapMarks() const; // what to show on it
-    void handleKey(sf::Keyboard::Key key);
+    void handlePress(const InputManager::Press& press);
+    // Controls: choosing an action in the menu waits for its new key or button, the next press.
+    void rebind(const InputManager::Press& press);
+    // What to press for an action, on the keyboard or the gamepad, whichever was used last: "W", "A".
+    std::string hint(controls::Action action) const;
 
     sf::FloatRect pauseButton() const;
     void step(float dt);
@@ -146,8 +151,10 @@ private:
     void drawAir(sf::Vector2f cam);   // what's in front: near motes, the dark and the lights
     void drawTransition();
     void drawBackground(const Theme& theme, float scrollX);
+    // Where a rope shot now would go (in the world): at the mouse, or along the stick.
+    sf::Vector2f aimPoint() const;
     void drawAim();
-    void drawCrosshair(sf::Color color);
+    void drawCrosshair(sf::Vector2f at, sf::Color color); // at a screen position
     void drawHud();
     void drawMenuScreen();
 
@@ -174,6 +181,7 @@ private:
 
     Screen screen = Screen::Title;
     Screen returnScreen = Screen::Title; // where Back goes from the options
+    std::optional<controls::Action> rebinding; // in the controls, waiting for this one's new key
     Menu menu;
     sf::Vector2f lastMouse;
 

@@ -22,6 +22,14 @@ namespace
         return in;
     }
 
+    // Where the tests leave pictures to look at: build/screenshots.
+    std::string pictures(const std::string& file)
+    {
+        const auto folder = std::filesystem::path(config::assetPath("..")) / "build" / "screenshots";
+        std::filesystem::create_directories(folder);
+        return (folder / file).string();
+    }
+
     std::vector<LevelInfo>& world()
     {
         static std::vector<LevelInfo> rooms = loadWorld(config::assetPath("world.ldtk"));
@@ -102,15 +110,13 @@ TEST(GameFlow, TalkingToWren) {
 TEST(GameFlow, EveryThemeDraws) {
     // A picture of the first room of each theme: never all one colour. Kept in the build folder,
     // to look at.
-    const auto pictures = std::filesystem::path(config::assetPath("..")) / "build" / "screenshots";
-    std::filesystem::create_directories(pictures);
     std::set<std::string> done;
     for (size_t room = 0; room < world().size(); ++room) {
         if (!done.insert(world()[room].theme).second) continue;
         Game game(world(), {.testing = true, .startRoom = room, .headless = true, .saveFolder = freshSaves("game_flow_pictures")});
         game.advance(1.f);
         const sf::Image picture = game.screenshot();
-        picture.saveToFile((pictures / (world()[room].theme + ".png")).string());
+        picture.saveToFile(pictures(world()[room].theme + ".png"));
         std::set<sf::Uint32> colours;
         for (unsigned y = 0; y < picture.getSize().y; y += 7) {
             for (unsigned x = 0; x < picture.getSize().x; x += 7) colours.insert(picture.getPixel(x, y).toInteger());
@@ -139,4 +145,49 @@ TEST(GameFlow, GettingOutIsTheEnd) {
     game.advance(2.f, walking(1.f));
     EXPECT_EQ(game.screenName(), "complete");
     std::filesystem::remove(path);
+}
+
+TEST(GameFlow, ChangingAKeyInTheControls) {
+    const std::string saves = freshSaves("game_flow_controls");
+    Game game(world(), {.headless = true, .saveFolder = saves});
+    game.pressKey(sf::Keyboard::Down);
+    game.pressKey(sf::Keyboard::Enter); // OPTIONS
+    for (int ii = 0; ii < 7; ++ii) game.pressKey(sf::Keyboard::Down);
+    game.pressKey(sf::Keyboard::Enter); // CONTROLS
+    ASSERT_EQ(game.screenName(), "controls");
+    for (int ii = 0; ii < 4; ++ii) game.pressKey(sf::Keyboard::Down);
+    game.pressKey(sf::Keyboard::Enter); // JUMP: waiting for a key
+    game.pressKey(sf::Keyboard::Enter); // ...not that one, it works the menus
+    game.pressKey(sf::Keyboard::C);
+    game.screenshot().saveToFile(pictures("controls.png"));
+
+    std::ifstream file(saves + "/settings.txt");
+    const std::string text((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
+    EXPECT_NE(text.find("key jump C"), std::string::npos);
+    // And Escape while waiting keeps the old key.
+    game.pressKey(sf::Keyboard::Enter);
+    game.pressKey(sf::Keyboard::Escape);
+    EXPECT_EQ(game.screenName(), "controls");
+    game.pressKey(sf::Keyboard::Escape);
+    EXPECT_EQ(game.screenName(), "options");
+}
+
+TEST(GameFlow, AGamepadWorksTheMenusAndThePause) {
+    Game game(world(), {.headless = true, .saveFolder = freshSaves("game_flow_pad")});
+    game.pressButton(0); // A: PLAY
+    EXPECT_EQ(game.screenName(), "slots");
+    game.pressButton(1); // B: back
+    EXPECT_EQ(game.screenName(), "title");
+    game.pressButton(0);
+    game.pressButton(0); // slot 1
+    ASSERT_EQ(game.screenName(), "playing");
+    game.pressButton(7); // Start
+    EXPECT_EQ(game.screenName(), "paused");
+    game.screenshot().saveToFile(pictures("paused_pad.png"));
+    game.pressButton(7);
+    EXPECT_EQ(game.screenName(), "playing");
+    game.pressButton(3); // Y: the map
+    EXPECT_EQ(game.screenName(), "map");
+    game.pressButton(1);
+    EXPECT_EQ(game.screenName(), "playing");
 }

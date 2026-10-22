@@ -21,12 +21,19 @@ namespace
         return buffer.str();
     }
 
+    // Into a file next to it first, then swapped in whole: stopping halfway through (a crash, the
+    // power going) leaves the old file as it was, never half of the new one.
     void write(const std::string& path, const std::string& text)
     {
         std::error_code error;
         std::filesystem::create_directories(std::filesystem::path(path).parent_path(), error);
-        std::ofstream file(path);
-        if (file) file << text;
+        const std::string temporary = path + ".new";
+        {
+            std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
+            if (!file || !(file << text) || !file.flush()) return;
+        }
+        std::filesystem::rename(temporary, path, error);
+        if (error) std::filesystem::remove(temporary, error);
     }
 
     // Calls `line` with the first word of every line and a stream of the rest.
@@ -59,6 +66,24 @@ Settings Settings::parse(const std::string& text)
         } else if (key == "music_volume" || key == "sound_volume") {
             int level;
             if (words >> level && level >= 0 && level <= 10) (key == "music_volume" ? s.musicVolume : s.soundVolume) = level;
+        } else if (key == "key" || key == "button") {
+            // "key jump SPACE", "key left A LEFT", "button rope 2".
+            std::string id;
+            words >> id;
+            for (size_t a = 0; a < controls::BINDABLE; ++a) {
+                const auto action = static_cast<controls::Action>(a);
+                if (controls::actionId(action) != id) continue;
+                if (key == "button") {
+                    int button;
+                    if (words >> button && button >= 0 && button < 32) s.controls.buttons[a] = button;
+                    return;
+                }
+                std::string first, second;
+                words >> first >> second;
+                const sf::Keyboard::Key one = controls::keyNamed(first), two = controls::keyNamed(second);
+                if (one == sf::Keyboard::Unknown || controls::reserved(one) || (two != sf::Keyboard::Unknown && controls::reserved(two))) return;
+                s.controls.keys[a] = {one, two};
+            }
         } else if (key == "last_slot") {
             int slot;
             if (words >> slot && slot >= 0 && slot < SaveFiles::SLOTS) s.lastSlot = slot;
@@ -78,6 +103,18 @@ std::string Settings::serialize() const
     out << "last_slot " << lastSlot << "\n";
     out << "music_volume " << musicVolume << "\n";
     out << "sound_volume " << soundVolume << "\n";
+    // Only what was changed, so new defaults reach everyone else.
+    const controls::Bindings defaults;
+    for (size_t a = 0; a < controls::BINDABLE; ++a) {
+        const std::string id = controls::actionId(static_cast<controls::Action>(a));
+        const auto& keys = controls.keys[a];
+        if (keys != defaults.keys[a]) {
+            out << "key " << id << " " << controls::keyName(keys[0]);
+            if (keys[1] != sf::Keyboard::Unknown) out << " " << controls::keyName(keys[1]);
+            out << "\n";
+        }
+        if (controls.buttons[a] != controls::Bindings::PAD_DEFAULT) out << "button " << id << " " << controls.buttons[a] << "\n";
+    }
     return out.str();
 }
 

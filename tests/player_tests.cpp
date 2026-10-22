@@ -575,3 +575,37 @@ TEST(PlayerTest, DoubleJumpOnceUntilLanding) {
     EXPECT_TRUE(player.isGrounded());
     EXPECT_TRUE(player.hasAirJump());
 }
+
+TEST(PlayerTest, AStickAimsAtTheHookNearestWhereItPoints) {
+    // A hook block up and to the right, steeper than the stick points.
+    auto level = Level::loadFromString(
+        "########################################\n"
+        "#......................................#\n"
+        "#......................................#\n"
+        "#........%.............................#\n"
+        "#......................................#\n"
+        "#......................................#\n"
+        "#......................................#\n"
+        "#......................................#\n"
+        "#......................................#\n"
+        "#......................................#\n"
+        "#....S.................................#\n"
+        "########################################\n");
+    Player player(level);
+    player.setCanHookRock(false);
+    player.respawn({40.f, 8.f});
+
+    // Straight up and to the right there's nothing; a little steeper there's the block.
+    const sf::Vector2f up = player.centre() + sf::Vector2f(1.f, 1.f) * (Player::ROPE_RANGE / std::sqrt(2.f));
+    EXPECT_FALSE(player.ropeTarget(up));
+    const auto hit = player.ropeTarget(player.aimAlong({1.f, 1.f}));
+    ASSERT_TRUE(hit);
+    EXPECT_NEAR(hit->x, 76.f, 4.f);
+    EXPECT_NEAR(hit->y, 64.f, 1.f);
+
+    // To the left there's only rock: straight that way, as far as the rope goes.
+    const sf::Vector2f left = player.aimAlong({-1.f, 0.f});
+    EXPECT_FALSE(player.ropeTarget(left));
+    EXPECT_NEAR(left.x, player.centre().x - Player::ROPE_RANGE, 0.01f);
+    EXPECT_NEAR(left.y, player.centre().y, 0.01f);
+}

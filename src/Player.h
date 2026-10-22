@@ -75,6 +75,11 @@ public:
     const Rope* getRope() const;
     // Where a rope shot towards `aim` would attach, if anywhere.
     std::optional<sf::Vector2f> ropeTarget(sf::Vector2f aim) const;
+    // Where to aim to shoot the rope in `direction` (y up), with a gamepad's stick: at whatever
+    // it would stick to nearest that direction, within AIM_ASSIST either side, since a stick can't
+    // point as exactly as a mouse. If there's nothing, straight that way.
+    sf::Vector2f aimAlong(sf::Vector2f direction) const;
+    bool isFacingLeft() const;
     // Without the climbing pick the rope only sticks to hook blocks ('%'); a shot at rock misses.
     void setCanHookRock(bool can);
     // How far the rope reaches: ROPE_RANGE, or LONG_ROPE_RANGE with the long rope.
@@ -115,6 +120,7 @@ public:
     static constexpr float SWING_ACCELERATION = 300.f;
     static constexpr float MAX_SWING_SPEED = 320.f;
     static constexpr float REEL_SPEED = 70.f;
+    static constexpr float AIM_ASSIST = 0.4f; // radians, about 23 degrees
     static constexpr float ROPE_JUMP_SPEED = JUMP_SPEED; // jumping off the rope is a full jump
     static constexpr float ROPE_JUMP_GRACE = 0.1f;       // ...even just after letting go of it
     // After leaving the rope it can't be shot again for a moment. After a rope jump that's as long

@@ -7,10 +7,6 @@
 namespace
 {
     constexpr float HALF_W = config::GAME_WIDTH * 0.5f;
-    // Columns used when items have values: labels start at LEFT, values end at RIGHT.
-    constexpr float LEFT = 60.f;
-    constexpr float RIGHT = 260.f;
-
     const sf::Color NORMAL(235, 235, 245);
     const sf::Color SELECTED(255, 210, 60);
     const sf::Color DIM(150, 150, 170);
@@ -35,35 +31,22 @@ size_t Menu::selected() const
     return current;
 }
 
-std::optional<MenuChoice> Menu::handleKey(sf::Keyboard::Key key)
+std::optional<MenuChoice> Menu::handle(controls::Actions actions)
 {
     if (items.empty()) return std::nullopt;
-    using K = sf::Keyboard;
-    switch (key) {
-        case K::Up:
-        case K::W:
-            current = (current + items.size() - 1) % items.size();
-            keepSelectionVisible();
-            return std::nullopt;
-        case K::Down:
-        case K::S:
-            current = (current + 1) % items.size();
-            keepSelectionVisible();
-            return std::nullopt;
-        case K::Left:
-        case K::A:
-            if (items[current].adjustable) return MenuChoice{items[current].id, -1};
-            return std::nullopt;
-        case K::Right:
-        case K::D:
-            if (items[current].adjustable) return MenuChoice{items[current].id, 1};
-            return std::nullopt;
-        case K::Enter:
-        case K::Space:
-            return MenuChoice{items[current].id, 0};
-        default:
-            return std::nullopt;
+    using controls::Action;
+    const auto has = [&](Action action) { return actions[controls::index(action)]; };
+    if (has(Action::Up) || has(Action::Down)) {
+        current = (current + (has(Action::Up) ? items.size() - 1 : 1)) % items.size();
+        keepSelectionVisible();
+        return std::nullopt;
     }
+    if (has(Action::Left) || has(Action::Right)) {
+        if (items[current].adjustable) return MenuChoice{items[current].id, has(Action::Left) ? -1 : 1};
+        return std::nullopt;
+    }
+    if (has(Action::Confirm) || has(Action::Jump)) return MenuChoice{items[current].id, 0};
+    return std::nullopt;
 }
 
 std::optional<MenuChoice> Menu::handleMouse(sf::Vector2f mouse, bool moved, bool clicked)
@@ -80,6 +63,7 @@ std::optional<MenuChoice> Menu::handleMouse(sf::Vector2f mouse, bool moved, bool
 void Menu::draw(sf::RenderTarget& target, float time) const
 {
     const bool columns = hasValues();
+    const float left = LEFT - shift(), right = RIGHT - shift();
     for (size_t row = 0; row < visibleCount(); ++row) {
         const size_t index = scroll + row;
         const MenuItem& item = items[index];
@@ -92,8 +76,9 @@ void Menu::draw(sf::RenderTarget& target, float time) const
 
         float labelX;
         if (columns) {
-            labelX = LEFT;
-            hud::drawText(target, value, {RIGHT - hud::textWidth(value), y}, isSelected ? SELECTED : DIM);
+            labelX = left;
+            hud::drawText(target, value, {right - hud::textWidth(value), y}, isSelected ? SELECTED : DIM);
+            if (!item.extra.empty()) hud::drawText(target, item.extra, {right + 12.f, y}, isSelected ? SELECTED : DIM);
         } else {
             labelX = std::floor(HALF_W - hud::textWidth(item.label) * 0.5f);
         }
@@ -107,9 +92,15 @@ void Menu::draw(sf::RenderTarget& target, float time) const
     }
 
     // Hints that the list goes on.
-    const float hintX = columns ? (LEFT + RIGHT) * 0.5f : HALF_W;
+    const float hintX = columns ? (left + right) * 0.5f : HALF_W;
     if (scroll > 0) hud::drawCentred(target, "...", hintX, top - lineHeight + 3.f, DIM);
     if (scroll + visibleCount() < items.size()) hud::drawCentred(target, "...", hintX, top + visibleCount() * lineHeight - 3.f, DIM);
+}
+
+float Menu::shift() const
+{
+    const bool extras = std::any_of(items.begin(), items.end(), [](const MenuItem& item) { return !item.extra.empty(); });
+    return extras ? EXTRA_WIDTH * 0.5f : 0.f;
 }
 
 bool Menu::hasValues() const
@@ -125,7 +116,7 @@ size_t Menu::visibleCount() const
 sf::FloatRect Menu::rowRect(size_t row) const
 {
     const float y = top + row * lineHeight - (lineHeight - hud::GLYPH_HEIGHT) * 0.5f;
-    if (hasValues()) return {LEFT - 10.f, y, RIGHT - LEFT + 20.f, lineHeight};
+    if (hasValues()) return {LEFT - shift() - 10.f, y, RIGHT - LEFT + 20.f + (shift() > 0.f ? EXTRA_WIDTH : 0.f), lineHeight};
 
     float widest = 0.f;
     for (const auto& item : items) widest = std::max(widest, hud::textWidth(item.label));
