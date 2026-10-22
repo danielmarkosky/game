@@ -27,7 +27,7 @@ air_jump_speed 195          # the updraft feather's jump
 # be thrown again once it's back in your hand, so the wait is however far it has to come.
 rope_range 64               # how far a throw from the ground reaches, from your middle
 long_rope_range 104         # with the long rope
-air_throw_range 0.75        # a throw in the air reaches this much as far: nothing to push off
+air_throw_range 0.85        # a throw in the air reaches this much as far: nothing to push off
 throw_windup 0.3            # swinging it round before throwing, until you can throw in the air
 throw_speed 320             # flying out: 64 px takes 0.2 s
 rope_return_speed 120       # coming back, slower: 64 px of rope takes 0.53 s, 104 px 0.87 s

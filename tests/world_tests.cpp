@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include "src/Level.h"
+#include "src/Player.h"
 #include <cmath>
 #include <optional>
 #include <set>
@@ -214,6 +215,55 @@ TEST(World, TheLDtkProjectDefinesEveryTileTheRoomsUse) {
             for (const auto& value : layer["intGridCsv"]) {
                 if (value.get<int>() != 0) EXPECT_TRUE(defined.count(value.get<int>())) << level["identifier"] << " uses tile " << value;
             }
+        }
+    }
+}
+
+TEST(World, TheGameStartsInTheCrevasseAndAshsRopeIsFoundThere) {
+    const std::vector<LevelInfo> rooms = loadWorld(config::assetPath("world.ldtk"));
+    ASSERT_FALSE(rooms.empty());
+    EXPECT_EQ(rooms.front().name, "crevasse_wake");
+    // The rope's the first thing to find, and found only once, before the way out of the crevasse.
+    std::vector<std::string> where;
+    for (const LevelInfo& room : rooms) {
+        for (const Pickup& pickup : room.level->pickups()) {
+            if (pickup.ability == "rope") where.push_back(room.name);
+        }
+    }
+    EXPECT_EQ(where, std::vector<std::string>{"crevasse_camp"});
+}
+
+TEST(World, GoingUpThroughAFloorLandsOnSomething) {
+    // Coming up into a room through a gap in its floor gives the lift of a jump (see
+    // Player::enterLevel), and no more: there has to be something to land on within reach of it, or
+    // you'd drop straight back down. Not for the Drop (down only), nor gaps under a gate.
+    for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
+        if (room.name == "the_drop") continue;
+        const Level& level = *room.level;
+        const sf::FloatRect b = level.bounds();
+        const int left = int(b.left / Level::TILE_SIZE), bottom = int(b.top / Level::TILE_SIZE);
+        const int width = int(b.width / Level::TILE_SIZE);
+        for (int x = left; x < left + width; ++x) {
+            if (level.isSolid(x, bottom) || level.isSolid(x - 1, bottom) == false) continue; // a gap's first column
+            int end = x;
+            while (end < left + width && !level.isSolid(end, bottom)) ++end;
+            bool gated = false;
+            for (int gx = x; gx < end; ++gx) {
+                for (int gy = bottom; gy < bottom + 6; ++gy) gated |= level.tileAt(gx, gy) == 6;
+            }
+            if (gated) continue;
+            Player player(room.level);
+            const float middle = (x + end) * 0.5f * Level::TILE_SIZE;
+            player.respawn({middle - Player::WIDTH * 0.5f, b.top - Player::HEIGHT * 0.5f});
+            player.enterLevel(room.level, {}, true);
+            bool landed = false;
+            for (int i = 0; i < static_cast<int>(2.f / config::FIXED_DT) && !landed; ++i) {
+                player.update(config::FIXED_DT);
+                landed = player.isGrounded() && player.getPosition().y >= b.top;
+                if (player.getPosition().y < b.top - 16.f) break;
+            }
+            EXPECT_TRUE(landed) << room.name << ": nothing to land on above the gap at column " << x - left;
+            x = end;
         }
     }
 }

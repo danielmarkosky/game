@@ -21,7 +21,7 @@ Pip: The garden's east. The long rope should be at the far end of it. The ruins 
 ? Thanks, Pip.                 -> end
 = ruins
 Pip: Nobody knows who built them. Moss lives at the bottom, in the Archive, with all the old books.
-Pip: She keeps something there that she says belongs to the wind. Whatever that means.
+Pip: She keeps something there for anyone who comes looking for Ash. She wouldn't tell me what.
 
 --- long_rope
 Pip: You found the long rope! Then the Tall Hall is yours.

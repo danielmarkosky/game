@@ -53,7 +53,7 @@ namespace
         constexpr int ITEM_SIZE = 10;
         constexpr int GEM = 1;
         // The frame of each ability's pickup.
-        const std::pair<const char*, int> ITEMS[] = {{"climbing_pick", 0}, {"long_rope", 2}, {"double_jump", 5}};
+        const std::pair<const char*, int> ITEMS[] = {{"rope", 0}, {"long_rope", 2}, {"double_jump", 5}, {"wall_climb", 6}, {"air_throw", 7}};
         constexpr int LEVER_UP = 3, LEVER_DOWN = 4;
     }
 
@@ -199,7 +199,7 @@ std::shared_ptr<Level> Level::fromRows(const std::vector<std::string>& rows)
                 case 'S': level->setStart({x, y}); break;
                 case 'C': level->addCheckpoint({x, y}); break;
                 case 'G': level->setGoal({x, y}); break;
-                case 'P': level->addPickup("climbing_pick", {x, y}); break;
+                case 'P': level->addPickup("rope", {x, y}); break;
                 case '*': level->addGem({x, y}); break;
                 case 'N': level->addNpc("", "", {x, y}); break; // says nothing: the fields come from LDtk
                 case 'B': level->addBench({x, y}); break;

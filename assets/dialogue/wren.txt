@@ -1,36 +1,28 @@
-# Wren, an old climber who lives at the bottom of The Cave, by where you start.
+# Wren, an old climber who lives in The Cave, by the bench at the top of the crevasse. You come up
+# out of it with Ash's rope, found in her old camp at the bottom.
 
---- !climbing_pick
-Wren: Oh! A climber, down here? Nobody falls in here on purpose.
-Wren: What brings you this far down?
-? I'm looking for my sister.     -> sister
-? I fell. I just want out.       -> out
+---
+Wren: Well, well! Somebody came up out of the crevasse. Nobody comes up out of the crevasse.
+Wren: Let's have a look at that rope. ...Green thread woven through it. I know this rope.
+? It's my sister's. Ash.                     -> sister
+? I found it in an old camp down there.      -> found
 = sister
-You: Her name's Ash. Green scarf, long rope, never listens to anyone.
-Wren: Ash... A girl like that came through here. Three winters ago, maybe four.
-Wren: She asked me the way up and didn't wait for the answer.
+You: Her name's Ash. She came this way three winters ago and never came back.
+Wren: Ash. Green scarf, never listened to anyone. She camped down there for days, learning that rope.
+Wren: Then she left it behind and went up. Said she'd find a better one higher up.
 set told_wren
 -> rope
-= out
-Wren: Ha! That's what they all say. Out is up, I'm afraid. Always up.
+= found
+Wren: That was her camp. A girl with a green scarf, three winters back. She left it all down there and went up.
 -> rope
 = rope
-Wren: That rope of yours only bites metal, you know. See the blocks with the yellow mark? Aim at one, shoot, and hold on.
-Wren: Bare rock is another story. You'd need a climbing pick for that.
-Wren: I lost mine down the corridor, years ago. If you find it, it's yours.
-
---- !climbing_pick
-Wren: Still here? The corridor's that way. My pick's out there somewhere, past the second flag.
-
---- climbing_pick told_wren
-Wren: You found my old pick! Good. Your sister would have liked it.
-Wren: Up past the well there's a crossroads. A mapmaker camps there, Pip. Pip sees everyone who passes.
+Wren: You throw it like you've never held one. Plant your feet, swing it round, let it fly.
+Wren: It bites rock and metal both. Not the slick stone, though. The wind polishes that like glass.
+Wren: Sit on the bench a while, if you like. Then along the corridor, and up the well.
 Wren: And keep your eyes up. There's something shiny stuck in the ceiling, just along from here.
 
---- climbing_pick !told_wren
-Wren: Is that my old pick? Well, look at you!
-Wren: With that, your rope sticks to rock, not just metal. You can swing from anything now.
-Wren: And keep your eyes up. There's something shiny stuck in the ceiling, just along from here.
+--- told_wren
+Wren: Up the well, climber. If anyone can find her, it's someone holding her rope.
 
---- climbing_pick
-Wren: Up and out, climber. And don't look down.
+---
+Wren: Up and out. And don't look down.

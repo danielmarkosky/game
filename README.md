@@ -69,19 +69,18 @@ The buttons can be changed in CONTROLS too. The pad that was pressed last is the
   sooner than a long miss. Where you fly after letting go is down to how you swung and
   when you let go. It wraps around corners, so swinging past an edge pivots you around it. The
   crosshair shows a white dot where it'll stick, and a dim red one where it would bounce off.
-  Nothing sticks to slick, wind-polished stone.
-- At first it's only thrown standing (or holding on to a wall), swung round over your head first,
-  reaches 64 px, and only sticks to the metal hook blocks.
+  It bites rock and the metal hook blocks; nothing sticks to slick, wind-polished stone.
+- **Ash's rope**, found at the bottom of the crevasse: at first it's only thrown standing (or
+  holding on to a wall), swung round over your head first, and reaches 64 px.
 - **The long rope**: it reaches 104 px.
-- **The climbing pick**: the rope sticks to rock too.
-- **The chalk bag**: push into a wall in the air to grab it, climb up and down, leap off it. Your
-  grip lasts a few seconds (the bar over your head), and comes back on the ground. Not slick stone.
-- **The throwing hand**: the rope can be thrown in the air too, straight away, but reaches less far
-  there (three quarters): there's nothing to push off.
-- **The updraft feather**: one more jump in the air, until you land or catch the rope.
+- **Ash's chalk bag**, on the top shelf of the Archive: push into a wall in the air to grab it,
+  climb up and down, leap off it. Your grip lasts a few seconds (the bar over your head), and comes
+  back on the ground. Not slick stone.
+- **The throwing glove**, up a chimney at The Summit: the rope can be thrown in the air too, straight
+  away, reaching a little less far there (85%): there's nothing to push off.
+- **The updraft feather**, in Backtrack: one more jump in the air, until you land or catch the rope.
 
-The numbers are all in [assets/physics.txt](assets/physics.txt). An ability no room gives yet is
-yours from the start, so the world can be built up an ability at a time.
+The numbers are all in [assets/physics.txt](assets/physics.txt).
 
 ## The world
 
@@ -89,20 +88,30 @@ Rooms join up like in Celeste: walk out through a gap in a room's wall (or drop 
 floor) and the camera pans over into the room on the other side. You can always go back the way you
 came, except down the Drop.
 
-You start at the bottom of The Cave, find the pick, and climb The Well to the Crossroads, a hub.
-West are the ruins: the Sunken Gate, Mushroom Hollow and the Archive, where the feather is. East is
-the Hook Garden and Curtains, a dead end where the long rope lies. Up is the Tall Hall, whose crystal
-walls give nothing to hold on to, its one hook too high for a short rope. Beyond it are the
-mountains: The Summit (where a lever opens the Drop, a shortcut straight back down to the
-Crossroads), Stepping Stones, The Chimney, Pendulums and Backtrack. Then the Windy Ledge, slick stone
-over a long fall that only the feather gets you across, and Daylight, whose way out at the top is
-the end of the game.
+You come to at the bottom of The Crevasse, where you fell, with nothing. Its six small rooms teach
+walking and jumping, then hold an old camp, three winters cold, and in it a rope with a green thread
+woven through it: Ash's. Its first swings are over safe pits, the last one over a spiked chasm, and
+up beyond it is The Cave, where Wren sits by a bench, and The Well, climbed shelf by shelf to the
+Crossroads, the hub.
+
+West, the ruins climb through the Sunken Gate and Mushroom Hollow to the Archive, where Moss keeps
+Ash's chalk bag on the top shelf. East, the Hook Garden leads to Curtains, where the long rope lies
+down a slick-walled hollow you only get out of with it. Up from the Crossroads is the Tall Hall:
+crystal-smooth walls and ledges, every hook a tile beyond a short rope. Above it is The Summit,
+Juniper's camp, with a lever that opens the Drop (straight back down to the Crossroads), a chimney
+to climb wall to wall for the throwing glove, and a cliff whose hook you can only catch from the top
+of a jump. Beyond are Stepping Stones, The Chimney, Pendulums, Backtrack and the updraft feather,
+the Windy Ledge, all slick stone, whose gaps only the feather gets you across, and Daylight, where
+Ash is, and the way out at the top.
+
+Every room was rebuilt for the slower physics and the thrown rope: small, one idea each, and checked
+by the level bot with exactly the abilities you'd have when you get there.
 
 Each part of the world has its own look and its own music: the cave, the garden, the ruins, the
 snowy mountains, the ember chimney and the daylight. Coming into a room, the first place you land
 is your checkpoint, until you reach a flag.
 
-**People.** Wren by the start of The Cave, Pip the mapmaker in the Crossroads, Moss in the Archive,
+**People.** Wren at the top of the crevasse, by The Cave's bench, Pip the mapmaker in the Crossroads, Moss in the Archive,
 Juniper at The Summit's camp, and at the very top, Ash. A bubble over someone means you're close
 enough to talk. Some conversations let you choose what to say, and what you choose, like what you've
 found, changes what people say later, and how the story ends. Their lines are text files in
@@ -136,9 +145,10 @@ save.
 
 ## Making it
 
-The rooms are made in [LDtk](https://ldtk.io), a free level editor: they're all in
-`assets/world.ldtk`. See [assets/levels/README.md](assets/levels/README.md) to change them or make
-your own, in LDtk or as text.
+The rooms are designed in `tools/make_world.py`, a few lines of Python each, and
+`python3 tools/make_world.py` writes them into `assets/world.ldtk`, the [LDtk](https://ldtk.io)
+project the game loads. See [assets/levels/README.md](assets/levels/README.md) for how rooms work,
+the tiles and the things in them, and how far each move reaches.
 
 For trying rooms out: `./build/Release/game --room tall_hall` starts straight in that room (any
 room's identifier), and `./build/Release/game some_room.txt` plays a single text room. Both skip the
@@ -150,8 +160,8 @@ gravity, the jump, how hard you can push a swing, how far a fling carries) is in
 playing: no compiling. `./build/Release/game assets/levels/playground.txt` is a room for trying it
 out: steps 1 to 4 tiles high, gaps 3 to 7 wide, a pit to swing across, a long flat floor to see how
 far a fling carries, a slick wall to get over and a tall one to climb. A test room starts with every
-ability, and the keys **1 to 6** switch them off and on: the rope, the long rope, the pick, the chalk
-bag, the throwing hand and the feather.
+ability, and the keys **1 to 5** switch them off and on: the rope, the long rope, the chalk bag, the
+throwing hand and the feather.
 
 **Checking the world can be played.** `python3 tools/check_world.py` sends the level bot
 ([tools/levelbot.cpp](tools/levelbot.cpp), built with the game) through every room both ways, through

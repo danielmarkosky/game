@@ -30,7 +30,7 @@ struct Physics
     // comes back too. It can only be thrown again once it's back in your hand.
     float ropeRange = 64.f;          // how far a throw from the ground reaches, from your middle
     float longRopeRange = 104.f;     // with the long rope
-    float airThrowRange = 0.75f;     // a throw in the air reaches this much as far: nothing to push off
+    float airThrowRange = 0.85f;     // a throw in the air reaches this much as far: nothing to push off
     float throwWindup = 0.3f;        // swinging it round before a throw, until you can throw in the air
     float throwSpeed = 320.f;        // how fast it flies out
     float ropeReturnSpeed = 120.f;   // and comes back

@@ -608,12 +608,10 @@ std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 {
     auto hit = nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, reach());
     if (!hit) return hit;
-    // The tile the shot ran into is just past the surface point. Nothing sticks to slick stone;
-    // rock needs the pick, metal doesn't.
+    // The tile the shot ran into is just past the surface point. Nothing sticks to slick stone.
     const sf::Vector2f dir = (aim - exactCentre()) / distance(aim, exactCentre());
     auto [tileX, tileY] = tailNumbers(*hit + dir * 0.25f);
     if (level->isSlick(tileX, tileY)) return std::nullopt;
-    if (!hooksRock && !level->isHookBlock(tileX, tileY)) return std::nullopt;
     return hit;
 }
 
@@ -622,12 +620,14 @@ sf::Vector2f Player::aimAlong(sf::Vector2f direction) const
     const sf::Vector2f from = exactCentre();
     const float straight = std::atan2(direction.y, direction.x);
     const auto along = [&](float angle) { return from + sf::Vector2f(std::cos(angle), std::sin(angle)) * reach(); };
-    // Out from the straight line both ways at once, so the nearest wins.
+    // Out from the straight line both ways at once, so the nearest wins. Not the ground under you,
+    // unless it's pointing down.
     constexpr int STEPS = 16;
     for (int step = 0; step <= STEPS; ++step) {
         for (float side : {1.f, -1.f}) {
             const sf::Vector2f aim = along(straight + side * AIM_ASSIST * float(step) / STEPS);
-            if (ropeTarget(aim)) return aim;
+            const auto hit = ropeTarget(aim);
+            if (hit && (direction.y < 0.f || hit->y >= from.y)) return aim;
         }
     }
     return along(straight);
@@ -662,11 +662,6 @@ void Player::setHasRope(bool has)
 void Player::setCanThrowInAir(bool can)
 {
     throwsInAir = can;
-}
-
-void Player::setCanHookRock(bool can)
-{
-    hooksRock = can;
 }
 
 void Player::setCanClimb(bool can)

@@ -94,6 +94,7 @@ private:
     bool hasFact(const std::string& fact) const; // an ability, or a flag set in a conversation
     void applyAbilities(); // to the player
     void toggleAbility(size_t index); // in a test room: on or off, by its number in the list
+    bool touchesSlick(sf::Vector2f point) const; // a point on a surface of the room: is it slick stone?
     void collect(const Pickup& pickup);
     void showMessage(std::string title, std::string text);
     void showNotice(std::string text); // a small line in the corner for a moment
@@ -169,7 +170,6 @@ private:
     SaveFiles files;
     Settings settings;
     Progress progress;      // of the slot being played
-    std::set<std::string> offered; // the abilities some room gives
     int slot = -1;          // being played, counting from 0; -1 when testing
     bool erasing = false;   // on the slot screen, choosing one to erase
     int slotToErase = -1;
@@ -207,6 +207,7 @@ private:
     sf::Vector2f checkpoint;
     bool needsSpawnPoint = false; // just came into the room: where the player first lands becomes the checkpoint
     std::optional<size_t> sitting; // the bench in this room the player is sitting on
+    bool waking = false;           // a new game: sitting up on the floor until moving
     float clockTime = 0.f;   // never stops, drives animations
     float deathTimer = 0.f;  // > 0 while dead, counting down to the respawn
     float deathFlash = 0.f;

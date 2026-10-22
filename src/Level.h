@@ -12,7 +12,7 @@
 // Something lying in a level that gives the player an ability when touched.
 struct Pickup
 {
-    std::string ability;   // e.g. "climbing_pick"
+    std::string ability;   // e.g. "long_rope"
     sf::Vector2f position; // bottom-left of its tile
 };
 

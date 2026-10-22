@@ -14,7 +14,7 @@ using namespace game_detail;
 
 void Game::renderCanvas()
 {
-    player->setSitting(sitting.has_value());
+    player->setSitting(sitting.has_value() || waking);
     canvas.clear();
     if (!inGame()) {
         drawWorld(titleCamera(), false);
@@ -246,6 +246,10 @@ void Game::drawHud()
         hud::fillRect(canvas, {bubble.left, bubble.top, bubble.width, bubble.height}, sf::Color(14, 14, 22, 220));
         hud::frame(canvas, bubble, hud::withAlpha(hud::WHITE, 160));
         hud::drawText(canvas, key, {bubble.left + 4.f, bubble.top + 2.f}, hud::WHITE);
+    }
+    if (waking && screen == Screen::Playing && titleTimer <= 0.f) {
+        const std::string move = input.usingPad() ? "STICK" : hint(controls::Action::Left) + " / " + hint(controls::Action::Right);
+        hud::drawCentred(canvas, move + " - GET UP", HALF_W, 168.f, hud::withAlpha(hud::GREY, 200));
     }
     if (sitting && screen == Screen::Playing) {
         const std::string getUp = "MOVE - GET UP";

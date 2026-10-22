@@ -33,13 +33,12 @@ namespace
         const char* name;
         const char* text;
     };
-    // In the order they're found, more or less: in a test room, the keys 1 to 6 switch them.
+    // In the order they're found: in a test room, the number keys switch them.
     const AbilityInfo ABILITIES[] = {
-        {"rope", "THE ROPE", "HOLD TO THROW IT, STANDING. KEEP HOLDING TO SWING"},
+        {"rope", "ASH'S ROPE", "HOLD TO THROW IT, STANDING. KEEP HOLDING TO SWING"},
         {"long_rope", "LONG ROPE", "YOUR ROPE REACHES FURTHER"},
-        {"climbing_pick", "CLIMBING PICK", "YOUR ROPE STICKS TO ROCK NOW, NOT JUST METAL"},
-        {"wall_climb", "CHALK BAG", "PUSH INTO A WALL TO GRAB IT. UP CLIMBS, JUMP LEAPS OFF"},
-        {"air_throw", "THROWING HAND", "THROW THE ROPE IN MID-AIR TOO"},
+        {"wall_climb", "ASH'S CHALK BAG", "PUSH INTO A WALL TO GRAB IT. UP CLIMBS, JUMP LEAPS OFF"},
+        {"air_throw", "THROWING GLOVE", "THROW THE ROPE IN MID-AIR TOO"},
         {"double_jump", "UPDRAFT FEATHER", "JUMP AGAIN IN THE AIR"},
     };
 }
@@ -67,9 +66,6 @@ Game::Game(std::vector<LevelInfo> levelList, Options options)
     for (size_t ii = 0; ii < rooms.size(); ++ii) mapRooms.push_back({rooms[ii], levels[ii].position});
     mapScreen = std::make_unique<MapScreen>(std::move(mapRooms));
 
-    for (const auto& room : rooms) {
-        for (const Pickup& pickup : room->pickups()) offered.insert(pickup.ability);
-    }
     applyGates();
     if (testing) {
         for (const AbilityInfo& info : ABILITIES) progress.abilities.insert(info.id);
@@ -94,6 +90,8 @@ void Game::startGame(int which)
     settings.lastSlot = which;
     saveSettings();
     progress = files.loadSlot(which);
+    // From before the rope was found at the bottom of the crevasse: past it, you have it.
+    if (progress.explored.count("level1")) progress.abilities.insert("rope");
     messageTimer = 0.f;
     visited.assign(levels.size(), false);
     applyGates();
@@ -101,6 +99,8 @@ void Game::startGame(int which)
     const auto bench = findBench(progress.bench);
     loadLevel(bench ? bench->first : 0);
     if (bench) sitDown(bench->second);
+    // A new game: you come to on the floor where you fell.
+    waking = progress.isEmpty();
     visited[levelIndex] = true;
     progress.explored.insert(levelKey(levelIndex));
     saveProgress();
@@ -123,6 +123,7 @@ void Game::spawnAtStart()
     checkpoint = level->getStartPos();
     needsSpawnPoint = false;
     sitting.reset();
+    waking = false;
     player->respawn(checkpoint);
     particles.clear();
     transition.reset();
@@ -147,10 +148,11 @@ void Game::enterRoom(size_t index, Level::Side side)
     checkpoint = player->getPosition();
     needsSpawnPoint = true;
     updateCamera(0.f, true);
-    // The title only shows the first time in.
+    // The title only shows the first time in, and only coming into another place: a place can be
+    // several rooms with the same title.
     if (!visited[index]) {
         visited[index] = true;
-        titleTimer = TITLE_TIME;
+        if (levels[index].title != levels[transition->from].title) titleTimer = TITLE_TIME;
     }
     progress.explored.insert(levelKey(index));
     saveProgress();
@@ -193,10 +195,8 @@ sf::Vector2f Game::roomOrigin(size_t index) const
 
 bool Game::hasAbility(const std::string& ability) const
 {
-    if (progress.abilities.count(ability)) return true;
-    // What no room gives, everyone starts with: the world doesn't need it to be found. (In a test
-    // room it's all given at the start, and the keys 1 to 6 switch it.)
-    return !testing && !offered.count(ability);
+    // Picked up. (In a test room it's all given at the start, and the number keys switch it.)
+    return progress.abilities.count(ability) > 0;
 }
 
 bool Game::hasFact(const std::string& fact) const
@@ -211,10 +211,20 @@ void Game::applyAbilities()
 {
     player->setHasRope(hasAbility("rope"));
     player->setRopeRange(hasAbility("long_rope") ? physics().longRopeRange : physics().ropeRange);
-    player->setCanHookRock(hasAbility("climbing_pick"));
     player->setCanClimb(hasAbility("wall_climb"));
     player->setCanThrowInAir(hasAbility("air_throw"));
     player->setCanDoubleJump(hasAbility("double_jump"));
+}
+
+bool Game::touchesSlick(sf::Vector2f point) const
+{
+    for (float dx : {-1.f, 1.f}) {
+        for (float dy : {-1.f, 1.f}) {
+            const auto [x, y] = tailNumbers(point + sf::Vector2f(dx, dy));
+            if (level->isSlick(x, y)) return true;
+        }
+    }
+    return false;
 }
 
 void Game::toggleAbility(size_t index)
@@ -548,10 +558,14 @@ void Game::frame(float frameTime, std::optional<PlayerInput> scripted)
         if (!transition && deathTimer <= 0.f && !ignoreInputThisFrame) {
             in = scripted ? *scripted : playerInput();
             if (ignorePressesThisFrame) in.jumpPressed = in.ropePressed = false;
-            // On a bench, moving gets you up; anything else leaves you sitting.
-            if (sitting) {
-                if (in.moveX != 0.f || in.jumpPressed || in.ropePressed) sitting.reset();
-                else in = {};
+            // On a bench (or coming to), moving gets you up; anything else leaves you sitting.
+            if (sitting || waking) {
+                if (in.moveX != 0.f || in.jumpPressed || in.ropePressed) {
+                    sitting.reset();
+                    waking = false;
+                } else {
+                    in = {};
+                }
             }
         }
         player->handleInput(in);
@@ -659,7 +673,7 @@ void Game::handlePress(const InputManager::Press& press)
         else if (interact && !sitting && benchInReach()) sitDown(*benchInReach());
         else if (interact && leverInReach()) pullLever();
         else if (has(A::Restart) && !transition && deathTimer <= 0.f) killPlayer(); // back to the checkpoint
-        else if (testing && press.key >= sf::Keyboard::Num1 && press.key <= sf::Keyboard::Num6) toggleAbility(size_t(press.key - sf::Keyboard::Num1));
+        else if (testing && press.key >= sf::Keyboard::Num1 && press.key <= sf::Keyboard::Num9) toggleAbility(size_t(press.key - sf::Keyboard::Num1));
         return;
     }
     if (screen == Screen::Talking) {
@@ -926,10 +940,10 @@ void Game::showEffects(const std::vector<PlayerEvent>& events)
             case PlayerEvent::Type::RopeBounced:
                 audio.play(Audio::Sfx::RopeClink);
                 particles.spawn(e.position, {.count = 5, .speed = 40.f, .life = 0.25f, .gravity = 200.f, .colors = dust});
-                // The first time it's for want of the pick, say why.
-                if (!shownRockHint && !hasAbility("climbing_pick")) {
+                // The first time off slick stone, say why.
+                if (!shownRockHint && touchesSlick(e.position)) {
                     shownRockHint = true;
-                    showMessage("CLINK!", "THE ROPE ONLY STICKS TO METAL BLOCKS");
+                    showMessage("CLINK!", "NOTHING HOLDS ON SLICK STONE");
                 }
                 break;
         }

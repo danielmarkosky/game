@@ -10,8 +10,7 @@
 //   --start      where to start: the tile to stand in, column and row from the top-left
 //                (default: the room's Start)
 //   --goal       which way out counts (default: any), or touching a pickup, or gem N
-//   --abilities  the ones the player has (default: all). "none" for none. In the world, as in the
-//                game, the abilities no room gives are had anyway.
+//   --abilities  the ones the player has (default: all). "none" for none.
 //   --explore    don't stop at the goal: list every spot that can be stood on
 //   --open       with the room's gates open, as if its lever had been pulled
 //   --measure    how far the moves reach with the physics in assets/physics.txt, for designing rooms
@@ -70,6 +69,8 @@ namespace
         bool jumpOff;     // let go by jumping: only different when the physics give that a kick
         float steer;
         bool airJump;
+        float again = -1.f; // with the throwing hand: thrown again at this angle as soon as it's back, < 0 not
+        float holdAgain = 0.f;
     };
 
     // Up against a wall (with the chalk bag): run and jump at it holding towards it until it's
@@ -80,6 +81,7 @@ namespace
         float time;    // climbing up
         bool leap;
         float steer;
+        int leaps = 0; // first, leaping back and forth to the wall across this many times
     };
 
     constexpr float THROW_WAIT = 1.5f; // the longest a throw is waited on to catch
@@ -179,6 +181,24 @@ namespace
                     let.jumpPressed = false;
                 }
             }
+            if (s.again >= 0.f && !player.isGrounded()) {
+                // Pressed again straight away: thrown as soon as it's back in the hand, mid-air.
+                PlayerInput next;
+                next.moveX = s.steer;
+                next.ropePressed = next.ropeHeld = true;
+                const sf::Vector2f direction(std::cos(s.again), std::sin(s.again));
+                for (int i = 0; i < int(THROW_WAIT / DT) && !player.getRope(); ++i) {
+                    next.aim = player.centre() + direction * 200.f;
+                    if (auto o = step(next)) return {*o, player.getPosition()};
+                    next.ropePressed = false;
+                    if (player.isGrounded()) break;
+                }
+                if (!player.getRope()) return {Out::Missed, {}};
+                next.moveX = s.push;
+                for (int i = 0; i < int(s.holdAgain / DT); ++i) {
+                    if (auto o = step(next)) return {*o, player.getPosition()};
+                }
+            }
             return settle(s.steer, true);
         }
 
@@ -194,13 +214,32 @@ namespace
                 at.jumpPressed = false;
             }
             if (!player.isClinging()) return {Out::Missed, {}};
+            // Back and forth up a chimney: leap off, steer across, grab the other wall.
+            float side = c.dir;
+            for (int leap = 0; leap < c.leaps; ++leap) {
+                PlayerInput off;
+                off.moveX = -side;
+                off.moveY = 1.f;
+                off.jumpPressed = off.jumpHeld = true;
+                bool held = false;
+                for (int i = 0; i < int(0.8f / DT); ++i) {
+                    if (auto o = step(off)) return {*o, player.getPosition()};
+                    off.jumpPressed = false;
+                    if (i > 2 && player.isClinging()) {
+                        held = true;
+                        break;
+                    }
+                }
+                if (!held) return settle(-side, true);
+                side = -side;
+            }
             PlayerInput up;
-            up.moveX = c.dir;
+            up.moveX = side;
             up.moveY = 1.f;
             for (int i = 0; i < int(c.time / DT) && player.isClinging(); ++i) {
                 if (auto o = step(up)) return {*o, player.getPosition()};
             }
-            if (!player.isClinging()) return settle(c.dir, true); // over the top
+            if (!player.isClinging()) return settle(side, true); // over the top
             PlayerInput off;
             off.moveX = c.steer;
             if (c.leap) off.jumpPressed = off.jumpHeld = true;
@@ -260,8 +299,8 @@ namespace
     std::string describe(const Climb& c)
     {
         char b[160];
-        std::snprintf(b, sizeof b, "climb the wall to the %s for %.2fs, %s steering %+.0f", c.dir < 0.f ? "left" : "right", c.time,
-                      c.leap ? "leap off" : "let go", c.steer);
+        std::snprintf(b, sizeof b, "climb the wall to the %s, leaping across %d times, climb for %.2fs, %s steering %+.0f",
+                      c.dir < 0.f ? "left" : "right", c.leaps, c.time, c.leap ? "leap off" : "let go", c.steer);
         return b;
     }
 
@@ -271,19 +310,23 @@ namespace
         std::snprintf(b, sizeof b, "rope%s at %.0f deg, push %+.0f%s for %.2fs once it catches, %s steering %+.0f%s", s.jumpFirst ? " mid-jump" : "",
                       s.angle * 57.2958f, s.push, s.reel ? " reeling in" : "", s.hold, s.jumpOff ? "jump off" : "let go", s.steer,
                       s.airJump ? ", jump again" : "");
-        return b;
+        std::string text = b;
+        if (s.again >= 0.f) {
+            std::snprintf(b, sizeof b, ", then the rope again in the air at %.0f deg for %.2fs", s.again * 57.2958f, s.holdAgain);
+            text += b;
+        }
+        return text;
     }
 }
 
 namespace
 {
-    const std::set<std::string> ALL_ABILITIES = {"rope", "long_rope", "climbing_pick", "wall_climb", "air_throw", "double_jump"};
+    const std::set<std::string> ALL_ABILITIES = {"rope", "long_rope", "wall_climb", "air_throw", "double_jump"};
 
     void giveAbilities(Player& player, const std::set<std::string>& abilities)
     {
         player.setHasRope(abilities.count("rope") > 0);
         player.setRopeRange(abilities.count("long_rope") ? physics().longRopeRange : physics().ropeRange);
-        player.setCanHookRock(abilities.count("climbing_pick") > 0);
         player.setCanClimb(abilities.count("wall_climb") > 0);
         player.setCanThrowInAir(abilities.count("air_throw") > 0);
         player.setCanDoubleJump(abilities.count("double_jump") > 0);
@@ -455,14 +498,8 @@ int main(int argc, char** argv)
     if (roomArg.size() > 4 && roomArg.substr(roomArg.size() - 4) == ".txt") {
         level = loadSingleLevel(roomArg).level;
     } else {
-        std::set<std::string> offered;
         for (auto& room : loadWorld(config::assetPath("world.ldtk"))) {
             if (room.name == roomArg) level = room.level;
-            for (const Pickup& pickup : room.level->pickups()) offered.insert(pickup.ability);
-        }
-        // As in the game: what no room gives, everyone has.
-        for (const std::string& ability : ALL_ABILITIES) {
-            if (!offered.count(ability)) abilities.insert(ability);
         }
     }
     if (!level) {
@@ -516,6 +553,18 @@ int main(int argc, char** argv)
                             for (float steer : {push, 0.f, -push}) {
                                 swings.push_back({jumpFirst, deg / 57.2958f, push, reel, hold, jumpOff, steer, false});
                                 if (doubleJump && steer == push) swings.push_back({jumpFirst, deg / 57.2958f, push, reel, hold, jumpOff, steer, true});
+                                // With the throwing hand: let go and throw again ahead, mid-air.
+                                if (airThrow && steer == push && !jumpFirst && !reel) {
+                                    for (int again : {40, 60, 80}) {
+                                        const float angle = (push > 0.f ? again : 180 - again) / 57.2958f;
+                                        for (float holdAgain : {0.5f, 1.0f, 1.5f}) {
+                                            Swing chained{jumpFirst, deg / 57.2958f, push, reel, hold, jumpOff, steer, false};
+                                            chained.again = angle;
+                                            chained.holdAgain = holdAgain;
+                                            swings.push_back(chained);
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
@@ -532,6 +581,8 @@ int main(int argc, char** argv)
             for (float steer : {-dir, 0.f}) climbing.push_back({dir, time, false, steer});
         }
         climbing.push_back({dir, 5.f, false, 0.f}); // as high as it goes: over the top
+        // Up a chimney, wall to wall, then as high as it goes.
+        for (int leaps : {2, 4, 6, 8}) climbing.push_back({dir, 5.f, false, 0.f, leaps});
     }
 
     // Best-first, furthest from the start first: where the goal is isn't known.

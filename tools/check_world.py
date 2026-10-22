@@ -3,8 +3,8 @@
 open with it, every gem reached. Uses the level bot (tools/levelbot.cpp, built as
 build/Release/levelbot), several at once. Takes a few minutes.
 
-  python3 tools/check_world.py            # all of it
-  python3 tools/check_world.py level3     # only the routes through rooms whose name has "level3"
+  python3 tools/check_world.py                # all of it
+  python3 tools/check_world.py crevasse_camp  # only the routes through rooms whose name has that
 
 Each route below is: the room, where to start ('S' for its Start, or "column row" counted from the
 top-left), the goal (L, R, T or B for a way out, "pickup", or "gem N"), the abilities the player has,
@@ -16,65 +16,94 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
-ALL = 'climbing_pick,long_rope,double_jump'
-PICK = 'climbing_pick'
-PICK_ROPE = 'climbing_pick,long_rope'
+# What you have by each part of the world: the rope from the crevasse, the long rope from the end of
+# the garden (east), the chalk bag from the Archive (west), the throwing hand at the Summit, the
+# feather in Backtrack.
+R = 'rope'
+RL = 'rope,long_rope'
+RLC = 'rope,long_rope,wall_climb'
+RLCA = 'rope,long_rope,wall_climb,air_throw'
+ALL = 'rope,long_rope,wall_climb,air_throw,double_jump'
 
 ROUTES = [
-    # The Cave: the pick can be reached without it, the way on can't.
-    ('level1', 'S', 'pickup', 'none', True),
-    ('level1', 'S', 'R', 'none', False),
-    ('level1', '74 49', 'R', PICK, True),
-    ('level1', 'S', 'gem 0', PICK, True),
-    ('level1', 'S', 'gem 1', 'none', False),
-    ('level1', 'S', 'gem 1', PICK, True),
-    ('level2', 'S', 'T', PICK, True),
-    ('level2', '10 1', 'L', PICK, True),
-    # The Crossroads: every way out, from where you come in.
-    ('crossroads', 'S', 'R', PICK, True),
-    ('crossroads', 'S', 'L', PICK, True),
-    ('crossroads', 'S', 'T', PICK, True),
-    ('crossroads', '10 21', 'R', PICK, True),
-    ('crossroads', '46 21', 'B', PICK, True),
-    ('crossroads', 'S', 'gem 0', PICK, True),
-    # The ruins, west: the pick is all they need.
-    ('ruins_gate', '60 21', 'L', PICK, True),
-    ('ruins_gate', '2 22', 'R', PICK, True),
-    ('ruins_gate', '60 21', 'gem 0', PICK, True),
-    ('ruins_hollow', '44 9', 'L', PICK, True),
-    ('ruins_hollow', '2 39', 'R', PICK, True),
-    ('ruins_hollow', '44 9', 'gem 0', PICK, True),
-    ('ruins_archive', 'S', 'pickup', PICK, True),
-    ('ruins_archive', 'S', 'R', PICK, True),
-    ('ruins_archive', 'S', 'gem 0', PICK, True),
-    # The garden, east, and the long rope at its end.
-    ('level3', 'S', 'R', PICK, True),
-    ('level3', '150 27', 'L', PICK, True),
-    ('level4', 'S', 'pickup', PICK, True),
-    ('level4', '142 25', 'L', PICK_ROPE, True),
-    # The Tall Hall: shut without the long rope.
-    ('tall_hall', '7 24', 'R', PICK, False),
-    ('tall_hall', '7 24', 'R', PICK_ROPE, True),
-    ('tall_hall', '13 5', 'B', PICK_ROPE, True),
-    ('tall_hall', '7 24', 'gem 0', PICK_ROPE, True),
-    # The Drop: down only.
-    ('the_drop', '3 11', 'T', ALL, False),
-    ('level5 --open', '7 61', 'B', PICK_ROPE, True),
-    # The mountains.
-    ('level5', '7 61', 'R', PICK_ROPE, True),
-    ('level5', '130 21', 'L', PICK_ROPE, True),
-    ('level6', 'S', 'R', PICK_ROPE, True),
-    ('level6', '78 6', 'L', PICK_ROPE, True),
-    ('level7', 'S', 'T', PICK_ROPE, True),
-    ('level7', '15 1', 'L', PICK_ROPE, True),
-    ('level8', '1 24', 'R', PICK_ROPE, True),
-    ('level8', '108 13', 'B', PICK_ROPE, True),
-    ('level9', 'S', 'R', PICK_ROPE, True),
-    ('level9', '88 11', 'L', PICK_ROPE, True),
-    # The Windy Ledge: shut without the double jump.
-    ('windy_ledge', 'S', 'R', PICK_ROPE, False),
+    # The Crevasse, where a new game starts: walking, jumping, Ash's rope and the first swings.
+    ('crevasse_wake', 'S', 'R', 'none', True),
+    ('crevasse_steps', 'S', 'R', 'none', True),
+    ('crevasse_steps', '37 13', 'L', 'none', True),
+    ('crevasse_gaps', 'S', 'R', 'none', True),
+    ('crevasse_gaps', '41 16', 'L', 'none', True),
+    ('crevasse_camp', 'S', 'pickup', 'none', True),
+    ('crevasse_camp', 'S', 'R', 'none', False),   # the pit needs the rope
+    ('crevasse_camp', 'S', 'R', R, True),
+    ('crevasse_camp', '45 17', 'L', R, True),
+    ('crevasse_dips', 'S', 'R', 'none', True),    # practice: walkable, swingable
+    ('crevasse_dips', 'S', 'gem 0', R, True),
+    ('crevasse_dips', '41 16', 'L', R, True),
+    ('crevasse_chasm', 'S', 'R', 'none', False),
+    ('crevasse_chasm', 'S', 'R', R, True),
+    ('crevasse_chasm', '48 18', 'L', R, True),
+    # The Cave and The Well, up to the Crossroads: the rope, thrown standing.
+    ('level1', 'S', 'R', R, True),
+    ('level1', '46 14', 'L', R, True),
+    ('level1', 'S', 'gem 0', R, True),
+    ('level2', 'S', 'T', R, True),
+    ('level2', '4 3', 'L', R, True),
+    ('level2', 'S', 'gem 0', R, True),
+    # The Crossroads.
+    ('crossroads', 'S', 'L', R, True),
+    ('crossroads', 'S', 'R', R, True),
+    ('crossroads', 'S', 'T', R, True),
+    ('crossroads', 'S', 'B', R, True),
+    ('crossroads', '2 26', 'R', R, True),
+    ('crossroads', '57 26', 'L', R, True),
+    ('crossroads', 'S', 'gem 0', R, True),
+    # The ruins, west, and the chalk bag at the top of the Archive.
+    ('ruins_gate', 'S', 'L', R, True),
+    ('ruins_gate', '2 18', 'R', R, True),
+    ('ruins_gate', 'S', 'gem 0', R, True),
+    ('ruins_hollow', 'S', 'L', R, True),
+    ('ruins_hollow', '3 8', 'R', R, True),
+    ('ruins_hollow', 'S', 'gem 0', R, True),
+    ('ruins_archive', 'S', 'pickup', R, True),
+    ('ruins_archive', 'S', 'R', R, True),
+    ('ruins_archive', 'S', 'gem 0', R, True),
+    # The garden, east, and the long rope down in Curtains' hollow: out of it only with it.
+    ('level3', 'S', 'R', R, True),
+    ('level3', '57 18', 'L', R, True),
+    ('level3', 'S', 'gem 0', R, True),
+    ('level4', 'S', 'pickup', R, True),
+    ('level4', '50 22', 'L', R, False),
+    ('level4', '50 22', 'L', RL, True),
+    ('level4', 'S', 'gem 0', R, True),
+    # The Tall Hall: shut without the long rope, even climbing.
+    ('tall_hall', 'S', 'T', 'rope,wall_climb', False),
+    ('tall_hall', 'S', 'T', RL, True),
+    ('tall_hall', 'S', 'gem 0', RL, True),
+    ('the_drop', 'S', 'T', ALL, False),           # down only
+    # The Summit: the throwing hand up a chimney that needs climbing; the way on needs it.
+    ('level5', '4 28', 'pickup', RL, False),
+    ('level5', '4 28', 'pickup', RLC, True),
+    ('level5', '4 28', 'R', RLC, False),
+    ('level5', '4 28', 'R', RLCA, True),
+    ('level5', '4 28', 'gem 0', RLC, True),
+    # The mountains, the ember chimney and the pendulums.
+    ('level6', 'S', 'R', RLCA, True),
+    ('level6', '57 22', 'L', RLCA, True),
+    ('level5', '61 17', 'B', RLCA, True),
+    ('level6', 'S', 'gem 0', RLCA, True),
+    ('level7', 'S', 'T', RLCA, True),
+    ('level7', 'S', 'gem 0', RLCA, True),
+    ('level8', 'S', 'R', RLCA, True),
+    ('level8', '57 20', 'B', RLCA, True),
+    ('level8', 'S', 'gem 0', RLCA, True),
+    # Backtrack and the feather; the Windy Ledge, shut without it; Daylight and the way out.
+    ('level9', 'S', 'pickup', RLCA, True),
+    ('level9', 'S', 'R', RLCA, True),
+    ('level9', '49 14', 'L', ALL, True),
+    ('level9', 'S', 'gem 0', RLCA, True),
+    ('windy_ledge', 'S', 'R', RLCA, False),
     ('windy_ledge', 'S', 'R', ALL, True),
-    ('windy_ledge', '52 26', 'L', ALL, True),
+    ('windy_ledge', '52 14', 'L', ALL, True),
     ('windy_ledge', 'S', 'gem 0', ALL, True),
     ('level10', 'S', 'T', ALL, True),
 ]

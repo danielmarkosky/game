@@ -75,8 +75,8 @@ public:
     bool isGrounded() const;
     bool isTouchingDanger() const;
     const Rope* getRope() const;
-    // Where a rope thrown towards `aim` now would catch, if anywhere: within reach(), not on slick
-    // stone, and on rock only with the pick.
+    // Where a rope thrown towards `aim` now would catch, if anywhere: on rock or a hook block within
+    // reach(), not on slick stone.
     std::optional<sf::Vector2f> ropeTarget(sf::Vector2f aim) const;
     // How far a throw now would reach: less in the air.
     float reach() const;
@@ -86,20 +86,17 @@ public:
     sf::Vector2f aimAlong(sf::Vector2f direction) const;
     bool isFacingLeft() const;
     // The abilities. Without the rope there's nothing to throw. Until it can be thrown in the air,
-    // it's only thrown standing (or holding on to a wall), and swung round first. Without the
-    // climbing pick it only sticks to hook blocks ('%'); a throw at rock bounces off. With the chalk
+    // it's only thrown standing (or holding on to a wall), and swung round first. With the chalk
     // bag, walls can be climbed.
     void setHasRope(bool has);
     void setCanThrowInAir(bool can);
-    void setCanHookRock(bool can);
     void setCanClimb(bool can);
     // How far the rope reaches: physics().ropeRange, or longRopeRange with the long rope.
     void setRopeRange(float range);
     // With the updraft feather: one more jump in the air, until landing or catching the rope.
     void setCanDoubleJump(bool can);
     bool hasAirJump() const; // it could double jump now
-    // Where a rope shot towards `aim` would hit something and bounce off: rock without the pick,
-    // or slick stone.
+    // Where a rope thrown towards `aim` would hit something and bounce off: slick stone.
     std::optional<sf::Vector2f> ropeBounce(sf::Vector2f aim) const;
     // The rope's in your hand and you're where it can be thrown from.
     bool canShootRope() const;
@@ -176,7 +173,6 @@ private:
     float regrabTimer = 0.f;
     bool jumping = false;
     bool facingLeft = false;
-    bool hooksRock = true;
     float ropeRange = 100.f;
     bool canDoubleJump = false;
     bool sitting = false;

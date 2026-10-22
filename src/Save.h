@@ -29,7 +29,7 @@ struct Progress
     std::string bench;                    // sat on last: Continue starts there. Empty: at the start
     std::set<std::string> benches;        // sat on: the places to travel between
     std::set<std::string> explored;       // the rooms shown on the map
-    std::set<std::string> abilities;      // picked up, e.g. "climbing_pick"
+    std::set<std::string> abilities;      // picked up, e.g. "long_rope"
     std::set<std::string> gems;           // found, as "<room> <tile x> <tile y>"
     std::set<std::string> conversations; // had, as "<dialogue> <number>", counting from 0
     std::set<std::string> flags;          // set in conversations: what's happened in the story

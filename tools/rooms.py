@@ -11,7 +11,7 @@ Text rooms use the characters in assets/levels/README.md. rooms.txt lists them l
 
   theme cave                                   # the theme of the rooms below it
   level1   0 0  The Cave                       # file (next to rooms.txt), map position, title
-  entity level1 74 49 ability=climbing_pick    # fields of the entity at column 74, row 49
+  entity level4 142 25 ability=long_rope      # fields of the entity at column 142, row 25
 
 Positions are in tiles, of the room's bottom-left tile, x to the right and y up. Rows count from
 the top of the room, like lines of the text file. Importing into an existing project keeps its
@@ -31,7 +31,7 @@ CHAR_OF = {value: char for value, char, _, _ in TILES}
 VALUE_OF = {char: value for value, char, _, _ in TILES}
 
 THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight', 'ruins']
-ABILITIES = ['climbing_pick', 'long_rope', 'double_jump']
+ABILITIES = ['rope', 'long_rope', 'wall_climb', 'air_throw', 'double_jump']
 
 # Entities: identifier, text character, colour, at most one per room, fields.
 ENTITIES = [
@@ -46,7 +46,7 @@ ENTITIES = [
 ]
 ENTITY_OF_CHAR = {char: ident for ident, char, *_ in ENTITIES}
 CHAR_OF_ENTITY = {ident: char for ident, char, *_ in ENTITIES}
-DEFAULT_FIELDS = {'Pickup': {'ability': 'climbing_pick'}}
+DEFAULT_FIELDS = {'Pickup': {'ability': 'rope'}}
 
 # Fixed uids, so the definitions are the same in every project this makes.
 UID = {'Tiles': 1, 'Entities': 2, 'Theme': 3, 'Ability': 4, 'title': 5, 'theme': 6}
@@ -172,8 +172,10 @@ def ensure_definitions(project):
     for enum in defs['enums']:
         want = next((e for e in wanted['enums'] if e['identifier'] == enum['identifier']), None)
         if want:
+            # The tool's own lists (themes, abilities): what it has, no more, no less.
+            ids = [v['id'] for v in want['values']]
             have = {v['id'] for v in enum['values']}
-            enum['values'] += [v for v in want['values'] if v['id'] not in have]
+            enum['values'] = [v for v in enum['values'] if v['id'] in ids] + [v for v in want['values'] if v['id'] not in have]
     used = [d['uid'] for key in ('layers', 'entities', 'enums', 'levelFields') for d in defs[key]]
     used += [f['uid'] for e in defs['entities'] for f in e['fieldDefs']]
     project['nextUid'] = max(project.get('nextUid', 0), max(used) + 1)

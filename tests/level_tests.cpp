@@ -136,7 +136,7 @@ TEST(Level_Pickups, AreReadFromTheFileAndTouched) {
         "#S.P#\n"
         "#####\n");
     ASSERT_EQ(lvl->pickups().size(), 1u);
-    EXPECT_EQ(lvl->pickups()[0].ability, "climbing_pick");
+    EXPECT_EQ(lvl->pickups()[0].ability, "rope");
     EXPECT_EQ(lvl->pickups()[0].position, sf::Vector2f(24.f, 8.f));
     EXPECT_FALSE(lvl->isSolid(3, 1));
     EXPECT_EQ(lvl->pickupAt({8.f, 8.f}, 11.f, 7.f), nullptr);

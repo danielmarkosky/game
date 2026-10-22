@@ -1,31 +1,31 @@
-# Moss, keeper of the Archive at the bottom of the ruins, where the updraft feather is.
+# Moss, keeper of the Archive at the top of the ruins, where Ash's chalk bag waits on the top shelf.
 
---- !double_jump
+--- !wall_climb
 Moss: ...A visitor. The mushrooms told me someone was coming. They are terrible at secrets.
 Moss: You have the look of someone following footprints.
 ? I'm looking for my sister, Ash.    -> ash
 ? What is this place?                -> place
 = ash
 Moss: Ash. Yes. She sat where you are standing and read every map I had.
-Moss: She left something with me. A feather from the mountain wind. She said, if anyone comes after me, give it to them.
+Moss: She left something with me. Her chalk bag. She said, if anyone comes after me, give it to them.
 Moss: It's on the top shelf. I am too old for shelves.
-set heard_feather
+set heard_chalk
 -> end
 = place
 Moss: The Archive. Everything anyone ever wrote about the mountain is here. Most of it is wrong.
-Moss: There's a feather on the top shelf. It lets you leap again in the air. Take it. It's no use to a book.
+Moss: There's a chalk bag on the top shelf. With chalk on your hands, a wall is a ladder. Take it. It's no use to a book.
 
---- !double_jump
+--- !wall_climb
 Moss: The top shelf. Climb the lower ones first.
 
---- double_jump
-Moss: The feather took to you. Good. The wind remembers who it lifts.
-Moss: Far up, past the summit, there is a ledge where the wind blows so hard that nothing holds. Only a leap will do.
+--- wall_climb
+Moss: The chalk took to your hands. Good. Rock remembers who it held.
+Moss: Far up, past the summit, there is a ledge where the wind blows so hard that nothing holds. Not hands, not rope.
 ? Is Ash up there?      -> up
 ? Thank you, Moss.      -> end
 = up
 Moss: Climbers go up the mountain to find something. Some of them find it. Some of them stay with it.
 Moss: Go and see.
 
---- double_jump
+--- wall_climb
 Moss: Go on. The books will still be here. They always are.

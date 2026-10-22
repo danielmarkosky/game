@@ -755,11 +755,11 @@ TEST(PlayerTest, GoingUpIntoARoomGivesALift) {
     EXPECT_FLOAT_EQ(player.getVelocity().y, physics().jumpSpeed);
 }
 
-TEST(PlayerTest, WithoutThePickTheRopeOnlySticksToMetal) {
-    // Rock ceiling with two hook blocks in it, 6 tiles above the floor.
+TEST(PlayerTest, TheRopeSticksToRockAndHookBlocksButNotSlickStone) {
+    // A ceiling 6 tiles above the floor: slick stone, then two hook blocks, then rock.
     auto level = Level::loadFromString(
         "################\n"
-        "#.........%%...#\n"
+        "#oooooooo%%####\n"
         "#..............#\n"
         "#..............#\n"
         "#..............#\n"
@@ -767,28 +767,28 @@ TEST(PlayerTest, WithoutThePickTheRopeOnlySticksToMetal) {
         "#..S...........#\n"
         "################\n");
     Player player(level);
-    player.setCanHookRock(false);
-    const sf::Vector2f rock = player.centre() + sf::Vector2f(0.f, 60.f);
-    const sf::Vector2f metal(84.f, 52.f);
+    player.setRopeRange(100.f);
+    const sf::Vector2f slick = player.centre() + sf::Vector2f(0.f, 60.f);
+    const sf::Vector2f metal(84.f, 52.f), rock(108.f, 52.f);
 
-    EXPECT_FALSE(player.ropeTarget(rock).has_value());
-    ASSERT_TRUE(player.ropeBounce(rock).has_value());
-    EXPECT_NEAR(player.ropeBounce(rock)->y, 56.f, 0.5f); // the underside of the ceiling
+    EXPECT_FALSE(player.ropeTarget(slick).has_value());
+    ASSERT_TRUE(player.ropeBounce(slick).has_value());
+    EXPECT_NEAR(player.ropeBounce(slick)->y, 48.f, 0.5f); // the underside of the ceiling
     EXPECT_TRUE(player.ropeTarget(metal).has_value());
+    EXPECT_TRUE(player.ropeTarget(rock).has_value());
     EXPECT_FALSE(player.ropeBounce(metal).has_value());
 
-    // Thrown at rock: it flies there, bounces off and comes back.
+    // Thrown at slick stone: it flies there, bounces off and comes back.
     PlayerInput in;
     in.ropePressed = in.ropeHeld = true;
-    in.aim = rock;
+    in.aim = slick;
     hold(player, in, 0.3f);
     EXPECT_EQ(player.getRope(), nullptr);
     std::vector<PlayerEvent::Type> happened;
     for (const PlayerEvent& e : player.takeEvents()) happened.push_back(e.type);
     EXPECT_EQ(happened, (std::vector{PlayerEvent::Type::RopeThrown, PlayerEvent::Type::RopeBounced}));
 
-    hold(player, {}, 0.3f);
-    player.setCanHookRock(true);
+    hold(player, {}, 1.f);
     catchRope(player, rock);
 }
 
@@ -825,22 +825,21 @@ TEST(PlayerTest, DoubleJumpOnceUntilLanding) {
 }
 
 TEST(PlayerTest, AStickAimsAtTheHookNearestWhereItPoints) {
-    // A hook block up and to the right, steeper than the stick points.
+    // A hook block up and to the right, steeper than the stick points, and slick stone to the left.
     auto level = Level::loadFromString(
         "########################################\n"
-        "#......................................#\n"
-        "#......................................#\n"
-        "#........%.............................#\n"
-        "#......................................#\n"
-        "#......................................#\n"
-        "#......................................#\n"
-        "#......................................#\n"
-        "#......................................#\n"
-        "#......................................#\n"
-        "#....S.................................#\n"
+        "o......................................#\n"
+        "o......................................#\n"
+        "o........%.............................#\n"
+        "o......................................#\n"
+        "o......................................#\n"
+        "o......................................#\n"
+        "o......................................#\n"
+        "o......................................#\n"
+        "o......................................#\n"
+        "o....S.................................#\n"
         "########################################\n");
     Player player(level);
-    player.setCanHookRock(false);
     player.respawn({40.f, 8.f});
 
     // Straight up and to the right there's nothing; a little steeper there's the block.
@@ -851,7 +850,7 @@ TEST(PlayerTest, AStickAimsAtTheHookNearestWhereItPoints) {
     EXPECT_NEAR(hit->x, 76.f, 4.f);
     EXPECT_NEAR(hit->y, 64.f, 1.f);
 
-    // To the left there's only rock: straight that way, as far as the rope goes.
+    // To the left there's only slick stone: straight that way, as far as the rope goes.
     const sf::Vector2f left = player.aimAlong({-1.f, 0.f});
     EXPECT_FALSE(player.ropeTarget(left));
     EXPECT_NEAR(left.x, player.centre().x - physics().ropeRange, 0.01f);

@@ -46,29 +46,34 @@ TEST(GameFlow, AnEmptySlotStartsAtTheBeginning) {
     EXPECT_EQ(game.screenName(), "playing");
     EXPECT_EQ(game.roomName(), world().front().name);
     EXPECT_FALSE(game.isSitting());
+    EXPECT_TRUE(game.state().abilities.empty()); // not even the rope: it's found further on
 }
 
 TEST(GameFlow, SittingOnABenchSavesAndContinueStartsThere) {
     const std::string saves = freshSaves("game_flow_bench");
+    std::ofstream(saves + "/slot1.txt") << "bench level1 0\nexplored level1\nplay_time 5\n";
     {
         Game game(world(), {.headless = true, .saveFolder = saves});
         game.pressKey(sf::Keyboard::Enter);
         game.pressKey(sf::Keyboard::Enter);
-        // The Cave's bench is just left of the start.
-        game.advance(0.3f, walking(-1.f));
-        game.advance(0.3f);
+        ASSERT_TRUE(game.isSitting());
+        // Moving gets you up; back to The Cave's bench, and sitting on it again saves.
+        game.advance(0.15f, walking(1.f));
+        EXPECT_FALSE(game.isSitting());
+        game.advance(0.4f);
+        game.advance(0.15f, walking(-1.f));
+        game.advance(0.4f);
         game.pressKey(sf::Keyboard::W);
         ASSERT_TRUE(game.isSitting());
-        EXPECT_EQ(game.state().bench, world().front().name + " 0");
-        // Moving gets you up.
-        game.advance(0.2f, walking(1.f));
-        EXPECT_FALSE(game.isSitting());
+        EXPECT_EQ(game.state().bench, "level1 0");
+        EXPECT_GT(game.state().playTime, 5.f);
     }
     Game again(world(), {.headless = true, .saveFolder = saves});
     again.pressKey(sf::Keyboard::Enter);
     again.pressKey(sf::Keyboard::Enter);
     EXPECT_TRUE(again.isSitting());
-    EXPECT_EQ(again.state().bench, world().front().name + " 0");
+    EXPECT_EQ(again.roomName(), "level1");
+    EXPECT_TRUE(again.state().abilities.count("rope")); // a save from before the rope was found
 }
 
 TEST(GameFlow, TravelFromBenchToBench) {
@@ -91,12 +96,14 @@ TEST(GameFlow, TravelFromBenchToBench) {
 }
 
 TEST(GameFlow, TalkingToWren) {
-    Game game(world(), {.headless = true, .saveFolder = freshSaves("game_flow_talk")});
+    const std::string saves = freshSaves("game_flow_talk");
+    std::ofstream(saves + "/slot1.txt") << "bench level1 0\nexplored level1\nability rope\n";
+    Game game(world(), {.headless = true, .saveFolder = saves});
     game.pressKey(sf::Keyboard::Enter);
     game.pressKey(sf::Keyboard::Enter);
-    // Wren stands a few steps right of the start.
-    game.advance(0.25f, walking(1.f));
-    game.advance(0.3f);
+    // Wren stands a few steps right of The Cave's bench.
+    game.advance(0.6f, walking(1.f));
+    game.advance(0.4f);
     game.pressKey(sf::Keyboard::W);
     ASSERT_EQ(game.screenName(), "talking");
     for (int i = 0; i < 200 && game.screenName() == "talking"; ++i) {

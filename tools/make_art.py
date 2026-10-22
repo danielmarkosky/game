@@ -264,7 +264,7 @@ def make_tiles(name, tiles):
 FRAME_W, FRAME_H = 12, 14
 OUTLINE = rgb('#16131f')
 
-# Classic: the original character, based on the first temp_player.png. Spiky green/pink hair,
+# Classic: the original character, based on the first hand-drawn player sprite. Spiky green/pink hair,
 # cyan band, beak facing right. Drawn 9x12 without an outline, frame by frame.
 PLAYER = {'a': rgb('#d77bba'), 'b': rgb('#99e550'), 'c': rgb('#5fcde4'), 'd': rgb('#eec39a'),
           'e': rgb('#5b6ee1'), 'f': rgb('#323c39'), 'g': rgb('#fbf236'), 'G': rgb('#d9b52c'),
@@ -631,23 +631,24 @@ def make_objects():
 
 # ----------------------------------------------------------------------------------------------
 # Items: assets/gfx/items.png, 10x10 frames, things to pick up that give an ability. The order is
-# mirrored in src/Level.cpp (namespace `sheet`). 0: the climbing pick, 1: a gem, 2: the long rope,
-# 3-4: a lever up and pulled down, 5: the updraft feather.
+# mirrored in src/Level.cpp (namespace `sheet`). 0: Ash's rope, 1: a gem, 2: the long rope,
+# 3-4: a lever up and pulled down, 5: the updraft feather, 6: the chalk bag, 7: the throwing hand.
 # ----------------------------------------------------------------------------------------------
 
 ITEM = {'3': rgb('#e8eef8'), '2': rgb('#9aa6bc'), 'w': rgb('#b47c48'), 'W': rgb('#7a4e2c'), '#': OUTLINE,
         'a': rgb('#eaffff'), 'b': rgb('#9ff0ff'), 'c': rgb('#4fd0e8'), 'd': rgb('#2a8fb0'),
         'r': rgb('#e6d6b4'), 'R': rgb('#9a8460'), 'k': rgb('#e8443a'), 'K': rgb('#9a2a2a'),
-        'f': rgb('#ffffff'), 'F': rgb('#bfe6ff'), 'q': rgb('#7ab8e8')}
-# A pickaxe lying diagonally: the steel head across the top, the wooden handle down to the left.
-climbing_pick = ['..33....',
-                 '...32...',
-                 '....W3..',
-                 '...w.32.',
-                 '..w...3.',
-                 '.W......',
-                 'w.......',
-                 '........']
+        'f': rgb('#ffffff'), 'F': rgb('#bfe6ff'), 'q': rgb('#7ab8e8'),
+        'g': rgb('#4ac08a'), 'G': rgb('#2a8a5a'), 'l': rgb('#c89a6a'), 'L': rgb('#8a5e3a')}
+# Ash's rope: a coil like the long rope, with a green thread woven through it (her scarf's green).
+ash_rope = ['..rgrr..',
+            '.rRRGRr.',
+            'gR.rr.Rr',
+            'rR.RG.Rg',
+            'rG.rr.Rr',
+            '.rRRgRr.',
+            '..rrgrR.',
+            '.......g']
 
 
 def item_frame(grid):
@@ -702,7 +703,26 @@ feather = ['......fF',
            '.Fq.....',
            'W.......']
 
-ITEMS = [climbing_pick, gem, long_rope, lever_up, lever_down, feather]
+# A chalk bag: a pouch on a drawstring, white with chalk at the top.
+chalk_bag = ['...LL...',
+             '..L..L..',
+             '.ffffff.',
+             '.lFffFl.',
+             '.llllll.',
+             '.lLllLl.',
+             '.llllll.',
+             '..LLLL..']
+# The throwing hand: a leather glove, fingers up, a loop of rope round the wrist.
+throwing_hand = ['.l.l.l..',
+                 '.l.l.l..',
+                 '.llllll.',
+                 '.lllllL.',
+                 '.llllL..',
+                 '..lllL..',
+                 '.rRrRr..',
+                 '..rRr...']
+
+ITEMS = [ash_rope, gem, long_rope, lever_up, lever_down, feather, chalk_bag, throwing_hand]
 
 
 def make_items():
