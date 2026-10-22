@@ -20,7 +20,7 @@ namespace
     // Where things are in the sprite sheets made by tools/make_art.py.
     namespace sheet
     {
-        // assets/gfx/tiles.png, 8x8 tiles, 8 per row.
+        // assets/gfx/themes/<theme>/tiles.png, 8x8 tiles, 8 per row. Every theme has them in the same places.
         constexpr int COLUMNS = 8;
         constexpr int ROCK = 0;        // 3 variants
         constexpr int ROCK_DEEP = 3;
@@ -44,6 +44,11 @@ namespace
         constexpr int FLAG_OFF = 0;
         constexpr int FLAG_ON = 1;     // 2 frames
         constexpr int GOAL = 3;        // 3 frames
+
+        // assets/gfx/items.png, 10x10 frames, in the order of ITEMS.
+        constexpr int ITEM_SIZE = 10;
+        const char* const ITEMS[] = {"climbing_pick"};
+        constexpr int GEM = 1;
     }
 
     // Spikes point away from the rock they're stuck to.
@@ -134,14 +139,14 @@ Level::Level()
     m_tileMap[22][5] = TILE_SPIKES;
 
     computeBounds();
-    loadTileset();
+    loadTextures();
 }
 
 Level::Level(const std::unordered_map<int, std::unordered_map<int, int>>& tiles)
 {
     m_tileMap = tiles;
     computeBounds();
-    loadTileset();
+    loadTextures();
 }
 
 std::shared_ptr<Level> Level::loadFromFile(const std::string& path)
@@ -181,6 +186,8 @@ std::shared_ptr<Level> Level::loadFromString(const std::string& text)
                 case 'S': level->m_startPos = tilePos; hasStart = true; break;
                 case 'C': level->m_checkpoints.push_back(tilePos); break;
                 case 'G': level->m_goal = tilePos; break;
+                case 'P': level->m_pickups.push_back({"climbing_pick", tilePos}); break;
+                case '*': level->m_gems.push_back(tilePos); break;
                 default: break;
             }
         }
@@ -191,10 +198,21 @@ std::shared_ptr<Level> Level::loadFromString(const std::string& text)
     return level;
 }
 
-void Level::loadTileset()
+void Level::loadTextures()
 {
-    m_tileset.loadFromFile(config::assetPath("gfx/tiles.png"));
+    m_theme = Theme::get(Theme::DEFAULT);
     m_objects.loadFromFile(config::assetPath("gfx/objects.png"));
+    m_items.loadFromFile(config::assetPath("gfx/items.png"));
+}
+
+void Level::setTheme(std::shared_ptr<const Theme> theme)
+{
+    m_theme = std::move(theme);
+}
+
+const Theme& Level::theme() const
+{
+    return *m_theme;
 }
 
 void Level::computeBounds()
@@ -224,7 +242,7 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     auto [x0, y0] = tailNumbers(centr - halfScreen);
     auto [x1, y1] = tailNumbers(centr + halfScreen);
 
-    sf::Sprite sprite(m_tileset);
+    sf::Sprite sprite(m_theme->tiles);
     const int size = static_cast<int>(TILE_SIZE);
     auto drawTile = [&](int index, int x, int y) {
         auto pos = viewCoordinates(sf::Vector2f(x * TILE_SIZE, (y + 1) * TILE_SIZE), centr);
@@ -232,6 +250,12 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
         sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
         target.draw(sprite);
     };
+
+    // For the looks only, beyond the edges of the level counts as rock: the room next door carries
+    // on there, so its outer walls get no outline or grass, and two rooms side by side join up.
+    const int left = static_cast<int>(m_bounds.left / TILE_SIZE), bottom = static_cast<int>(m_bounds.top / TILE_SIZE);
+    const int right = left + static_cast<int>(m_bounds.width / TILE_SIZE), top = bottom + static_cast<int>(m_bounds.height / TILE_SIZE);
+    auto looksSolid = [&](int x, int y) { return x < left || x >= right || y < bottom || y >= top || isSolid(x, y); };
 
     for (int x = x0 - 1; x <= x1 + 1; ++x) {
         for (int y = y0 - 1; y <= y1 + 1; ++y) {
@@ -242,20 +266,20 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
             if (tile == TILE_ROCK) {
                 // Pick the look from the neighbours: grass on top, outlines on exposed sides,
                 // darker rock deep inside.
-                const bool top = !isSolid(x, y + 1), bottom = !isSolid(x, y - 1);
-                const bool left = !isSolid(x - 1, y), right = !isSolid(x + 1, y);
-                drawTile((top || bottom || left || right) ? sheet::ROCK + static_cast<int>(hash % 3) : sheet::ROCK_DEEP, x, y);
-                if (left) drawTile(sheet::EDGE_LEFT, x, y);
-                if (right) drawTile(sheet::EDGE_RIGHT, x, y);
-                if (bottom) drawTile(sheet::EDGE_BOTTOM, x, y);
-                if (top) {
+                const bool openTop = !looksSolid(x, y + 1), openBottom = !looksSolid(x, y - 1);
+                const bool openLeft = !looksSolid(x - 1, y), openRight = !looksSolid(x + 1, y);
+                drawTile((openTop || openBottom || openLeft || openRight) ? sheet::ROCK + static_cast<int>(hash % 3) : sheet::ROCK_DEEP, x, y);
+                if (openLeft) drawTile(sheet::EDGE_LEFT, x, y);
+                if (openRight) drawTile(sheet::EDGE_RIGHT, x, y);
+                if (openBottom) drawTile(sheet::EDGE_BOTTOM, x, y);
+                if (openTop) {
                     drawTile(sheet::GRASS + static_cast<int>((hash >> 4) % 2), x, y);
                     if (tileAt(x, y + 1) == 0) {
                         if (hash % 9 == 0) drawTile(sheet::FLOWER, x, y + 1);
                         else if (hash % 4 == 0) drawTile(sheet::TUFT, x, y + 1);
                     }
                 }
-                if (bottom && tileAt(x, y - 1) == 0 && hash % 5 == 0) drawTile(sheet::DRIP, x, y - 1);
+                if (openBottom && tileAt(x, y - 1) == 0 && hash % 5 == 0) drawTile(sheet::DRIP, x, y - 1);
             } else if (tile == TILE_METAL) {
                 drawTile(sheet::HOOK_BLOCK, x, y);
             } else if (isDangerous(x, y)) {
@@ -270,7 +294,7 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     }
 }
 
-void Level::drawMarkers(sf::RenderTarget& target, sf::Vector2f centr, sf::Vector2f activeCheckpoint, float time) const
+void Level::drawMarkers(sf::RenderTarget& target, sf::Vector2f centr, std::optional<sf::Vector2f> activeCheckpoint, float time) const
 {
     sf::Sprite sprite(m_objects);
     auto drawObject = [&](int frame, sf::Vector2f tilePos) {
@@ -288,6 +312,44 @@ void Level::drawMarkers(sf::RenderTarget& target, sf::Vector2f centr, sf::Vector
     if (m_goal) drawObject(sheet::GOAL + static_cast<int>(time * 6.f) % 3, *m_goal);
 }
 
+void Level::drawPickups(sf::RenderTarget& target, sf::Vector2f centr, float time, const std::function<bool(const std::string&)>& owned) const
+{
+    sf::Sprite sprite(m_items);
+    for (const Pickup& pickup : m_pickups) {
+        if (owned(pickup.ability)) continue;
+        const auto it = std::find_if(std::begin(sheet::ITEMS), std::end(sheet::ITEMS), [&](const char* name) { return pickup.ability == name; });
+        const int frame = static_cast<int>(it - std::begin(sheet::ITEMS));
+        sprite.setTextureRect(sf::IntRect(frame * sheet::ITEM_SIZE, 0, sheet::ITEM_SIZE, sheet::ITEM_SIZE));
+        // Floats in the middle of its tile, a pixel or two above the ground.
+        const float bob = std::round(std::sin(time * 3.f) * 1.5f);
+        auto pos = viewCoordinates(pickup.position + sf::Vector2f(-1.f, TILE_SIZE + 3.f + bob), centr);
+        // A soft glow behind it, pulsing, so it catches the eye.
+        const float glow = 0.5f + 0.5f * std::sin(time * 4.f);
+        sf::CircleShape halo(7.f);
+        halo.setOrigin(7.f, 7.f);
+        halo.setPosition(std::floor(pos.x) + 5.f, std::floor(pos.y) + 5.f);
+        halo.setFillColor(sf::Color(255, 220, 120, static_cast<sf::Uint8>(40.f + 40.f * glow)));
+        target.draw(halo);
+        sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
+        target.draw(sprite);
+    }
+}
+
+void Level::drawGems(sf::RenderTarget& target, sf::Vector2f centr, float time, const std::function<bool(size_t)>& collected) const
+{
+    sf::Sprite sprite(m_items, sf::IntRect(sheet::GEM * sheet::ITEM_SIZE, 0, sheet::ITEM_SIZE, sheet::ITEM_SIZE));
+    for (size_t ii = 0; ii < m_gems.size(); ++ii) {
+        // Bobbing out of step with each other, and glinting now and then.
+        const float phase = time * 2.5f + static_cast<float>(ii) * 1.3f;
+        const float bob = std::round(std::sin(phase) * 1.f);
+        auto pos = viewCoordinates(m_gems[ii] + sf::Vector2f(-1.f, TILE_SIZE + 1.f + bob), centr);
+        const bool glint = std::fmod(phase, 6.f) < 0.25f;
+        sprite.setColor(collected(ii) ? sf::Color(255, 255, 255, 60) : glint ? sf::Color(255, 255, 255) : sf::Color(225, 235, 240));
+        sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
+        target.draw(sprite);
+    }
+}
+
 int Level::tileAt(int x, int y) const
 {
     auto itx = m_tileMap.find(x);
@@ -295,6 +357,11 @@ int Level::tileAt(int x, int y) const
     auto ity = itx->second.find(y);
     if (ity == itx->second.end()) return 0;
     return ity->second;
+}
+
+bool Level::isHookBlock(int x, int y) const
+{
+    return tileAt(x, y) == TILE_METAL;
 }
 
 bool Level::isSolid(int x, int y) const
@@ -347,17 +414,49 @@ bool Level::isGoal(sf::Vector2f pos, float height, float width) const
     return m_goal && overlaps(pos, height, width, markerArea(*m_goal));
 }
 
+const std::vector<Pickup>& Level::pickups() const
+{
+    return m_pickups;
+}
+
+const Pickup* Level::pickupAt(sf::Vector2f pos, float height, float width) const
+{
+    for (const auto& pickup : m_pickups) {
+        if (overlaps(pos, height, width, markerArea(pickup.position))) return &pickup;
+    }
+    return nullptr;
+}
+
+const std::vector<sf::Vector2f>& Level::gems() const
+{
+    return m_gems;
+}
+
+std::optional<size_t> Level::gemAt(sf::Vector2f pos, float height, float width) const
+{
+    for (size_t ii = 0; ii < m_gems.size(); ++ii) {
+        if (overlaps(pos, height, width, {m_gems[ii].x, m_gems[ii].y, TILE_SIZE, TILE_SIZE})) return ii;
+    }
+    return std::nullopt;
+}
+
 std::optional<Level::Side> Level::exitThrough(sf::Vector2f point) const
 {
     if (point.x < m_bounds.left) return Side::Left;
     if (point.x > m_bounds.left + m_bounds.width) return Side::Right;
     if (point.y > m_bounds.top + m_bounds.height) return Side::Top;
+    if (point.y < m_bounds.top) return Side::Bottom;
     return std::nullopt;
 }
 
 sf::Vector2f Level::getStartPos() const
 {
     return m_startPos;
+}
+
+const std::vector<sf::Vector2f>& Level::checkpoints() const
+{
+    return m_checkpoints;
 }
 
 sf::FloatRect Level::bounds() const

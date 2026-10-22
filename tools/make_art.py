@@ -8,6 +8,7 @@ sprite, edit its grid here and run `python3 tools/make_art.py`. No drawing progr
 """
 import math
 import os
+import random
 import struct
 import zlib
 
@@ -27,6 +28,13 @@ class Canvas:
         if 0 <= x < self.w and 0 <= y < self.h and rgba[3] > 0:
             self.px[y][x] = rgba
 
+    def mix(self, x, y, rgba):
+        """Like put, but blends a see-through colour over what's already there."""
+        if 0 <= x < self.w and 0 <= y < self.h:
+            a = rgba[3] / 255
+            old = self.px[y][x]
+            self.px[y][x] = tuple(round(old[i] * (1 - a) + rgba[i] * a) for i in range(3)) + (max(old[3], rgba[3]),)
+
     def blit(self, grid, palette, ox, oy):
         for y, row in enumerate(grid):
             for x, ch in enumerate(row):
@@ -39,8 +47,9 @@ class Canvas:
             return struct.pack('>I', len(data)) + tag + data + struct.pack('>I', zlib.crc32(tag + data) & 0xffffffff)
         png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', self.w, self.h, 8, 6, 0, 0, 0))
         png += chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b'')
-        os.makedirs(OUT, exist_ok=True)
-        with open(os.path.join(OUT, name), 'wb') as f:
+        path = os.path.join(OUT, name)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, 'wb') as f:
             f.write(png)
         print('wrote', name, f'{self.w}x{self.h}')
 
@@ -60,8 +69,9 @@ def flip_v(grid):
 
 
 # ----------------------------------------------------------------------------------------------
-# Tiles: assets/gfx/tiles.png, 8x8 tiles in a grid 8 wide. The index of each tile is fixed and
-# mirrored in src/Level.cpp (namespace `sheet`), so only append new tiles at the end.
+# Tiles: assets/gfx/themes/<theme>/tiles.png, 8x8 tiles in a grid 8 wide. The index of each tile
+# is fixed and mirrored in src/Level.cpp (namespace `sheet`), so only append new tiles at the end.
+# These are the cave's; the other themes (further down) swap in their own colours and decorations.
 # ----------------------------------------------------------------------------------------------
 
 ROCK = {'0': rgb('#221e2e'), '1': rgb('#3a3248'), '2': rgb('#4e4460'), '3': rgb('#6a5c7a'),
@@ -197,25 +207,27 @@ hook_block = ['00000000',
               '02111110',
               '00000000']
 
-TILES = [
-    (rock_a, ROCK), (rock_b, ROCK), (rock_c, ROCK), (rock_deep, ROCK),             # 0-3
-    (grass_top, ROCK), (grass_top_b, ROCK), (edge_left, ROCK), (edge_right, ROCK),  # 4-7
-    (edge_bottom, ROCK), (tuft, ROCK), (flower, ROCK), (drip, ROCK),                # 8-11
-    (spikes_up, SPIKE), (flip_v(spikes_up), SPIKE),                                 # 12-13: up, down
-    (rotate(spikes_up), SPIKE), (rotate(rotate(rotate(spikes_up))), SPIKE),         # 14-15: left wall, right wall
-    (spikes_up, CRYSTAL), (flip_v(spikes_up), CRYSTAL),                             # 16-17
-    (rotate(spikes_up), CRYSTAL), (rotate(rotate(rotate(spikes_up))), CRYSTAL),     # 18-19
-    (plank_left, WOOD), (plank_mid, WOOD), (plank_right, WOOD), (hook_block, METAL),  # 20-23
-]
+def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip), spike=SPIKE):
+    """The tiles of one theme: `rock` is the palette for the rock and everything growing on it."""
+    return [
+        (rock_a, rock), (rock_b, rock), (rock_c, rock), (rock_deep, rock),             # 0-3
+        (grass[0], rock), (grass[1], rock), (edge_left, rock), (edge_right, rock),      # 4-7
+        (edge_bottom, rock), (decor[0], rock), (decor[1], rock), (decor[2], rock),      # 8-11: tuft, flower, drip
+        (spikes_up, spike), (flip_v(spikes_up), spike),                                 # 12-13: up, down
+        (rotate(spikes_up), spike), (rotate(rotate(rotate(spikes_up))), spike),         # 14-15: left wall, right wall
+        (spikes_up, CRYSTAL), (flip_v(spikes_up), CRYSTAL),                             # 16-17
+        (rotate(spikes_up), CRYSTAL), (rotate(rotate(rotate(spikes_up))), CRYSTAL),     # 18-19
+        (plank_left, WOOD), (plank_mid, WOOD), (plank_right, WOOD), (hook_block, METAL),  # 20-23
+    ]
 
 
-def make_tiles():
+def make_tiles(name, tiles):
     cols = 8
-    rows = (len(TILES) + cols - 1) // cols
+    rows = (len(tiles) + cols - 1) // cols
     c = Canvas(cols * 8, rows * 8)
-    for i, (grid, pal) in enumerate(TILES):
+    for i, (grid, pal) in enumerate(tiles):
         c.blit(grid, pal, (i % cols) * 8, (i // cols) * 8)
-    c.save('tiles.png')
+    c.save(f'themes/{name}/tiles.png')
 
 
 # ----------------------------------------------------------------------------------------------
@@ -510,33 +522,490 @@ def make_objects():
 
 
 # ----------------------------------------------------------------------------------------------
-# Backgrounds: 320x180, tile horizontally. Drawn behind the level with parallax.
+# Items: assets/gfx/items.png, 10x10 frames, things to pick up that give an ability. The order is
+# mirrored in src/Level.cpp (namespace `sheet`). 0: the climbing pick, 1: a gem.
 # ----------------------------------------------------------------------------------------------
+
+ITEM = {'3': rgb('#e8eef8'), '2': rgb('#9aa6bc'), 'w': rgb('#b47c48'), 'W': rgb('#7a4e2c'), '#': OUTLINE,
+        'a': rgb('#eaffff'), 'b': rgb('#9ff0ff'), 'c': rgb('#4fd0e8'), 'd': rgb('#2a8fb0')}
+# A pickaxe lying diagonally: the steel head across the top, the wooden handle down to the left.
+climbing_pick = ['..33....',
+                 '...32...',
+                 '....W3..',
+                 '...w.32.',
+                 '..w...3.',
+                 '.W......',
+                 'w.......',
+                 '........']
+
+
+def item_frame(grid):
+    """Pads an 8x8 drawing to 10x10 with an outline round it."""
+    g = ['.' * 10] + ['.' + r + '.' for r in grid] + ['.' * 10]
+    out = [list(r) for r in g]
+    for y in range(10):
+        for x in range(10):
+            if g[y][x] == '.' and any(0 <= x + dx < 10 and 0 <= y + dy < 10 and g[y + dy][x + dx] != '.'
+                                      for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+                out[y][x] = '#'
+    return [''.join(r) for r in out]
+
+
+# Cut like a diamond: flat on top, pointed below, lit from the top left.
+gem = ['........',
+       '..abbc..',
+       '.abbccd.',
+       'abbcccdd',
+       '.bccccd.',
+       '..cccd..',
+       '...cd...',
+       '........']
+
+ITEMS = [climbing_pick, gem]
+
+
+def make_items():
+    c = Canvas(10 * len(ITEMS), 10)
+    for i, grid in enumerate(ITEMS):
+        c.blit(item_frame(grid), ITEM, i * 10, 0)
+    c.save('items.png')
+
+
+# ----------------------------------------------------------------------------------------------
+# Backgrounds: assets/gfx/themes/<theme>/sky.png, far.png and near.png, 320x180, repeating
+# sideways. Drawn behind the level back to front, each scrolling a bit faster than the last.
+# ----------------------------------------------------------------------------------------------
+
+W, H = 320, 180
+
 
 def periodic_noise(x, seed, octaves=((1, 1.0), (3, 0.5), (7, 0.25), (13, 0.12))):
     """Smooth noise that repeats every 320 px, so the layer tiles seamlessly."""
     v = 0.0
     for freq, amp in octaves:
-        v += amp * math.sin(2 * math.pi * freq * x / 320.0 + seed * (freq + 1.7))
+        v += amp * math.sin(2 * math.pi * freq * x / W + seed * (freq + 1.7))
     return v
 
 
-def make_background(name, color, top_depth, bottom_height, seed, jag):
-    c = Canvas(320, 180)
+def wrapped_dx(x, cx):
+    """Distance from x to cx going round the 320 px loop, so shapes near the edge tile too."""
+    d = abs(x - cx) % W
+    return min(d, W - d)
+
+
+def lerp(a, b, t):
+    return tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(4))
+
+
+def fill_down(c, color, depth):
+    """Fills each column from the top down to depth(x)."""
+    for x in range(W):
+        for y in range(0, max(0, int(depth(x)))):
+            c.put(x, y, color)
+
+
+def fill_up(c, color, height):
+    """Fills each column from the bottom up to height(x)."""
+    for x in range(W):
+        for y in range(H - max(0, int(height(x))), H):
+            c.put(x, y, color)
+
+
+def disc(c, cx, cy, r, color):
+    for y in range(int(cy - r), int(cy + r) + 1):
+        for x in range(int(cx - r), int(cx + r) + 1):
+            if (x - cx) ** 2 + (y - cy) ** 2 <= r * r:
+                c.put(x % W, y, color)
+
+
+def sky(top, bottom):
+    c = Canvas(W, H)
+    a, b = rgb(top), rgb(bottom)
+    for y in range(H):
+        for x in range(W):
+            c.put(x, y, lerp(a, b, y / (H - 1)))
+    return c
+
+
+def stars(c, count, seed, color='#ffffff', below=H):
+    rng = random.Random(seed)
+    for _ in range(count):
+        x, y = rng.randrange(W), rng.randrange(below)
+        c.mix(x, y, rgb(color, rng.choice((70, 120, 200))))
+        if rng.random() < 0.08:  # a few bright ones with a little cross
+            for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                c.mix(x + dx, y + dy, rgb(color, 70))
+
+
+def glow(c, cx, cy, r, color, rings=3):
+    """A round light with soft rings around it."""
+    for i in range(rings, 0, -1):
+        rr = r + i * 4
+        for y in range(int(cy - rr), int(cy + rr) + 1):
+            for x in range(int(cx - rr), int(cx + rr) + 1):
+                if (x - cx) ** 2 + (y - cy) ** 2 <= rr * rr:
+                    c.mix(x % W, y, rgb(color, 22))
+    disc(c, cx, cy, r, rgb(color))
+
+
+def cloud(c, cx, cy, size, light, shade):
+    """A puffy cloud with a flat bottom and a shaded underside."""
+    rng = random.Random(cx * 31 + cy)
+    puffs = [(cx + dx, cy - rng.uniform(0, size * 0.5), rng.uniform(size * 0.45, size * 0.8))
+             for dx in range(-size, size + 1, max(2, size // 2))]
+    for px, py, r in puffs:
+        for y in range(int(py - r), int(cy) + 1):
+            for x in range(int(px - r), int(px + r) + 1):
+                if (x - px) ** 2 + (y - py) ** 2 <= r * r:
+                    c.put(x % W, y, rgb(shade) if y > cy - 3 else rgb(light))
+
+
+def cave_layer(color, top_depth, bottom_height, seed, jag):
+    """Rocky silhouettes hanging from the top and rising from the bottom."""
+    c = Canvas(W, H)
     col = rgb(color)
-    for x in range(320):
+    for x in range(W):
         top = int(top_depth + 18 * periodic_noise(x, seed) + jag * ((x * 7919 + seed * 13) % 5 - 2))
         bottom = int(bottom_height + 16 * periodic_noise(x, seed + 4.2) + jag * ((x * 104729 + seed) % 5 - 2))
         for y in range(0, max(0, top)):
             c.put(x, y, col)
-        for y in range(180 - max(0, bottom), 180):
+        for y in range(H - max(0, bottom), H):
             c.put(x, y, col)
-    c.save(name)
+    return c
+
+
+def tree_line(c, color, base, seed, spacing, radius):
+    """Round tree tops along a hill whose height is base(x)."""
+    rng = random.Random(seed)
+    fill_up(c, rgb(color), base)
+    for cx in range(0, W, spacing):
+        cx += rng.randrange(spacing // 2)
+        r = rng.uniform(*radius)
+        disc(c, cx, H - base(cx) - r * 0.4, r, rgb(color))
+
+
+def peaks(seed, count, height, slope):
+    """Mountain tops as a height function: the highest of `count` triangles."""
+    rng = random.Random(seed)
+    tops = [(rng.uniform(0, W), rng.uniform(*height), rng.uniform(*slope)) for _ in range(count)]
+
+    def h(x):
+        return max(top - wrapped_dx(x, cx) * k for cx, top, k in tops) + ((x * 7919) % 3 - 1)
+    return h
+
+
+def snowy_peaks(c, rock, snow, h, snowline):
+    """Fills the peaks with rock, capped with snow wherever they're taller than `snowline`."""
+    for x in range(W):
+        height = int(h(x))
+        cap = height - snowline + int(3 * periodic_noise(x, 2.0, ((5, 1.0), (11, 0.6))))
+        for y in range(H - max(0, height), H):
+            c.put(x, y, rgb(snow) if y < H - height + cap else rgb(rock))
+
+
+def pines(c, color, ground, seed, spacing, height):
+    rng = random.Random(seed)
+    for cx in range(0, W, spacing):
+        cx += rng.randrange(spacing)
+        tall = rng.randrange(*height)
+        foot = H - int(ground(cx)) + 2
+        for i in range(tall):
+            half = (i * 0.38) if i < tall - 1 else 0.6
+            for x in range(int(cx - half), int(cx + half) + 1):
+                c.put(x % W, foot - tall + i, rgb(color))
+
+
+def chimneys(c, color, window, seed, count):
+    """Tall stacks rising from the bottom, with a few lit windows."""
+    rng = random.Random(seed)
+    for _ in range(count):
+        cx, w, tall = rng.randrange(W), rng.randrange(8, 20), rng.randrange(50, 120)
+        for y in range(H - tall, H):
+            lip = 2 if y < H - tall + 3 else 0
+            for x in range(cx - w // 2 - lip, cx + w // 2 + lip):
+                c.put(x % W, y, rgb(color))
+        for _ in range(rng.randrange(0, 4)):
+            wx, wy = cx + rng.randrange(-w // 2 + 2, max(-w // 2 + 3, w // 2 - 2)), H - tall + rng.randrange(8, tall - 6)
+            for dy in range(3):
+                c.put(wx % W, wy + dy, rgb(window))
+
+
+def stalactites(c, color, seed, count, length):
+    rng = random.Random(seed)
+    for _ in range(count):
+        cx, w, long = rng.randrange(W), rng.randrange(4, 14), rng.randrange(*length)
+        for y in range(long):
+            half = w / 2 * (1 - y / long)
+            for x in range(int(cx - half), int(cx + half) + 1):
+                c.put(x % W, y, rgb(color))
+
+
+def vines(c, color, leaf, seed, count, length):
+    """Strands hanging from the top, with leaves on alternating sides."""
+    rng = random.Random(seed)
+    for _ in range(count):
+        x, long = rng.randrange(W), rng.randrange(*length)
+        for y in range(long):
+            sway = int(round(math.sin(y / 6 + x) * 1.2))
+            c.put((x + sway) % W, y, rgb(color))
+            if y % 5 == 2:
+                side = 1 if (y // 5) % 2 else -1
+                c.put((x + sway + side) % W, y, rgb(leaf))
+                c.put((x + sway + 2 * side) % W, y - 1, rgb(leaf))
+
+
+def sparks(c, seed, count, colors, above):
+    """Glowing bits floating up from below."""
+    rng = random.Random(seed)
+    for _ in range(count):
+        x, y = rng.randrange(W), rng.randrange(above, H)
+        c.mix(x, y, rgb(rng.choice(colors), rng.choice((90, 160, 230))))
+
+
+# ----------------------------------------------------------------------------------------------
+# Themes. Each one is a tiles.png plus three background layers in assets/gfx/themes/<name>/, and
+# assets/levels/levels.txt says which levels use which. A theme changes the colours of the rock
+# and what grows on it; spikes, hook blocks and platforms look the same everywhere, so they're
+# always easy to spot (except that on snow the spikes are dark iron, as white ones would vanish).
+# ----------------------------------------------------------------------------------------------
+
+def make_cave():
+    make_tiles('cave', tile_sheet(ROCK))
+    sky('#22263a', '#10121a').save('themes/cave/sky.png')
+    cave_layer('#232638', top_depth=38, bottom_height=44, seed=1.3, jag=1).save('themes/cave/far.png')
+    cave_layer('#1a1c2a', top_depth=22, bottom_height=28, seed=5.1, jag=2).save('themes/cave/near.png')
+
+
+# Garden: brown earth under thick grass, ferns, red flowers and vines hanging from ceilings.
+GARDEN = {'0': rgb('#24170f'), '1': rgb('#43301f'), '2': rgb('#5a412a'), '3': rgb('#76583a'),
+          'g': rgb('#2b6234'), 'G': rgb('#3f9446'), 'h': rgb('#78cc54'), 'H': rgb('#bdf07c'),
+          'f': rgb('#ffe27a'), 'p': rgb('#f0604a')}
+garden_grass = ['HhHHhHHh',
+                'hGhhGhhG',
+                'GgGGgGgG',
+                'gGgg1gGg',
+                '.g.G.g.g',
+                '.G...G..',
+                '.g......',
+                '........']
+garden_grass_b = ['hHhHHhHH',
+                  'GhGhhGhG',
+                  'gGgGGgGg',
+                  'Gg1gGg1g',
+                  'g.G.g.G.',
+                  '..g...g.',
+                  '......G.',
+                  '........']
+fern = ['........',
+        '........',
+        '...h....',
+        '.h.hG.h.',
+        '.Gh.hGh.',
+        'h.GhG.G.',
+        '.GhGhG..',
+        'GhGgGhG.']
+poppies = ['........',
+           '..p.....',
+           '.pfp..p.',
+           '..p..pfp',
+           '..G...p.',
+           '..G..G..',
+           '.hG.Gh..',
+           '.GhGhG..']
+vine = ['.g..Gg..',
+        '.G...G..',
+        '.Gh..g..',
+        '..G..Gh.',
+        '.hG...G.',
+        '..g...g.',
+        '..h.....',
+        '........']
+
+
+def make_garden():
+    make_tiles('garden', tile_sheet(GARDEN, (garden_grass, garden_grass_b), (fern, poppies, vine)))
+    c = sky('#1b2b3d', '#3a5a45')
+    sparks(c, seed=3, count=40, colors=('#e8f08c', '#b8f070'), above=90)  # fireflies
+    c.save('themes/garden/sky.png')
+    c = Canvas(W, H)
+    tree_line(c, '#22402f', lambda x: 42 + 12 * periodic_noise(x, 0.7), seed=4, spacing=16, radius=(9, 15))
+    c.save('themes/garden/far.png')
+    c = Canvas(W, H)
+    vines(c, '#152a1f', '#1b3627', seed=5, count=26, length=(12, 50))
+    fill_down(c, rgb('#152a1f'), lambda x: 6 + 4 * periodic_noise(x, 1.9))
+    tree_line(c, '#152a1f', lambda x: 16 + 8 * periodic_noise(x, 3.3), seed=6, spacing=22, radius=(8, 13))
+    c.save('themes/garden/near.png')
+
+
+# Summit: grey-blue stone under snow, icicles, little pines, and mountains under a moonlit sky.
+SNOW = {'0': rgb('#1c2232'), '1': rgb('#384258'), '2': rgb('#4c5870'), '3': rgb('#6a7892'),
+        'g': rgb('#8ea4c2'), 'G': rgb('#c2d4ea'), 'h': rgb('#e6f0fa'), 'H': rgb('#ffffff'),
+        't': rgb('#2c5a48'), 'T': rgb('#3f7a5a'), 'w': rgb('#5a4030')}
+snow_top = ['HHHHHHHH',
+            'HhHHHHhH',
+            'hhhHhhhh',
+            'GhG1GhGG',
+            '.G...G..',
+            '........',
+            '........',
+            '........']
+snow_top_b = ['HHHHHHHH',
+              'HHHhHHHh',
+              'hhhhhHhh',
+              'GGhGG1hG',
+              '..G...G.',
+              '........',
+              '........',
+              '........']
+snow_lump = ['........',
+             '........',
+             '........',
+             '........',
+             '........',
+             '........',
+             '..hHH...',
+             '.hHHHHh.']
+pine = ['...T....',
+        '..tTt...',
+        '..TtH...',
+        '.tTtTt..',
+        '.HtTtT..',
+        'tTtTtHt.',
+        '...w....',
+        '...w....']
+IRON = {'1': rgb('#a4acc0'), '2': rgb('#5c6478'), '3': rgb('#262a38')}
+icicles = ['hHHh.hHh',
+           '.hH...h.',
+           '.hH...h.',
+           '..h.....',
+           '..h.....',
+           '........',
+           '........',
+           '........']
+
+
+def make_snow():
+    make_tiles('snow', tile_sheet(SNOW, (snow_top, snow_top_b), (snow_lump, pine, icicles), IRON))
+    c = sky('#121a32', '#3a4c74')
+    stars(c, count=110, seed=7, below=120)
+    glow(c, 246, 34, 9, '#eef2fa')
+    for x, y in ((243, 31), (249, 37), (245, 38)):  # craters
+        c.put(x, y, rgb('#c8d0e0'))
+    c.save('themes/snow/sky.png')
+    c = Canvas(W, H)
+    snowy_peaks(c, '#28344f', '#56688c', peaks(8, 7, (70, 120), (0.9, 1.6)), snowline=78)
+    c.save('themes/snow/far.png')
+    c = Canvas(W, H)
+    ground = lambda x: 26 + 8 * periodic_noise(x, 2.6)
+    fill_up(c, rgb('#18203a'), ground)
+    pines(c, '#18203a', ground, seed=9, spacing=14, height=(14, 30))
+    c.save('themes/snow/near.png')
+
+
+# Chimney: black basalt with glowing cracks and embers, and a furnace glow from below.
+EMBER = {'0': rgb('#150d10'), '1': rgb('#2a1c20'), '2': rgb('#3d282a'), '3': rgb('#583834'),
+         'g': rgb('#3a1c1a'), 'G': rgb('#5c2620'), 'h': rgb('#e8662a'), 'H': rgb('#ffc04a'),
+         'w': rgb('#d8c0a0')}
+ember_top = ['GGgGGGgG',
+             'gHgghgGg',
+             'h1gG1hg1',
+             '.h..1.h.',
+             '....h...',
+             '........',
+             '........',
+             '........']
+ember_top_b = ['GgGGGgGG',
+               'gGhgGgHg',
+               '1gh1gGh1',
+               '..h..1h.',
+               '..h.....',
+               '........',
+               '........',
+               '........']
+coals = ['........',
+         '........',
+         '........',
+         '........',
+         '........',
+         '....H...',
+         '..h.hH..',
+         '.GhGhGh.']
+glowshroom = ['........',
+              '........',
+              '........',
+              '...hHh..',
+              '..hHHHh.',
+              '....w...',
+              '....w...',
+              '...GwG..']
+lava_drip = ['00h1h00.',
+             '.0hH0...',
+             '..hH....',
+             '..h.....',
+             '........',
+             '..H.....',
+             '........',
+             '........']
+
+
+def make_ember():
+    make_tiles('ember', tile_sheet(EMBER, (ember_top, ember_top_b), (coals, glowshroom, lava_drip)))
+    c = sky('#170a0e', '#5c2016')
+    sparks(c, seed=11, count=70, colors=('#ffb040', '#ff7a30', '#ffe08a'), above=40)
+    c.save('themes/ember/sky.png')
+    c = Canvas(W, H)
+    chimneys(c, '#2e1517', '#e8762c', seed=12, count=13)
+    c.save('themes/ember/far.png')
+    c = Canvas(W, H)
+    stalactites(c, '#1c0c0f', seed=13, count=30, length=(10, 46))
+    fill_down(c, rgb('#1c0c0f'), lambda x: 8 + 5 * periodic_noise(x, 4.4))
+    fill_up(c, rgb('#1c0c0f'), lambda x: 20 + 10 * periodic_noise(x, 6.1))
+    c.save('themes/ember/near.png')
+
+
+# Daylight: warm sandstone, bright grass and flowers, a blue sky with clouds and green hills.
+SUN = {'0': rgb('#4a3020'), '1': rgb('#8c6440'), '2': rgb('#a87a50'), '3': rgb('#c8986a'),
+       'g': rgb('#3a8436'), 'G': rgb('#56b446'), 'h': rgb('#98dc5c'), 'H': rgb('#d6f68e'),
+       'f': rgb('#fff27a'), 'p': rgb('#ff6aa8')}
+daisies = ['........',
+           '........',
+           '.....f..',
+           '....fpf.',
+           '.f...f..',
+           'fpf..G..',
+           '.f..hG..',
+           '.G.GhG..']
+roots = ['.0..0.0.',
+         '.0..0.0.',
+         '..0.0...',
+         '..0..0..',
+         '.0...0..',
+         '.....0..',
+         '........',
+         '........']
+
+
+def make_daylight():
+    make_tiles('daylight', tile_sheet(SUN, decor=(tuft, daisies, roots)))
+    c = sky('#3c78bc', '#a4cfe8')
+    glow(c, 58, 30, 11, '#fff4c8', rings=4)
+    for x, y, size in ((150, 42, 14), (232, 26, 10), (300, 60, 12), (100, 74, 8), (20, 96, 9)):
+        cloud(c, x, y, size, '#f6faff', '#d4e2f2')
+    c.save('themes/daylight/sky.png')
+    c = Canvas(W, H)
+    fill_up(c, rgb('#7eaec6'), lambda x: 62 + 22 * periodic_noise(x, 0.4))
+    c.save('themes/daylight/far.png')
+    c = Canvas(W, H)
+    tree_line(c, '#4a8458', lambda x: 30 + 12 * periodic_noise(x, 5.5), seed=14, spacing=34, radius=(6, 11))
+    c.save('themes/daylight/near.png')
+
+
+THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight]
 
 
 if __name__ == '__main__':
-    make_tiles()
+    for make_theme in THEMES:
+        make_theme()
     make_player()
     make_objects()
-    make_background('bg_far.png', '#232638', top_depth=38, bottom_height=44, seed=1.3, jag=1)
-    make_background('bg_near.png', '#1a1c2a', top_depth=22, bottom_height=28, seed=5.1, jag=2)
+    make_items()

@@ -8,6 +8,9 @@ TEST(SaveData, RoundTripsThroughText) {
     data.continueLevel = "level4.txt";
     data.addResult("level1.txt", 42.5f, 3);
     data.addResult("level2.txt", 61.25f, 0);
+    data.explored = {"level1.txt", "level2.txt"};
+    data.abilities = {"climbing_pick"};
+    data.gems = {"level3.txt 12 5", "level1.txt 70 9"};
 
     SaveData loaded = SaveData::parse(data.serialize());
 
@@ -23,6 +26,9 @@ TEST(SaveData, RoundTripsThroughText) {
     ASSERT_NE(loaded.record("level2.txt"), nullptr);
     EXPECT_FLOAT_EQ(loaded.record("level2.txt")->bestTime, 61.25f);
     EXPECT_EQ(loaded.record("level3.txt"), nullptr);
+    EXPECT_EQ(loaded.explored, (std::set<std::string>{"level1.txt", "level2.txt"}));
+    EXPECT_EQ(loaded.abilities, std::set<std::string>{"climbing_pick"});
+    EXPECT_EQ(loaded.gems, data.gems);
 }
 
 TEST(SaveData, KeepsBestTimeAndFewestDeathsSeparately) {

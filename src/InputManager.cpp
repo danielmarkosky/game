@@ -10,6 +10,7 @@ void InputManager::newFrame()
     m_pressedKeys.fill(false);
     m_mouseClicked = false;
     m_mouseReleased = false;
+    m_wheel = 0.f;
 
     if (!window) return;
     // sf::Mouse reads the whole system, not just our window.
@@ -46,6 +47,9 @@ void InputManager::handleEvent(const sf::Event& event)
                 m_mouseFromEvents = false;
                 if (!m_mouseFromPolling) m_mouseReleased = true;
             }
+            break;
+        case sf::Event::MouseWheelScrolled:
+            if (event.mouseWheelScroll.wheel == sf::Mouse::VerticalWheel) m_wheel += event.mouseWheelScroll.delta;
             break;
         case sf::Event::GainedFocus:
             m_focused = true;
@@ -88,6 +92,11 @@ bool InputManager::isMousePressed() const
 bool InputManager::wasMouseClicked() const
 {
     return m_mouseClicked;
+}
+
+float InputManager::wheelDelta() const
+{
+    return m_wheel;
 }
 
 bool InputManager::wasMouseReleased() const

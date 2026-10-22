@@ -2,6 +2,7 @@
 
 #include <map>
 #include <optional>
+#include <set>
 #include <string>
 
 struct Settings
@@ -27,6 +28,9 @@ struct SaveData
     Settings settings;
     std::string continueLevel;                   // file name of the last level reached, empty if none
     std::map<std::string, LevelRecord> records;  // by level file name
+    std::set<std::string> explored;              // file names of the rooms shown on the map
+    std::set<std::string> abilities;             // picked up, e.g. "climbing_pick"
+    std::set<std::string> gems;                  // found, as "<level file> <tile x> <tile y>"
 
     // Keeps the better time and the fewer deaths separately.
     void addResult(const std::string& level, float time, int deaths);

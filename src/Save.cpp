@@ -46,6 +46,16 @@ SaveData SaveData::parse(const std::string& text)
             std::string level;
             LevelRecord record;
             if (words >> level >> record.bestTime >> record.fewestDeaths) data.records[level] = record;
+        } else if (key == "explored") {
+            std::string level;
+            if (words >> level) data.explored.insert(level);
+        } else if (key == "ability") {
+            std::string ability;
+            if (words >> ability) data.abilities.insert(ability);
+        } else if (key == "gem") {
+            std::string level;
+            int x, y;
+            if (words >> level >> x >> y) data.gems.insert(level + " " + std::to_string(x) + " " + std::to_string(y));
         }
     }
     return data;
@@ -63,6 +73,9 @@ std::string SaveData::serialize() const
     for (const auto& [level, record] : records) {
         out << "record " << level << " " << record.bestTime << " " << record.fewestDeaths << "\n";
     }
+    for (const auto& level : explored) out << "explored " << level << "\n";
+    for (const auto& ability : abilities) out << "ability " << ability << "\n";
+    for (const auto& gem : gems) out << "gem " << gem << "\n";
     return out.str();
 }
 

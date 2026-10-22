@@ -21,6 +21,8 @@ public:
     bool isMousePressed() const;
     bool wasMouseClicked() const;
     bool wasMouseReleased() const;
+    // Mouse wheel turned this frame: positive is up (away from you).
+    float wheelDelta() const;
     // In game pixels (0..GAME_WIDTH, 0..GAME_HEIGHT), not window pixels.
     sf::Vector2f mousePosition() const;
     sf::Vector2f scaleMouseInput(sf::Vector2i pixelPos) const;
@@ -37,4 +39,5 @@ private:
     std::optional<bool> m_focused; // unknown until the first frame
     bool m_mouseClicked = false;
     bool m_mouseReleased = false;
+    float m_wheel = 0.f;
 };

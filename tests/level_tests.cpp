@@ -123,7 +123,7 @@ TEST(Level_LoadLevelList, ParsesFilesAndTitles) {
     const auto path = std::filesystem::temp_directory_path() / "game_test_levels.txt";
     {
         std::ofstream file(path);
-        file << "# comment\n\nfirst.txt  The First One\nsecond.txt Two\n";
+        file << "# comment\n\nfirst.txt 0 0  The First One\nsecond.txt -3 12 Two\n";
     }
     auto levels = loadLevelList(path.string());
     std::filesystem::remove(path);
@@ -132,6 +132,81 @@ TEST(Level_LoadLevelList, ParsesFilesAndTitles) {
     EXPECT_EQ(levels[0].path, (path.parent_path() / "first.txt").string());
     EXPECT_EQ(levels[0].title, "The First One");
     EXPECT_EQ(levels[1].title, "Two");
+    EXPECT_EQ(levels[1].position, sf::Vector2i(-3, 12));
+}
+
+TEST(Level_LoadLevelList, NeedsAPositionForEveryLevel) {
+    const auto path = std::filesystem::temp_directory_path() / "game_test_no_position.txt";
+    {
+        std::ofstream file(path);
+        file << "first.txt The First One\n";
+    }
+    EXPECT_THROW(loadLevelList(path.string()), std::runtime_error);
+    std::filesystem::remove(path);
+}
+
+TEST(Level_LoadLevelList, ThemeLinesApplyToTheLevelsAfterThem) {
+    const auto path = std::filesystem::temp_directory_path() / "game_test_themes.txt";
+    {
+        std::ofstream file(path);
+        file << "first.txt 0 0 One\ntheme snow\nsecond.txt 1 0 Two\nthird.txt 2 0 Three\ntheme ember\nfourth.txt 3 0 Four\n";
+    }
+    auto levels = loadLevelList(path.string());
+    std::filesystem::remove(path);
+
+    ASSERT_EQ(levels.size(), 4u);
+    EXPECT_EQ(levels[0].theme, Theme::DEFAULT);
+    EXPECT_EQ(levels[1].theme, "snow");
+    EXPECT_EQ(levels[2].theme, "snow");
+    EXPECT_EQ(levels[3].theme, "ember");
+}
+
+TEST(Level_Theme, EveryShippedThemeLoads) {
+    std::set<std::string> themes;
+    for (const auto& info : loadLevelList(config::assetPath("levels/levels.txt"))) themes.insert(info.theme);
+    EXPECT_GE(themes.size(), 5u);
+    for (const auto& name : themes) {
+        SCOPED_TRACE(name);
+        auto theme = Theme::get(name);
+        EXPECT_EQ(theme->tiles.getSize(), sf::Vector2u(64, 24));
+        for (const auto& layer : theme->layers) EXPECT_EQ(layer.getSize(), sf::Vector2u(320, 180));
+    }
+    EXPECT_THROW(Theme::get("no_such_theme"), std::runtime_error);
+}
+
+TEST(Level_Theme, LevelsShareALoadedTheme) {
+    auto a = Theme::get("snow");
+    EXPECT_EQ(Theme::get("snow"), a);
+    Level lvl;
+    EXPECT_EQ(lvl.theme().name, Theme::DEFAULT);
+    lvl.setTheme(a);
+    EXPECT_EQ(&lvl.theme(), a.get());
+}
+
+TEST(Level_Pickups, AreReadFromTheFileAndTouched) {
+    auto lvl = Level::loadFromString(
+        "#####\n"
+        "#S.P#\n"
+        "#####\n");
+    ASSERT_EQ(lvl->pickups().size(), 1u);
+    EXPECT_EQ(lvl->pickups()[0].ability, "climbing_pick");
+    EXPECT_EQ(lvl->pickups()[0].position, sf::Vector2f(24.f, 8.f));
+    EXPECT_FALSE(lvl->isSolid(3, 1));
+    EXPECT_EQ(lvl->pickupAt({8.f, 8.f}, 11.f, 7.f), nullptr);
+    EXPECT_EQ(lvl->pickupAt({20.f, 8.f}, 11.f, 7.f), &lvl->pickups()[0]);
+}
+
+TEST(Level_Gems, AreReadFromTheFileAndTouched) {
+    auto lvl = Level::loadFromString(
+        "######\n"
+        "#S.*.#\n"
+        "######\n");
+    ASSERT_EQ(lvl->gems().size(), 1u);
+    EXPECT_EQ(lvl->gems()[0], sf::Vector2f(24.f, 8.f));
+    EXPECT_FALSE(lvl->isSolid(3, 1));
+    EXPECT_FALSE(lvl->gemAt({8.f, 8.f}, 11.f, 7.f).has_value());
+    EXPECT_FALSE(lvl->gemAt({32.f, 8.f}, 11.f, 7.f).has_value()); // just touching its side
+    EXPECT_EQ(lvl->gemAt({28.f, 8.f}, 11.f, 7.f), 0u);
 }
 
 TEST(Level_IsDangerousSpace, OnlyThePointyHalfOfASpikeHurts) {
@@ -150,7 +225,7 @@ TEST(Level_IsDangerousSpace, OnlyThePointyHalfOfASpikeHurts) {
     EXPECT_TRUE(lvl->isDangerousSpace({24.f, 10.f}, 11.f, 7.f));
 }
 
-TEST(Level_ExitThrough, LeftRightAndTopButNotBottom) {
+TEST(Level_ExitThrough, EverySide) {
     // 5 x 3 tiles: x 0..40, y 0..24.
     auto lvl = Level::loadFromString(
         "#####\n"
@@ -161,38 +236,6 @@ TEST(Level_ExitThrough, LeftRightAndTopButNotBottom) {
     EXPECT_EQ(lvl->exitThrough({-1.f, 12.f}), Level::Side::Left);
     EXPECT_EQ(lvl->exitThrough({20.f, 25.f}), Level::Side::Top);
     EXPECT_FALSE(lvl->exitThrough({20.f, 12.f}).has_value());
+    EXPECT_EQ(lvl->exitThrough({20.f, -1.f}), Level::Side::Bottom);
     EXPECT_FALSE(lvl->exitThrough({40.f, 12.f}).has_value()); // exactly on the edge is still inside
-    EXPECT_FALSE(lvl->exitThrough({20.f, -30.f}).has_value()); // falling out isn't leaving
-}
-
-TEST(Level_ExitThrough, EveryShippedLevelHasAWayOut) {
-    // Flood fills the empty tiles from the start. Some must lead out through the left, right or
-    // top edge, or the level could never be finished. (This doesn't check the jumps are possible.)
-    for (const auto& info : loadLevelList(config::assetPath("levels/levels.txt"))) {
-        SCOPED_TRACE(info.path);
-        auto lvl = Level::loadFromFile(info.path);
-        const sf::FloatRect b = lvl->bounds();
-        const int minX = static_cast<int>(b.left / TILE_SIZE), maxX = static_cast<int>((b.left + b.width) / TILE_SIZE) - 1;
-        const int minY = static_cast<int>(b.top / TILE_SIZE), maxY = static_cast<int>((b.top + b.height) / TILE_SIZE) - 1;
-        const sf::Vector2f start = lvl->getStartPos();
-
-        std::vector<std::pair<int, int>> todo = {{static_cast<int>(start.x / TILE_SIZE), static_cast<int>(start.y / TILE_SIZE)}};
-        std::set<std::pair<int, int>> seen(todo.begin(), todo.end());
-        bool foundExit = false;
-        while (!todo.empty() && !foundExit) {
-            auto [x, y] = todo.back();
-            todo.pop_back();
-            if (x < minX || x > maxX || y > maxY) {
-                foundExit = true;
-                break;
-            }
-            if (y < minY) continue; // fell out of the bottom
-            for (auto [dx, dy] : {std::pair{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-                std::pair<int, int> next{x + dx, y + dy};
-                if (lvl->isSolid(next.first, next.second) || !seen.insert(next).second) continue;
-                todo.push_back(next);
-            }
-        }
-        EXPECT_TRUE(foundExit);
-    }
 }

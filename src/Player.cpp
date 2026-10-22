@@ -52,6 +52,8 @@ void Player::handleInput(const PlayerInput& in)
             if (auto hit = ropeTarget(in.aim)) {
                 rope.emplace(exactCentre(), *hit, level);
                 events.push_back({PlayerEvent::Type::RopeAttached, *hit});
+            } else if (auto bounce = ropeBounce(in.aim)) {
+                events.push_back({PlayerEvent::Type::RopeBounced, *bounce});
             }
         }
     }
@@ -296,6 +298,18 @@ void Player::drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scal
     target.draw(sprite);
 }
 
+void Player::enterLevel(std::shared_ptr<const Level> lvl, sf::Vector2f shift, bool fromBelow)
+{
+    level = std::move(lvl);
+    position += shift;
+    rope.reset();
+    ropeJumpTimer = 0.f;
+    if (fromBelow) {
+        velocity.y = std::max(velocity.y, ROOM_ENTRY_LIFT);
+        jumping = false; // a full lift even if jump was let go of
+    }
+}
+
 void Player::respawn(sf::Vector2f pos)
 {
     position = {std::round(pos.x), std::round(pos.y)};
@@ -355,8 +369,26 @@ std::vector<PlayerEvent> Player::takeEvents()
 
 std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 {
+    auto hit = nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ROPE_RANGE);
+    if (!hit || hooksRock) return hit;
+    // The tile the shot ran into is just past the surface point.
+    const sf::Vector2f dir = (aim - exactCentre()) / distance(aim, exactCentre());
+    auto [tileX, tileY] = tailNumbers(*hit + dir * 0.25f);
+    if (!level->isHookBlock(tileX, tileY)) return std::nullopt;
+    return hit;
+}
+
+std::optional<sf::Vector2f> Player::ropeBounce(sf::Vector2f aim) const
+{
+    if (hooksRock || ropeTarget(aim)) return std::nullopt;
     return nearestSolidPoint(exactCentre(), aim, level, Rope::MIN_LENGTH, ROPE_RANGE);
 }
+
+void Player::setCanHookRock(bool can)
+{
+    hooksRock = can;
+}
+
 
 bool Player::canShootRope() const
 {

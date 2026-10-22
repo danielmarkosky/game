@@ -23,7 +23,7 @@ struct PlayerInput
 // Something that happened during an update, so the game can show an effect for it.
 struct PlayerEvent
 {
-    enum class Type { Jumped, Landed, Stepped, RopeAttached, RopeWrapped };
+    enum class Type { Jumped, Landed, Stepped, RopeAttached, RopeWrapped, RopeBounced };
     Type type;
     sf::Vector2f position;
     float strength = 0.f; // Landed: how fast the player was falling
@@ -49,6 +49,10 @@ public:
     void draw(sf::RenderTarget& target, sf::Vector2f centr) const;
 
     void respawn(sf::Vector2f pos);
+    // Carries on into the next room, moved by `shift` into its coordinates, keeping the speed but
+    // letting go of the rope. Going up into a room through its floor gives a lift, like in
+    // Celeste, so a jump through the gap makes it onto the ledge above.
+    void enterLevel(std::shared_ptr<const Level> lvl, sf::Vector2f shift, bool fromBelow);
 
     sf::Vector2f centre() const;
     // Bottom-left corner of the hitbox. Always whole pixels.
@@ -60,6 +64,10 @@ public:
     const Rope* getRope() const;
     // Where a rope shot towards `aim` would attach, if anywhere.
     std::optional<sf::Vector2f> ropeTarget(sf::Vector2f aim) const;
+    // Without the climbing pick the rope only sticks to hook blocks ('%'); a shot at rock misses.
+    void setCanHookRock(bool can);
+    // Where a rope shot towards `aim` would hit rock and bounce off, for want of the pick.
+    std::optional<sf::Vector2f> ropeBounce(sf::Vector2f aim) const;
     // False during the cooldown after leaving the rope.
     bool canShootRope() const;
     // Events since the last call.
@@ -95,6 +103,9 @@ public:
     static constexpr float ROPE_COOLDOWN = 0.3f;
     static constexpr float ROPE_JUMP_COOLDOWN = 0.55f;
 
+    // Going up into a room above, the player moves up at least this fast.
+    static constexpr float ROOM_ENTRY_LIFT = JUMP_SPEED;
+
     // How far the player gets nudged sideways around a corner instead of bonking into it.
     static constexpr int CORNER_CORRECTION = 4;
     // Holding down on a one-way platform drops through it for this long.
@@ -124,6 +135,7 @@ private:
     bool ropeShotQueued = false; // clicked during the cooldown: shoots when it ends, if still held
     bool jumping = false;
     bool facingLeft = false;
+    bool hooksRock = true;
 
     // Looks
     size_t skin = 0;

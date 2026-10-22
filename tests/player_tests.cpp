@@ -476,3 +476,69 @@ TEST(PlayerTest, EverySkinHasARowOfFrames) {
     EXPECT_EQ(sheet.getSize().x, 9u * 12u);
     EXPECT_EQ(sheet.getSize().y, Player::SKINS.size() * 14u);
 }
+
+TEST(PlayerTest, EnteringAnotherRoomKeepsTheSpeedButLetsGoOfTheRope) {
+    auto level = Level::loadFromString(ROOM);
+    auto next = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({100.f, 48.f});
+    PlayerInput in;
+    in.ropePressed = in.ropeHeld = true;
+    in.aim = player.centre() + sf::Vector2f(60.f, 40.f);
+    player.handleInput(in);
+    ASSERT_NE(player.getRope(), nullptr);
+    player.setVelocity({150.f, -40.f});
+
+    player.enterLevel(next, {-320.f, 8.f}, false);
+
+    EXPECT_EQ(player.getPosition(), sf::Vector2f(-220.f, 56.f));
+    EXPECT_EQ(player.getVelocity(), sf::Vector2f(150.f, -40.f));
+    EXPECT_EQ(player.getRope(), nullptr);
+}
+
+TEST(PlayerTest, GoingUpIntoARoomGivesALift) {
+    auto level = Level::loadFromString(ROOM);
+    Player player(level);
+    player.respawn({100.f, 48.f});
+    player.setVelocity({0.f, 40.f});
+
+    player.enterLevel(level, {0.f, -96.f}, true);
+
+    EXPECT_FLOAT_EQ(player.getVelocity().y, Player::ROOM_ENTRY_LIFT);
+}
+
+TEST(PlayerTest, WithoutThePickTheRopeOnlySticksToMetal) {
+    // Rock ceiling with two hook blocks in it, 6 tiles above the floor.
+    auto level = Level::loadFromString(
+        "################\n"
+        "#.........%%...#\n"
+        "#..............#\n"
+        "#..............#\n"
+        "#..............#\n"
+        "#..............#\n"
+        "#..S...........#\n"
+        "################\n");
+    Player player(level);
+    player.setCanHookRock(false);
+    const sf::Vector2f rock = player.centre() + sf::Vector2f(0.f, 60.f);
+    const sf::Vector2f metal(84.f, 52.f);
+
+    EXPECT_FALSE(player.ropeTarget(rock).has_value());
+    ASSERT_TRUE(player.ropeBounce(rock).has_value());
+    EXPECT_NEAR(player.ropeBounce(rock)->y, 56.f, 0.5f); // the underside of the ceiling
+    EXPECT_TRUE(player.ropeTarget(metal).has_value());
+    EXPECT_FALSE(player.ropeBounce(metal).has_value());
+
+    PlayerInput in;
+    in.ropePressed = in.ropeHeld = true;
+    in.aim = rock;
+    player.handleInput(in);
+    EXPECT_EQ(player.getRope(), nullptr);
+    auto events = player.takeEvents();
+    ASSERT_EQ(events.size(), 1u);
+    EXPECT_EQ(events[0].type, PlayerEvent::Type::RopeBounced);
+
+    player.setCanHookRock(true);
+    player.handleInput(in);
+    EXPECT_NE(player.getRope(), nullptr);
+}
