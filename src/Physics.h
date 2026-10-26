@@ -13,8 +13,8 @@ struct Physics
     float runSpeed = 70.f;           // top speed on the ground, px/s
     float runAcceleration = 300.f;   // px/s each second: 70 / 300 is a quarter of a second to top speed
     float runDeceleration = 450.f;   // slowing down with nothing held (turning round brakes and accelerates)
-    float airAcceleration = 220.f;   // the same in the air, where there's less grip
-    float airDeceleration = 60.f;    // nothing held in the air: you mostly drift on
+    float airAcceleration = 100.f;   // the same in the air: a little steering, you mostly go where the jump sent you
+    float airDeceleration = 0.f;     // nothing held doesn't slow you down
     float flingDeceleration = 140.f; // in the air faster than running, e.g. after letting go of a swing
 
     // Jumping and falling
@@ -50,6 +50,27 @@ struct Physics
     float wallSlideSpeed = 40.f;     // sliding down, out of stamina
     float wallJumpPush = 110.f;      // jumping off a wall: away from it this fast, and up as a jump
     float climbOverSpeed = 150.f;    // climbing over the top: a hop up onto it
+
+    // Swimming. In water you float with your head and shoulders out, bobbing.
+    float swimSpeed = 45.f;          // across, and down holding down
+    float swimAcceleration = 220.f;
+    float buoyancy = 70.f;           // how hard the water lifts you back to floating, px/s each second for each px too deep
+    float waterDrag = 5.f;           // how quickly the water slows you up and down: this much of the speed a second
+    float swimJumpSpeed = 200.f;     // jumping out from the surface: enough to get onto a ledge at the water's edge
+    float airTime = 8.f;             // seconds of breath under water, before you drown
+    float airRefillTime = 1.f;       // seconds at the surface to get it all back
+    float divingAir = 4.f;           // the diving suit makes your breath last this many times as long
+
+    // Bounce mushrooms: landing on one throws you up this fast (holding down, you stand on it).
+    float bounceSpeed = 330.f;
+
+    // Riding a mine cart along the rails: it rolls on at this speed, and jump jumps it.
+    float cartSpeed = 110.f;
+
+    // Floating where there's no gravity (the Still): the arrows push you any way.
+    float floatAcceleration = 200.f;
+    float floatSpeed = 70.f;         // the fastest pushing gets you
+    float floatDrag = 1.2f;          // how much of your speed you lose each second, pushing nowhere
 
     // "run_speed 70" lines; # starts a comment. Unknown names and broken numbers are skipped and
     // described in `problems`, if given.

@@ -2,6 +2,8 @@
 #include "Game.h"
 #include "src/GameShared.h"
 #include "src/Hud.h"
+#include "src/Outfits.h"
+#include "src/Regions.h"
 #include "src/Props.h"
 #include "src/Text.h"
 #include "src/utils.h"
@@ -58,7 +60,15 @@ void Game::render()
 void Game::drawWorld(sf::Vector2f cam, bool withPlayer)
 {
     drawRooms(cam);
-    if (withPlayer && deathTimer <= 0.f) player->draw(canvas, cam);
+    if (withPlayer) {
+        if (hasDog()) dog.draw(canvas, *player, cam, clockTime);
+        if (deathTimer <= 0.f) {
+            player->draw(canvas, cam);
+            // In a cart: its sides in front of your legs.
+            if (player->isRiding()) level->drawRiddenCart(canvas, cam, player->getPosition() + sf::Vector2f(Player::WIDTH * 0.5f, 0.f), clockTime);
+        }
+    }
+    drawFront();
     if (screen != Screen::Complete) particles.draw(canvas, cam); // the confetti goes over the dimmed screen
     drawAir(cam);
 }
@@ -66,9 +76,10 @@ void Game::drawWorld(sf::Vector2f cam, bool withPlayer)
 void Game::drawAir(sf::Vector2f cam)
 {
     ambience.drawNear(canvas);
-    // In dark places the player carries a little light.
+    // In dark places the player carries a little light; more, with a lamp on your hat.
+    const bool lamp = progress.outfit == outfits::MINER;
     if (deathTimer <= 0.f && ambience.isDark()) {
-        lights.push_back({viewCoordinates(player->centre(), cam), 34.f, sf::Color(150, 140, 170, 255)});
+        lights.push_back({viewCoordinates(player->centre(), cam), lamp ? 64.f : 34.f, lamp ? sf::Color(220, 200, 150, 255) : sf::Color(150, 140, 170, 255)});
     } else if (deathTimer <= 0.f && ambience.darkness() > 0.f) {
         lights.push_back({viewCoordinates(player->centre(), cam), 46.f, sf::Color(90, 85, 110, static_cast<sf::Uint8>(160.f * ambience.darkness()))});
     }
@@ -85,7 +96,7 @@ void Game::drawBeams()
         const float sway = std::sin(clockTime * 0.4f + beam.seed) * 3.f;
         const sf::Vector2f top = beam.top, bottom = beam.top + sf::Vector2f(sway, beam.length);
         const float topHalf = 5.f, bottomHalf = 14.f;
-        const sf::Color bright(255, 238, 200, 70), none(255, 238, 200, 0);
+        const sf::Color bright(255, 238, 200, 42), none(255, 238, 200, 0);
         const sf::Vertex quad[] = {{top + sf::Vector2f(-topHalf, 0.f), bright}, {top + sf::Vector2f(topHalf, 0.f), bright},
                                    {bottom + sf::Vector2f(bottomHalf, 0.f), none}, {bottom + sf::Vector2f(-bottomHalf, 0.f), none}};
         canvas.draw(quad, 4, sf::Quads, add);
@@ -98,10 +109,51 @@ void Game::drawBeams()
             const float t = along / beam.length;
             const float half = topHalf + (bottomHalf - topHalf) * t;
             const float x = top.x + sway * t + std::sin(clockTime * 0.6f + i * 1.7f) * half * 0.8f;
-            const auto alpha = static_cast<sf::Uint8>(150.f * (1.f - t) * (0.5f + 0.5f * std::sin(clockTime * 1.3f + i)));
+            const auto alpha = static_cast<sf::Uint8>(90.f * (1.f - t) * (0.5f + 0.5f * std::sin(clockTime * 1.3f + i)));
             hud::fillRect(canvas, {std::floor(x), std::floor(top.y + along), 1.f, 1.f}, sf::Color(255, 240, 210, alpha));
         }
     }
+}
+
+void Game::drawFront()
+{
+    // Hidden passages, over you: in one, they fade away round you.
+    for (const auto& [room, roomCam] : roomsDrawn) {
+        rooms[room]->drawHidden(canvas, roomCam, player->centre() + roomOrigin(levelIndex) - roomOrigin(room));
+    }
+    for (const auto& [room, roomCam] : roomsDrawn) rooms[room]->drawWater(canvas, roomCam, clockTime);
+    // Waterfalls: streaks of water running down, paler in the middle, and foam where they land.
+    sf::VertexArray quads(sf::Quads);
+    auto dot = [&](float x, float y, float w, float h, sf::Color c) {
+        quads.append({{x, y}, c});
+        quads.append({{x + w, y}, c});
+        quads.append({{x + w, y + h}, c});
+        quads.append({{x, y + h}, c});
+    };
+    constexpr int HALF = 7;
+    for (const Fall& fall : falls) {
+        const float left = std::floor(fall.top.x), top = std::floor(fall.top.y);
+        for (int c = -HALF; c < HALF; ++c) {
+            const float speed = 110.f + 18.f * static_cast<float>((c * 7 + 11) % 4);
+            const bool edge = c == -HALF || c == HALF - 1;
+            for (int y = 0; y < static_cast<int>(fall.length); ++y) {
+                const float t = static_cast<float>(y) - clockTime * speed;
+                const float streak = std::sin(t * 0.19f + c * 1.7f + fall.seed) + 0.8f * std::sin(t * 0.061f + c * 0.9f);
+                sf::Color colour = streak > 1.2f ? sf::Color(225, 250, 255, 200) : streak > 0.1f ? sf::Color(130, 215, 240, 160) : sf::Color(60, 150, 205, 140);
+                if (edge) colour.a = static_cast<sf::Uint8>(colour.a / 2);
+                dot(left + static_cast<float>(c), top + static_cast<float>(y), 1.f, 1.f, colour);
+            }
+        }
+        // Foam, churning where it meets the water.
+        const float bottom = top + fall.length;
+        for (int i = 0; i < 18; ++i) {
+            const float x = left + std::sin(clockTime * (3.f + i % 4) + i * 2.3f) * (HALF + 3.f);
+            const float y = bottom - 1.f - std::abs(std::sin(clockTime * 4.f + i * 1.1f)) * 4.f;
+            const float size = i % 3 == 0 ? 2.f : 1.f;
+            dot(std::floor(x), std::floor(y), size, size, sf::Color(235, 250, 255, 160));
+        }
+    }
+    canvas.draw(quads);
 }
 
 void Game::drawRooms(sf::Vector2f cam)
@@ -140,14 +192,24 @@ void Game::drawRooms(sf::Vector2f cam)
     ambience.drawFar(canvas);
     lights.clear();
     beams.clear();
+    falls.clear();
+    roomsDrawn.clear();
     auto owned = [this](const std::string& ability) { return hasAbility(ability); };
+    auto holds = [this](const std::string& fact) { return hasFact(fact); };
     for (const Visible& v : visible) {
         std::optional<sf::Vector2f> flag;
         if (v.index == levelIndex) flag = checkpoint;
         else if (transition && v.index == transition->from) flag = transition->fromCheckpoint;
+        roomsDrawn.emplace_back(v.index, v.cam);
         rooms[v.index]->draw(canvas, v.cam);
-        rooms[v.index]->drawProps(canvas, v.cam, clockTime);
+        rooms[v.index]->drawProps(canvas, v.cam, clockTime, holds);
         rooms[v.index]->drawMoving(canvas, v.cam, clockTime);
+        // The cart you're in isn't still standing there; one left at the end of the line is.
+        if (!(v.index == levelIndex && player->isRiding())) {
+            rooms[v.index]->drawCarts(canvas, v.cam, [this](const Cart& cart) { return cartReady(cart); });
+        }
+        if (parked && parked->first == v.index && !player->isRiding()) rooms[v.index]->drawRiddenCart(canvas, v.cam, parked->second, 0.f);
+        if (hasAbility("stopwatch")) rooms[v.index]->drawTrials(canvas, v.cam, clockTime);
         rooms[v.index]->drawMarkers(canvas, v.cam, flag, clockTime);
         std::optional<size_t> saved;
         for (size_t bench = 0; bench < rooms[v.index]->benches().size(); ++bench) {
@@ -160,15 +222,23 @@ void Game::drawRooms(sf::Vector2f cam)
         // What shines: lamps and fires, gems still to find, things to pick up, benches.
         const Level& room = *rooms[v.index];
         for (const Prop& prop : room.props()) {
-            if (prop.kind == props::LIGHT_SHAFT) {
-                // Down from its tile to the first rock under it.
-                int x = static_cast<int>(prop.position.x / Level::TILE_SIZE), y = static_cast<int>(prop.position.y / Level::TILE_SIZE);
-                int floor = y;
-                while (floor > y - 40 && !room.isSolid(x, floor - 1)) --floor;
+            if (prop.kind == props::LIGHT_SHAFT || prop.kind == props::WATERFALL) {
+                // Down from its tile to the first rock under it (or water, for a waterfall).
+                const bool water = prop.kind == props::WATERFALL;
+                const int x = static_cast<int>(prop.position.x / Level::TILE_SIZE), y = static_cast<int>(prop.position.y / Level::TILE_SIZE);
+                const float length = static_cast<float>(y + 1 - fallFloor(room, x, y, water)) * Level::TILE_SIZE;
+                if (water) {
+                    // Two tiles wide: its tile and the one to the right. A glow where it lands.
+                    const sf::Vector2f top = viewCoordinates(prop.position + sf::Vector2f(Level::TILE_SIZE, Level::TILE_SIZE), v.cam);
+                    falls.push_back({top, length, prop.position.x});
+                    lights.push_back({top + sf::Vector2f(0.f, length), 32.f, sf::Color(90, 210, 240, 80)});
+                    continue;
+                }
                 const sf::Vector2f top = viewCoordinates(prop.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, Level::TILE_SIZE), v.cam);
-                beams.push_back({top, static_cast<float>(y + 1 - floor) * Level::TILE_SIZE, prop.position.x});
+                beams.push_back({top, length, prop.position.x});
                 continue;
             }
+            if (!prop.needs.empty() && !hasFact(prop.needs)) continue; // not lit yet
             const PropInfo* info = props::find(prop.kind);
             if (!info || info->lightRadius <= 0.f) continue;
             if (room.isDark() && prop.kind == "lantern_post") continue; // a dark room's lamps are lit with the rope
@@ -176,44 +246,44 @@ void Game::drawRooms(sf::Vector2f cam)
             const sf::Vector2f middle = prop.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, info->hangs ? Level::TILE_SIZE - h * 0.6f : h * 0.5f);
             const float flicker = info->fps > 0.f ? 1.f + 0.07f * std::sin(clockTime * 11.f + prop.position.x) : 1.f;
             sf::Color colour = info->light;
-            colour.a = 150;
-            lights.push_back({viewCoordinates(middle, v.cam), info->lightRadius * flicker, colour});
+            colour.a = 105;
+            lights.push_back({viewCoordinates(middle, v.cam), info->lightRadius * 0.85f * flicker, colour});
         }
         for (size_t gem = 0; gem < room.gems().size(); ++gem) {
-            if (!gemFound(v.index, gem)) lights.push_back({viewCoordinates(room.gems()[gem] + sf::Vector2f(4.f, 4.f), v.cam), 16.f, sf::Color(60, 150, 170, 150)});
+            if (!gemFound(v.index, gem)) lights.push_back({viewCoordinates(room.gems()[gem] + sf::Vector2f(4.f, 4.f), v.cam), 13.f, sf::Color(60, 150, 170, 100)});
+        }
+        {
+            // The water glows faintly along its surface, swelling and fading.
+            const sf::FloatRect b = room.bounds();
+            const int x0 = static_cast<int>(b.left / Level::TILE_SIZE), y0 = static_cast<int>(b.top / Level::TILE_SIZE);
+            const int x1 = x0 + static_cast<int>(b.width / Level::TILE_SIZE), y1 = y0 + static_cast<int>(b.height / Level::TILE_SIZE);
+            for (int y = y0; y < y1; ++y) {
+                for (int x = x0; x < x1; x += 3) {
+                    if (!room.isWater(x, y) || room.isWater(x, y + 1)) continue;
+                    const sf::Vector2f at(x * Level::TILE_SIZE + 4.f, y * Level::TILE_SIZE + 4.f);
+                    const float swell = 0.5f + 0.5f * std::sin(clockTime * 0.9f + x * 0.7f);
+                    lights.push_back({viewCoordinates(at, v.cam), 18.f + 4.f * swell, sf::Color(70, 200, 230, static_cast<sf::Uint8>(45 + 30 * swell))});
+                }
+            }
         }
         for (const Lamp& lamp : room.lamps()) {
             const sf::Vector2f middle = lamp.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, Level::TILE_SIZE * 0.4f);
-            if (lamp.lit) lights.push_back({viewCoordinates(middle, v.cam), 64.f * (1.f + 0.04f * std::sin(clockTime * 9.f + middle.x)), sf::Color(255, 200, 120, 170)});
+            if (lamp.lit) lights.push_back({viewCoordinates(middle, v.cam), 56.f * (1.f + 0.04f * std::sin(clockTime * 9.f + middle.x)), sf::Color(255, 200, 120, 140)});
             else lights.push_back({viewCoordinates(middle, v.cam), 7.f, sf::Color(120, 120, 150, 120)}); // a glint, to find it by
         }
         for (const Pickup& pickup : room.pickups()) {
-            if (!hasAbility(pickup.ability)) lights.push_back({viewCoordinates(pickup.position + sf::Vector2f(4.f, 6.f), v.cam), 30.f, sf::Color(170, 140, 60, 170)});
+            if (!hasAbility(pickup.ability)) lights.push_back({viewCoordinates(pickup.position + sf::Vector2f(4.f, 6.f), v.cam), 24.f, sf::Color(170, 140, 60, 120)});
         }
         for (const sf::Vector2f& bench : room.benches()) {
-            lights.push_back({viewCoordinates(bench + sf::Vector2f(Level::BENCH_WIDTH * 0.5f, 6.f), v.cam), 34.f, sf::Color(150, 110, 60, 140)});
+            lights.push_back({viewCoordinates(bench + sf::Vector2f(Level::BENCH_WIDTH * 0.5f, 6.f), v.cam), 26.f, sf::Color(150, 110, 60, 90)});
         }
         for (const Npc& npc : rooms[v.index]->npcs()) {
+            if (!isAround(npc)) continue;
             const sf::Vector2f feet = npc.position + sf::Vector2f(Level::TILE_SIZE * 0.5f, 0.f);
-            if (npc.look == "note") {
-                // One of Ash's notes: a page weighed down with a stone, glinting until it's read.
-                const PropInfo* note = props::find("note");
-                if (note) {
-                    sf::Sprite sprite(props::texture(), note->rect);
-                    sprite.setOrigin(std::floor(note->rect.width * 0.5f), note->rect.height - 1.f);
-                    const sf::Vector2f at = viewCoordinates(feet, v.cam);
-                    sprite.setPosition(std::floor(at.x), std::floor(at.y));
-                    canvas.draw(sprite);
-                }
-                continue;
-            }
             // Turned towards the player, and not all breathing in step.
             const bool facingLeft = v.index == levelIndex && player->centre().x < feet.x;
-            player->drawFigure(canvas, Player::lookNamed(npc.look), viewCoordinates(feet, v.cam), facingLeft, clockTime + feet.x * 0.37f);
-        }
-        rooms[v.index]->drawQuestItems(canvas, v.cam, clockTime, [&](size_t item) { return progress.flags.count("got_" + room.questItems()[item].item) > 0; });
-        for (const QuestItem& item : room.questItems()) {
-            if (!progress.flags.count("got_" + item.item)) lights.push_back({viewCoordinates(item.position + sf::Vector2f(4.f, 5.f), v.cam), 22.f, sf::Color(230, 200, 110, 150)});
+            player->drawFigure(canvas, Player::lookNamed(npc.look), viewCoordinates(feet, v.cam), facingLeft, clockTime + feet.x * 0.37f, 1.f,
+                               npc.sitting);
         }
     }
 }
@@ -227,6 +297,7 @@ void Game::drawTransition()
     const sf::Vector2f cam(std::round(t.fromCamera.x + (to.x - t.fromCamera.x) * p), std::round(t.fromCamera.y + (to.y - t.fromCamera.y) * p));
     drawRooms(cam);
     player->draw(canvas, cam);
+    drawFront();
     drawAir(cam);
 }
 
@@ -245,8 +316,8 @@ void Game::drawBackground(const Theme& theme, float scrollX)
 
 void Game::drawAim()
 {
-    const bool pad = input.usingPad();
-    const sf::Vector2f mouse = input.mousePosition();
+    const bool pad = input.usingPad() && !playedMouse;
+    const sf::Vector2f mouse = playedMouse.value_or(input.mousePosition());
     if (!pad && pauseButton().contains(mouse)) {
         drawCrosshair(mouse, hud::GREY);
         return;
@@ -290,7 +361,7 @@ void Game::drawCrosshair(sf::Vector2f at, sf::Color color)
 void Game::drawHud()
 {
     if (deathFlash > 0.f) {
-        auto alpha = static_cast<sf::Uint8>(110.f * deathFlash / DEATH_TIME);
+        auto alpha = static_cast<sf::Uint8>(80.f * deathFlash / DEATH_TIME);
         hud::fillRect(canvas, {0.f, 0.f, float(config::GAME_WIDTH), float(config::GAME_HEIGHT)}, sf::Color(200, 30, 40, alpha));
     }
 
@@ -298,22 +369,21 @@ void Game::drawHud()
         hud::drawText(canvas, hud::formatTime(progress.playTime), {4.f, 4.f}, hud::WHITE);
         hud::drawText(canvas, "x" + std::to_string(progress.deaths), {4.f, 11.f}, hud::RED);
     }
-    // A race: the time left, big, red at the end.
-    if (race && screen == Screen::Playing) {
-        const int left = static_cast<int>(std::ceil(race->left));
-        const bool hurry = race->left < 10.f;
-        hud::drawCentred(canvas, std::to_string(left), HALF_W, 4.f, hurry && std::fmod(race->left, 0.5f) < 0.25f ? hud::RED : hud::WHITE, 2.f);
-    }
-
-    // Holding on to a wall: how much strength is left, a bar over your head that goes red at the end.
-    if (screen == Screen::Playing && (player->isClinging() || (player->staminaLeft() < 1.f && !player->isGrounded()))) {
-        const float left = player->staminaLeft();
-        const sf::Vector2f p = viewCoordinates(player->centre() + sf::Vector2f(0.f, 10.f), drawCamera());
+    // Bars over your head that go red at the end: holding on to a wall, how much strength is left;
+    // under water, how much air.
+    const auto meter = [this](float above, float left, sf::Color color) {
+        const sf::Vector2f p = viewCoordinates(player->centre() + sf::Vector2f(0.f, above), drawCamera());
         const sf::FloatRect bar(std::floor(p.x) - 5.f, std::floor(p.y), 10.f, 2.f);
         hud::fillRect(canvas, {bar.left - 1.f, bar.top - 1.f, bar.width + 2.f, bar.height + 2.f}, sf::Color(14, 14, 22, 200));
         const bool flash = left < 0.25f && std::fmod(clockTime, 0.3f) < 0.15f;
-        hud::fillRect(canvas, {bar.left, bar.top, std::round(bar.width * left), bar.height}, left < 0.25f ? (flash ? hud::WHITE : hud::RED) : hud::GOLD);
+        hud::fillRect(canvas, {bar.left, bar.top, std::round(bar.width * left), bar.height}, left < 0.25f ? (flash ? hud::WHITE : hud::RED) : color);
+    };
+    bool climbBar = false;
+    if (screen == Screen::Playing && (player->isClinging() || (player->staminaLeft() < 1.f && !player->isGrounded()))) {
+        meter(10.f, player->staminaLeft(), hud::GOLD);
+        climbBar = true;
     }
+    if (screen == Screen::Playing && player->airLeft() < 1.f && deathTimer <= 0.f) meter(climbBar ? 14.f : 10.f, player->airLeft(), hud::CYAN);
 
     // Someone to talk to, or a bench to sit on: a little bubble above saying which key.
     std::optional<sf::Vector2f> bubbleAt;
@@ -335,12 +405,19 @@ void Game::drawHud()
     }
     if (waking && screen == Screen::Playing && titleTimer <= 0.f) {
         const std::string move = input.usingPad() ? "STICK" : hint(controls::Action::Left) + " / " + hint(controls::Action::Right);
-        hud::drawCentred(canvas, move + " - GET UP", HALF_W, 168.f, hud::withAlpha(hud::GREY, 200));
+        hud::drawCentred(canvas, move + (player->isSwimming() ? " - SWIM" : " - GET UP"), HALF_W, 168.f, hud::withAlpha(hud::GREY, 200));
     }
     if (sitting && screen == Screen::Playing) {
         const std::string getUp = "MOVE - GET UP";
         const std::string text = travelDestinations().size() > 1 ? hint(controls::Action::Map) + " - TRAVEL    " + getUp : getUp;
         hud::drawCentred(canvas, text, HALF_W, 168.f, hud::GREY);
+    }
+
+    // A timed run: the time going, at the top; once it's over, how it went.
+    if (screen == Screen::Playing && (timedRun || runShown > 0.f)) {
+        const std::string shown = timedRun ? regions::name(timedRun->route) + "  " + hud::formatTime(timedRun->time) : runText;
+        const float alpha = timedRun ? 1.f : std::min(1.f, runShown);
+        hud::drawCentred(canvas, shown, HALF_W, 4.f, hud::withAlpha(timedRun ? hud::WHITE : hud::GOLD, static_cast<sf::Uint8>(255.f * alpha)));
     }
 
     // A note for a moment (saved, or how many gems now), and the gem count while paused.

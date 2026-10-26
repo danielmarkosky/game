@@ -1,0 +1,39 @@
+# Odo, mending the old road outside the lake cave. Gives you the rope and hook. Once you've the
+# long rope he's gone up to the Old Station, to get the line running again.
+
+---
+Odo: Whoa! Where did you come from?
+Odo: Out of the cave? Nobody comes out of that cave. Nobody goes in, either. The road's been out for years.
+? I fell. From the waterfall, I think.    -> fell
+? I don't remember. I woke up in a lake.  -> woke
+= fell
+You: I fell. From up there, with the water.
+Odo: From the falls? And not a scratch on you. The lake caught you, then. It does that, they say.
+-> rope
+= woke
+You: I don't remember anything. I woke up floating in a lake.
+Odo: The Hidden Lake. That's not ordinary water, friend. Glows at night. Hums, some say.
+-> rope
+= rope
+Odo: Either way, you'll not get far on foot. The bridge went in the spring flood, and I'm one man with one barrow.
+Odo: Here. A rope with a hook on the end. Every road-mender carries one, and I've a spare.
+give ability rope
+set met_odo
+Odo: Hook the rock over the ditch and swing across. Hold to throw it, keep holding to hang on, let go to fly.
+Odo: Past the ditch there's a gully where I practise. Try it there. Then follow the road to the fire.
+Odo: Fen's camped by it. Fen knows more about falling things than I do.
+
+--- met_odo !long_rope
+Odo: Hold to throw it. Keep holding to swing. Let go near the top.
+Odo: Can't reach a ledge? Hook above it and reel in with up.
+
+--- long_rope
+Odo: There you are! I came up to the old station. Somebody has to get this line running.
+Odo: It went all the way up the mountain once. To the Lantern. The cart's still here, see? Sound as a bell.
+Odo: But she won't move for me. The line runs on the beacons' light, the old miners said. Four of them, out on the hills.
+Odo: Light all four and she'll wake. I'll keep the rails greased till you do.
+
+--- long_rope wall_climb air_throw double_jump
+Odo: Look at that. All four burning! Hear her humming?
+Odo: Get in and hold on. She goes where the rails go, and all you can do is jump.
+Odo: And mind the bridge. It's still out. It was out the night you came down, I'd wager.

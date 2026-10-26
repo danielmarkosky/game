@@ -22,6 +22,8 @@ namespace props
 {
     // Not a picture: a shaft of light falling from its tile down to the ground.
     inline const std::string LIGHT_SHAFT = "light_shaft";
+    // Nor this: water falling from its tile down to the first rock or water under it, two tiles wide.
+    inline const std::string WATERFALL = "waterfall";
 
     // Every prop there is, read from props.txt the first time.
     const std::vector<PropInfo>& all();

@@ -1,0 +1,13 @@
+# The Glade: a quiet night by the fire, G major, gentle and warm.
+tempo 76
+lead 0.16 triangle
+arp 0.07 updown
+pad 0.13
+bass 0.2 x...x...
+echo 0.3
+
+chords G Em C D | G Em Am D | C G Em D | C D G G
+melody B4 - D5 - G5 - - -   | E5 - - - B4 - - -   | C5 - E5 - G5 - E5 -  | F#5 - - - - - . .
+melody G5 - - - D5 - B4 -   | B4 - - - G4 - - -   | A4 - C5 - E5 - A5 -  | F#5 - - - D5 - - -
+melody E5 - - - G5 - - -    | D5 - B4 - G4 - - -  | G4 - B4 - E5 - G5 -  | F#5 - - - A5 - - -
+melody G5 - - - E5 - C5 -   | D5 - - - A4 - F#4 - | G4 - - - - - - -     | . . . . . . . .

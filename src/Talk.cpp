@@ -123,7 +123,7 @@ void Talk::pointAt(sf::Vector2f mouse, bool clicked)
     if (clicked) advance();
 }
 
-void Talk::draw(sf::RenderTarget& target, const Player& faces, size_t playerSkin, float time) const
+void Talk::draw(sf::RenderTarget& target, const Player& faces, float time) const
 {
     if (finished()) return;
     const DialogueStep& step = runner.current();
@@ -135,11 +135,11 @@ void Talk::draw(sf::RenderTarget& target, const Player& faces, size_t playerSkin
     const sf::FloatRect face(BOX.left + 6.f, BOX.top + 8.f, 34.f, 36.f);
     hud::fillRect(target, face, sf::Color(34, 38, 58));
     hud::frame(target, face, sf::Color(150, 150, 170, 120));
-    // The speaker's own face if they're someone with a look (Ash, in her notes), else whoever this is.
+    // The speaker's own face if they're someone with a look, else whoever this is.
     std::string look = step.speaker;
     for (char& c : look) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
     const bool known = std::find(Player::LOOKS.begin(), Player::LOOKS.end(), look) != Player::LOOKS.end();
-    faces.drawFigure(target, you ? playerSkin : Player::lookNamed(known ? look : m_npc.look), {face.left + 17.f, face.top + 33.f}, false, time, 2.f);
+    faces.drawFigure(target, you ? Player::lookNamed("heroine") : Player::lookNamed(known ? look : m_npc.look), {face.left + 17.f, face.top + 33.f}, false, time, 2.f);
 
     const float left = BOX.left + TEXT_LEFT;
     if (step.kind == DialogueStep::Kind::Choice) {

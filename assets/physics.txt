@@ -9,8 +9,8 @@
 run_speed 70                # top speed on the ground
 run_acceleration 300        # 70 / 300: a quarter of a second to top speed
 run_deceleration 450        # letting go: a short slide to a stop (turning round brakes too)
-air_acceleration 220        # less grip in the air
-air_deceleration 60         # nothing held in the air: you mostly drift on
+air_acceleration 100        # a little steering: in the air you mostly go where the jump sent you
+air_deceleration 0          # nothing held doesn't slow you down
 fling_deceleration 140      # in the air faster than running, after letting go of a swing
 
 # --- Jumping and falling ---
@@ -48,3 +48,26 @@ climb_stamina 4             # seconds of holding on, climbing up uses it twice a
 wall_slide_speed 40         # sliding down when it's gone
 wall_jump_push 110          # leaping off: away from the wall this fast, and up like a jump
 climb_over_speed 150        # climbing over the top: a hop up onto it
+
+# --- Swimming ---
+# In water you float with your head and shoulders out. Left / right swim, down dives, jump at the
+# surface leaps out. Under the surface you hold your breath: the bar over your head.
+swim_speed 45               # across, and down holding down
+swim_acceleration 220
+buoyancy 70                 # the lift back up to floating, for each pixel too deep: a spring
+water_drag 5                # how much of your speed up and down the water takes away each second
+swim_jump_speed 200         # leaping out at the surface: 25 px, up onto a ledge at the water's edge
+air_time 8                  # seconds of breath under water: when it runs out you drown
+air_refill_time 1           # seconds with your head out to get it all back
+diving_air 4                # the diving suit (from Mags's stall): breath lasts this many times as long
+
+# --- Bounce mushrooms ---
+bounce_speed 330            # landing on one throws you up this fast: 68 px, 8.5 tiles. Hold down to stand on it
+
+# --- Mine carts ---
+cart_speed 110              # riding one, it rolls along the rails this fast. Jump jumps the cart
+
+# --- Floating, where there's no gravity (the Still) ---
+float_acceleration 200      # the arrows push you any way, this hard...
+float_speed 70              # ...up to this fast
+float_drag 1.2              # and pushing nowhere you lose this much of your speed a second: drifting to a stop

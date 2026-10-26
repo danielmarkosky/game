@@ -1,6 +1,0 @@
-# One of Ash's notes: in the Forge.
-
----
-Ash: Cinder says I'm the fastest up the Chimney he's ever seen.
-Ash: I didn't tell him I was only running from the heat. - A.
-set read_note_ember

@@ -1,21 +1,13 @@
-# What you can wear: Tuck sells some at the Market for gems, others are only won. The classic look
-# is everyone's from the start. The looks are drawn in tools/make_art.py (SKINS) and listed in
-# Player::SKINS.
+# What you can wear. Mags sells them at her stall by the campfire, for gems; the first is what you
+# woke up in. Each id is a look drawn in tools/make_art.py (OUTFITS) and listed in Player::LOOKS.
+# Two do more than look nice: the diving suit lets you hold your breath four times as long
+# (diving_air in assets/physics.txt), and the miner's lamp lights up dark places.
 #
-#   outfit <look> | <price in gems, 0 if it's not for sale> | <name>
+#   outfit <id> | <price in gems> | <name> | <what Mags says about it>
 
-outfit classic   | 0  | CLASSIC
-outfit kid       | 3  | KID
-outfit frog      | 4  | FROG
-outfit mushroom  | 4  | MUSHROOM
-outfit climber   | 6  | CLIMBER
-outfit fox       | 6  | FOX
-outfit explorer  | 8  | EXPLORER
-outfit knight    | 10 | KNIGHT
-outfit robot     | 12 | ROBOT
-outfit astronaut | 15 | ASTRONAUT
-outfit scholar   | 0  | SCHOLAR
-outfit gardener  | 0  | GARDENER
-outfit fisher    | 0  | FISHER
-outfit smith     | 0  | SMITH
-outfit scarf     | 0  | GREEN SCARF
+outfit heroine   | 0  | TRAVELLER     | WHAT YOU WOKE UP IN. A LITTLE DAMP STILL
+outfit ranger    | 3  | RANGER'S CLOAK | GREEN WOOL, GOOD FOR NIGHTS OUTSIDE
+outfit fox       | 5  | FOX HOOD      | EARS AND ALL. NOBODY WILL SUSPECT A THING
+outfit miner     | 6  | MINER'S HAT   | A LAMP ON TOP: DARK PLACES LESS DARK
+outfit diver     | 8  | DIVING SUIT   | BRASS HELMET, AIR IN A TANK: BREATHE FOUR TIMES AS LONG UNDER WATER
+outfit starlight | 12 | STARLIGHT     | SEWN WITH THREAD SPUN FROM FALLEN STARS. DON'T ASK HOW

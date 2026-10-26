@@ -1,0 +1,14 @@
+# The Old Line: rattling up the mountain in a cart, the rails clacking under you. A minor, quick.
+tempo 138
+lead 0.15 square
+arp 0.07 up
+pad 0.1
+bass 0.2 x.x.x.x.
+drums 0.13 x...x... ....x... xxxxxxxx
+echo 0.2
+
+chords Am Am F G | Am Am F E | Dm Am F G | Am F E Am
+melody A4 - C5 - E5 - A5 - | G5 - E5 - C5 - D5 -  | E5 - - - D5 - C5 -  | B4 - - - G4 - . .
+melody A4 - C5 - E5 - A5 - | B5 - A5 - G5 - E5 -  | F5 - - - E5 - D5 -  | E5 - - - - - . .
+melody D5 - F5 - A5 - - -  | E5 - - - C5 - A4 -   | F5 - E5 - D5 - C5 -  | D5 - - - B4 - . .
+melody C5 - E5 - A5 - - -  | F5 - - - A5 - C6 -   | B5 - - - G#5 - E5 -  | A5 - - - - - . .

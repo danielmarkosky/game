@@ -48,6 +48,7 @@ public:
     static constexpr float RIGHT = 260.f; // values end here
     static constexpr float EXTRA_WIDTH = 40.f;
     float top = 70.f;
+    float offsetX = 0.f; // the whole menu moved right by this (left, negative), to leave room beside it
     float lineHeight = 11.f;
     size_t maxVisible = 9;
 

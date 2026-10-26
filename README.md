@@ -21,18 +21,26 @@ conan install . --build=missing     # SFML, GoogleTest and nlohmann_json
 cmake --preset conan-release
 cmake --build --preset conan-release
 ./build/Release/game          # the game
+./build/Release/editor        # the room editor (see assets/levels/README.md)
 ./build/Release/game_tests    # the tests
 ```
 
 ## Tether
 
-A climber falls into a crevasse at the foot of a mountain, following the trail of an older sister,
-Ash, who set off for the top three winters ago and never came back. The only way out is up.
+You come to floating in a hidden lake, in a little cave full of magic, under the waterfall you
+fell from, and you don't remember who you are. A road mender gives you a rope with a hook on the
+end; by the campfire at the end of the road, Fen tells you why the air is full of drifting lights:
+the stars are coming loose. The Lantern on the mountain that held them up has gone dark, and the
+old mine line up to it won't run until four beacons burn again, one at the end of each way out of
+the camp. Along the way you find your dog, waiting for you at the bottom of the Hollows, and,
+behind the waterfall, in the still place between the stars where the falls begin, your Gran's
+stopwatch. By the time the cart climbs the mountain you know whose granddaughter you are, and
+what you were carrying up the line the night you fell.
 
 *Tether* (a working title: it's `TITLE` in [src/GameShared.h](src/GameShared.h)) is a 2D platformer about a
 rope, in a connected world like Hollow Knight's and with Celeste's quick, precise rooms: a pixel
-art world of seventeen rooms, abilities that open up the places you've already been, people to talk
-to, and an ending that depends on what you tell them.
+art world, abilities that open up the places you've already been, secrets that wait for them,
+people to talk to, and a dog. See [The world](#the-world).
 
 ## Controls
 
@@ -43,6 +51,10 @@ to, and an ending that depends on what you tell them.
 | Left mouse or Shift | Throw the rope at the crosshair, hold to keep it, release to let go |
 | Towards a wall, in the air (with the chalk bag) | Grab it. W / S climb, jump leaps off |
 | W / S (on the rope) | Reel in / let out |
+| A / D, S, Space (in water) | Swim, dive, leap out at the surface. Under water you hold your breath: the blue bar over your head. Come up before it runs out |
+| Arrows / WASD (where nothing falls) | Push yourself any way; let go and you drift to a stop |
+| Space (in a mine cart) | Jump the cart. That's all: it goes where the rails go |
+| S (on a bounce mushroom) | Stand on it instead of bouncing |
 | S (on a platform) | Drop through it |
 | W / Up / E | Talk to someone, sit on a bench, pull a lever: a bubble shows when you're close enough |
 | Up / Down, Enter / Space or the mouse (talking) | Choose what to say, next line. Esc stops |
@@ -70,16 +82,29 @@ The buttons can be changed in CONTROLS too. The pad that was pressed last is the
   when you let go. It wraps around corners, so swinging past an edge pivots you around it. The
   crosshair shows a white dot where it'll stick, and a dim red one where it would bounce off.
   It bites rock and the metal hook blocks; nothing sticks to slick, wind-polished stone.
-- **Ash's rope**, found at the bottom of the crevasse: at first it's only thrown standing (or
+- **The rope and hook**, from Odo the road mender, outside the lake cave: at first it's only thrown standing (or
   holding on to a wall), swung round over your head first, and reaches 64 px.
 - **The long rope**: it reaches 104 px.
-- **Ash's chalk bag**, on the top shelf of the Archive: push into a wall in the air to grab it,
-  climb up and down, leap off it. Your grip lasts a few seconds (the bar over your head), and comes
-  back on the ground. Not slick stone.
-- **The throwing glove**, at Ash's frozen camp at the end of the Frost Caves: the rope can be thrown
-  in the air too, straight away, reaching a little less far there (85%): there's nothing to push off.
-- **The updraft feather**, at the top of the Updraft in the Ember Chimney: one more jump in the air,
-  until you land or catch the rope.
+- **The chalk bag**: push into a wall in the air to grab it, climb up and down, leap off it. Your
+  grip lasts a few seconds (the bar over your head), and comes back on the ground. Not slick stone.
+- **The throwing glove**: the rope can be thrown in the air too, straight away, reaching a little
+  less far there (85%): there's nothing to push off.
+- **The updraft feather**: one more jump in the air, until you land or catch the rope.
+- **Gran's stopwatch**: times runs of a route, from its green post to its chequered flag, and keeps
+  your best (RECORDS, in the pause menu).
+
+The rope comes from Odo; the long rope and the chalk bag are at the ends of the two routes open from
+the start, the glove and the feather at the ends of the two they open, and the stopwatch behind the
+waterfall. A test room has them all.
+
+**Outfits.** Mags keeps a stall by the campfire: clothes, for the gems you've found. The diving suit
+lets you hold your breath four times as long (there's somewhere you'll need that), and the miner's
+hat carries a lamp in dark places. The rest just look nice. They're in
+[assets/outfits.txt](assets/outfits.txt).
+
+**Pip.** Your dog, once you've found him: he follows you everywhere, and now and then points his nose
+at the nearest gem still to find in the room and barks. On the map, a paw print marks every room
+with gems left in it.
 
 The numbers are all in [assets/physics.txt](assets/physics.txt).
 
@@ -87,58 +112,57 @@ The numbers are all in [assets/physics.txt](assets/physics.txt).
 
 Rooms join up like in Celeste: walk out through a gap in a room's wall (or drop down a hole in its
 floor) and the camera pans over into the room on the other side. You can always go back the way you
-came, except down the Drop.
+came.
 
-You come to at the bottom of The Crevasse, where you fell, with nothing. Its six small rooms teach
-walking and jumping, then hold an old camp, three winters cold, and in it a rope with a green thread
-woven through it: Ash's. Its first swings are over safe pits, the last one over a spiked chasm, and
-up beyond it is The Cave, where Wren sits by a bench, and The Well, climbed shelf by shelf to the
-Crossroads, the hub.
+You come to floating in **the Hidden Lake**, swim ashore and walk out of the cave onto **the Old
+Road**, where Odo gives you the rope; past **the Gully**, his practice ground, the road ends at **the
+Campfire**: Fen by the fire, Mags at her stall, a bench, and five ways on.
 
-Forty-six rooms in nine regions: [docs/world.md](docs/world.md) is the plan, with the map. In short:
-west, the Sunken Ruins, with a gate the rope opens by tugging its lever through a slit, a stair
-lit only by the lamps the rope lights, and the Archive, where Moss keeps Ash's chalk bag. East,
-past Tuck's Market, the Hook Garden: hook rings sliding on tracks, Bramble's Greenhouse, and the
-long rope at the bottom of Curtains. Up through the Tall Hall, the Summit, Juniper's camp, and the
-Drop back down. West of it the Frost Caves (ice you slide on, icicles that fall) and the throwing
-glove; east the Ember Chimney (heat that lifts you, blocks that crumble) and the updraft feather;
-and above it all the Sky (clouds that fade, wind that pushes), and Daylight, where Ash is, and the
-way out at the top. Every region has a challenge room off the main path, full of gems.
+- **The Hook Garden**, east: swings over spikes, bounce mushrooms, hook rings that carry you. At its
+  end, the long rope. Open from the start.
+- **The Hollows**, down the sinkhole: crumbling stone, a hollow so dark you light lamps with the rope
+  to see, and the den at the bottom: the chalk bag, and Pip. Open from the start.
+- **The Frost Caves**, off the lookout: a chasm only the long rope crosses, icicles over ice, a
+  frozen waterfall to swing up. At its end, the throwing glove.
+- **The Sky Road**, up through the top of the lookout: a wall only the chalk bag climbs, clouds that
+  fade under you, updrafts in the wind. At its end, the feather.
+- **The Old Line**, up the planks to the station: once all four beacons burn, the cart takes you up
+  the mountain, over the broken bridge (a jump and a second jump), to the Lantern: up to it with
+  everything you've got, and past it, the end of the game.
 
-People ask for things: quests, in the pause menu's QUESTS list. Moss lost a page, Wren a lantern,
-Pell a lure; Bramble and Cinder race you. Ash left notes along her way. Gems buy outfits from Tuck,
-and the quests win the rest.
+And secrets. Behind the lake's waterfall the rock isn't there: through it, **the Still**, where
+there's no gravity at all, only black and stars, and the stopwatch; up inside it, a climb for the
+long rope to **the Hidden Spring**. Down a crack in the lake bed, a tunnel longer than any breath
+lasts, to **the Drowned Grotto** (the diving suit). And along every route, gems that wait for an
+ability you'll only have later, and rock here and there that isn't there either.
+
+The rooms are made in [`tools/world/`](tools/world/), a file each part of the world, and
+[docs/world.md](docs/world.md) is the plan, room by room.
 
 Every room is small, one idea each, and checked by the level bot with exactly the abilities you'd
 have when you get there.
 
-Each part of the world has its own look and its own music: the cave, the garden, the ruins, the
-snowy mountains, the frost caves, the ember chimney, the sky and the daylight. Coming into a room, the first place you land
-is your checkpoint, until you reach a flag.
+Each part of the world has its own look and its own music: the grotto of the Hidden Lake and the
+glade under the aurora, the cave, the garden, the frost caves, the sky, the black of the Still and
+the mountain the Old Line climbs (and ready for more, the ruins, the snowy mountains, the ember
+chimney and the daylight). Coming into a room, the first place you land is your checkpoint, until
+you reach a flag.
 
-**People.** Wren at the top of the crevasse, by The Cave's bench, Pip the mapmaker in the Crossroads,
-Tuck at the Market, Moss in the Archive, Bramble in the Greenhouse, Juniper at The Summit's camp,
-Pell at the Frost Camp, Cinder at the Forge, and at the very top, Ash. A bubble over someone means you're close
-enough to talk. Some conversations let you choose what to say, and what you choose, like what you've
-found, changes what people say later, and how the story ends. Their lines are text files in
-`assets/dialogue/`, see [its README](assets/dialogue/README.md).
+**People.** Odo mending the Old Road (and later, the line), Fen by the Campfire, Mags at her stall. A bubble over someone means you're
+close enough to talk. Some conversations let you choose what to say, and what you choose, like what
+you've found, changes what people say later. Their lines are text files in `assets/dialogue/`, see
+[its README](assets/dialogue/README.md).
 
-**Gems.** 49 of them, one or two in most rooms and three in each challenge room: high under ceilings, beside spikes, low in a pit you can only
-touch with a swing, tucked into the walls. Some are in sight long before you can reach them. Gems
-you've found stay behind as faint ghosts; the count shows when you find one and while paused, and
-the map shows each room's.
+**Gems** are to collect, and to spend at Mags's stall: the ones you've found stay behind as faint
+ghosts, the count shows when you find one and while paused, and the map shows each room's.
 
 **The map** shows every room you've been in, in its own colours, with you blinking on it: spikes
-red, platforms brown, hook blocks steel, flags green, what's still to pick up glinting gold, things
-to find for people in pink, people, Ash's notes you haven't read, and the benches you've sat on.
-Zoomed out, each region's name is written over it.
+red, platforms brown, hook blocks steel, flags green, what's still to pick up glinting gold, people,
+and the benches you've sat on. Zoomed out, each region's name is written over it.
 
 **Sounds** warn you before the danger: stone cracks before it crumbles, an icicle rattles before it
-falls. You hear the wind where it blows and the roar of heat near an updraft, and the last five
-seconds of a race tick away.
-
-**The end.** What you say to Ash decides how the story ends; then the end screen rolls up what
-became of everyone you helped on the way, and how your climb went.
+falls. You hear the waterfall, the wind where it blows and the roar of heat near an updraft, and
+bubbles when you're under water.
 
 **Benches**, like in Hollow Knight, are where the game is saved: sit on one and it glows, and choosing
 your slot again puts you back on it. Sitting on a bench, M opens the map to travel to any other bench
@@ -146,25 +170,35 @@ you've sat on. Dying only puts you back where you came into the room, or at the 
 Celeste. What you pick up, the gems, the map, the gates you've opened and what you've talked about are
 saved as soon as they happen; only where you are waits for a bench.
 
+**The end** is past the Lantern at the top of the Old Line: the end screen tells how it all turned
+out, then how long it took, how many times you died, your gems and your records.
+
 ## Menus and saving
 
 PLAY on the title screen shows three save slots, each with where it'll carry on, its play time and
 its gems (a `*` once it's been finished). An empty one starts a new game. ERASE A SLOT, then a slot,
 asks before erasing it. Options has the window size, fullscreen, screen shake, the timer (play time
-and deaths, in the corner), the player's skin (ten to choose from, previewed running under the menu)
-and the music and sound volumes, and CONTROLS: choose an action and press its new key or button.
+and deaths, in the corner) and the music and sound volumes, and CONTROLS: choose an action and press
+its new key or button.
 Everything is saved in `~/.celeste_like_game/`: `settings.txt`, and `slot1.txt` to `slot3.txt`. Each
 file is written next to the old one and then swapped in, so a crash while saving can't leave half a
 save.
 
 ## Making it
 
-The rooms are designed in `tools/make_world.py`, a few lines of Python each, and
-`python3 tools/make_world.py` writes them into `assets/world.ldtk`, the [LDtk](https://ldtk.io)
-project the game loads. See [assets/levels/README.md](assets/levels/README.md) for how rooms work,
+The rooms are designed in `tools/world/`, a file of Python per part of the world, a few lines each room, and
+`python3 tools/make_world.py` joins them up and writes them into `assets/world.ldtk`, the
+[LDtk](https://ldtk.io) project the game loads. It won't write over changes made to the project in
+LDtk since it last wrote it. See [assets/levels/README.md](assets/levels/README.md) for how rooms work,
 the tiles and the things in them, and how far each move reaches.
 
-For trying rooms out: `./build/Release/game --room tall_hall` starts straight in that room (any
+Rooms can also be laid out with the mouse, in the game's own art: `./build/Release/editor`
+(see [the room editor](assets/levels/README.md#the-room-editor)) opens any room, the ones made in
+Python too, or makes a new one. Ctrl+S saves the room and puts it in the world, F5 plays it right
+there in the editor as it is, saved or not (F5 again and you're back editing where you got to;
+Shift+F5 plays from the mouse), and Tab shows the world map, where rooms are dragged into place.
+
+For trying rooms out: `./build/Release/game --room gully` starts straight in that room (any
 room's identifier), and `./build/Release/game some_room.txt` plays a single text room. Both skip the
 title screen, give every ability and don't save anything.
 
@@ -174,21 +208,21 @@ gravity, the jump, how hard you can push a swing, how far a fling carries) is in
 playing: no compiling. `./build/Release/game assets/levels/playground.txt` is a room for trying it
 out: steps 1 to 4 tiles high, gaps 3 to 7 wide, a pit to swing across, a long flat floor to see how
 far a fling carries, a slick wall to get over and a tall one to climb. A test room starts with every
-ability, and the keys **1 to 5** switch them off and on: the rope, the long rope, the chalk bag, the
-throwing hand and the feather.
+ability, and the keys **1 to 6** switch them off and on: the rope, the long rope, the chalk bag, the
+throwing hand, the feather and the stopwatch.
 
 **Checking the world can be played.** `python3 tools/check_world.py` sends the level bot
 ([tools/levelbot.cpp](tools/levelbot.cpp), built with the game) through every room both ways, through
-every gate with and without its ability, and to every gem, and says if anything's changed. It takes a
-few minutes. When you change a room, add its routes to the list at the top of the script.
+every gate with and without its ability, and to every gem, and says if anything's changed. When you change a room, add its routes to the list at the top of the script.
 `./build/Release/levelbot <room> --goal R` tries one room and prints how it got through, or a map of
 where it got stuck. `./build/Release/levelbot --measure` prints how far a jump, a throw, a climb and a
 swing reach with the physics as they are, for designing rooms (see the table in
 [assets/levels/README.md](assets/levels/README.md)).
 
-**Tests.** `game_tests` checks the rules (physics, rope, rooms joining up, saves, dialogue, music),
-and plays the game without a window: the slots, benches, travel, talking, levers and the ending. It
-also leaves a picture of every theme in `build/screenshots/`.
+**Tests.** `game_tests` checks the rules (physics, rope, swimming and holding your breath, rooms
+joining up, saves, dialogue, music), and plays the game without a window: the slots, benches,
+travel, talking, levers, drowning and the ending. It also leaves pictures of the themes in use in
+`build/screenshots/`.
 
 ## Art
 
@@ -203,15 +237,17 @@ ones are a few lines each: colours, a few decoration grids and the background sh
 and give it a song. What drifts in its air and how dark it is are in
 [src/Ambience.cpp](src/Ambience.cpp).
 
-Things to pick up are in `ITEMS`, drawn into `items.png`; the font for conversations is `FONT`.
+The abilities, gems and levers are in `ITEMS`, drawn into `items.png`; the font for conversations is `FONT`.
 The scenery is in `PROPS`, drawn into `props.png`, with `props.txt` saying where each one is, how
 many frames it has, whether it hangs and what light it gives: the game reads that. Add a prop there,
-then place it in a room with `room.prop(x, y, 'name')` in `tools/make_world.py`.
+then place it in a room with `room.prop(x, y, 'name')` in its region's file in `tools/world/`.
 
-Player skins are drawn once, standing; the script makes the other poses (breathing, running, jumping,
-falling, swinging, sitting) from that and outlines them. To add a skin, add it to `SKINS` in the script
-and its name to `Player::SKINS` and `Player::LOOKS` in [src/Player.h](src/Player.h), in the same order.
-The people you meet are drawn the same way, in `NPCS`, after the skins.
+The heroine (`HEROINE`) is drawn once, standing, and once with her hair streaming out behind her;
+the script makes the other poses (breathing, running, jumping, falling, swinging, sitting, climbing)
+from that and outlines them. The people you meet are drawn the same way, in `NPCS`, after her; then
+Pip, frame by frame (`PIP_FRAMES`); then the heroine in her other outfits (`OUTFITS`: her drawing
+with its colours and rows changed). Each look's name is in `Player::LOOKS` in
+[src/Player.h](src/Player.h), in the same order.
 
 ## Sound
 

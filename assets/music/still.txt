@@ -1,0 +1,14 @@
+# The Still: behind the waterfall, between the stars. Slow and weightless, a lydian E, nothing
+# keeping time but the echo.
+tempo 58
+lead 0.14 sine
+arp 0.06 updown
+pad 0.2
+bass 0.12 x.......
+echo 0.6
+
+chords Emaj7 F# Emaj7 F# | C#m7 A B Emaj7 | Emaj7 F# G#m7 A | C#m7 F# A B
+melody B5 - - - G#5 - - - | A#5 - - - - - . .   | B5 - D#6 - - - B5 -  | C#6 - - - - - . .
+melody G#5 - - - E5 - - - | C#5 - E5 - F#5 - - - | D#5 - - - F#5 - - -  | G#5 - - - - - . .
+melody B5 - - - D#6 - - - | C#6 - - - A#5 - . .  | B5 - - - G#5 - F#5 - | E5 - - - - - . .
+melody G#5 - - - B5 - E6 - | D#6 - - - - - C#6 - | A5 - - - C#6 - - -   | B5 - - - - - . .

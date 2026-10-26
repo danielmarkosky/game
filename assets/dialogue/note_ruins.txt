@@ -1,6 +1,0 @@
-# One of Ash's notes: on a shelf in the Archive.
-
----
-Ash: Moss let me read everything. Most of it is wrong. One map isn't.
-Ash: It shows a fire at the very top of the mountain, burning in the daylight. Somebody keeps it. Who? - A.
-set read_note_ruins

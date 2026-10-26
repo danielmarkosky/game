@@ -8,7 +8,6 @@
 namespace
 {
     const sf::FloatRect AREA(8.f, 20.f, 304.f, 138.f);
-    const sf::Color PINK(240, 120, 200);  // things to find for people
     const sf::Color GREEN(150, 230, 120); // people
     constexpr float PAN_SPEED = 120.f; // screen pixels a second, with the arrow keys
     constexpr float HALF_W = config::GAME_WIDTH * 0.5f;
@@ -125,9 +124,7 @@ void MapScreen::draw(sf::RenderTarget& target, const Marks& marks, sf::Vector2f 
         hud::drawText(target, what, {x + size.x + 3.f, 8.f}, hud::GREY);
     };
     key(10.f, hud::GOLD, {3.f, 3.f}, "TO PICK UP");
-    key(66.f, PINK, {3.f, 3.f}, "TO FIND");
-    key(207.f, GREEN, {1.f, 2.f}, "SOMEONE");
-    key(244.f, hud::WHITE, {3.f, 2.f}, "NOTE");
+    key(222.f, GREEN, {1.f, 2.f}, "SOMEONE");
     key(272.f, sf::Color(220, 170, 108), {4.f, 2.f}, "BENCH");
     const WorldMap::View v = view();
     hud::frame(target, AREA, hud::withAlpha(hud::GREY, 90));
@@ -172,21 +169,22 @@ void MapScreen::draw(sf::RenderTarget& target, const Marks& marks, sf::Vector2f 
             }
         }
     }
-    // Things still to pick up in the rooms you've seen, glinting; things to find for people; people
-    // and Ash's notes.
+    // Things still to pick up in the rooms you've seen, glinting; and people.
     const bool bright = std::fmod(time, 0.8f) < 0.4f;
     for (const sf::Vector2f& pickup : marks.pickups) {
         hud::fillRect(target, {at(pickup).x - 1.f, at(pickup).y - 1.f, 3.f, 3.f}, bright ? sf::Color(255, 246, 200) : hud::GOLD);
     }
-    for (const sf::Vector2f& item : marks.items) {
-        hud::fillRect(target, {at(item).x - 1.f, at(item).y - 1.f, 3.f, 3.f}, bright ? sf::Color(255, 200, 240) : PINK);
+    for (const sf::Vector2f& room : marks.gemRooms) {
+        // A paw print: a pad and three toes.
+        const sf::Vector2f p = at(room);
+        const sf::Color paw = hud::withAlpha(hud::CYAN, 200);
+        hud::fillRect(target, {p.x - 3.f, p.y - 3.f, 7.f, 7.f}, sf::Color(0, 0, 0, 120));
+        hud::fillRect(target, {p.x - 1.f, p.y, 3.f, 2.f}, paw);
+        for (float dx : {-2.f, 0.f, 2.f}) hud::fillRect(target, {p.x + dx, p.y - 2.f, 1.f, 1.f}, paw);
     }
     for (const sf::Vector2f& person : marks.people) {
         hud::fillRect(target, {at(person).x - 1.f, at(person).y - 2.f, 3.f, 4.f}, sf::Color(0, 0, 0, 160));
         hud::fillRect(target, {at(person).x, at(person).y - 1.f, 1.f, 2.f}, GREEN);
-    }
-    for (const sf::Vector2f& note : marks.notes) {
-        hud::fillRect(target, {at(note).x - 1.f, at(note).y - 1.f, 3.f, 2.f}, hud::WHITE);
     }
     // The benches you've sat on, and in travel mode the one you'd go to, framed.
     for (size_t ii = 0; ii < marks.benches.size(); ++ii) {

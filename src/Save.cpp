@@ -6,13 +6,6 @@
 
 namespace
 {
-    // Older saves named rooms after their text level files.
-    std::string roomName(std::string name)
-    {
-        if (name.size() > 4 && name.compare(name.size() - 4, 4, ".txt") == 0) name.resize(name.size() - 4);
-        return name;
-    }
-
     std::string read(const std::string& path)
     {
         std::ifstream file(path);
@@ -61,8 +54,6 @@ Settings Settings::parse(const std::string& text)
             if (!(words >> on)) return;
             bool& flag = key == "fullscreen" ? s.fullscreen : key == "screen_shake" ? s.screenShake : s.showTimer;
             flag = on != 0;
-        } else if (key == "skin") {
-            words >> s.skin;
         } else if (key == "music_volume" || key == "sound_volume") {
             int level;
             if (words >> level && level >= 0 && level <= 10) (key == "music_volume" ? s.musicVolume : s.soundVolume) = level;
@@ -99,7 +90,6 @@ std::string Settings::serialize() const
     out << "fullscreen " << fullscreen << "\n";
     out << "screen_shake " << screenShake << "\n";
     out << "show_timer " << showTimer << "\n";
-    out << "skin " << skin << "\n";
     out << "last_slot " << lastSlot << "\n";
     out << "music_volume " << musicVolume << "\n";
     out << "sound_volume " << soundVolume << "\n";
@@ -136,23 +126,27 @@ Progress Progress::parse(const std::string& text)
             if (key == "bench") p.bench = bench;
             p.benches.insert(bench);
         } else if (key == "explored") {
-            if (words >> room) p.explored.insert(roomName(room));
+            if (words >> room) p.explored.insert(room);
         } else if (key == "ability") {
             std::string ability;
             if (words >> ability) p.abilities.insert(ability);
         } else if (key == "gem") {
-            if (words >> room >> x >> y) p.gems.insert(roomName(room) + " " + std::to_string(x) + " " + std::to_string(y));
+            if (words >> room >> x >> y) p.gems.insert(room + " " + std::to_string(x) + " " + std::to_string(y));
         } else if (key == "talked") {
             std::string dialogue;
             if (words >> dialogue >> x) p.conversations.insert(dialogue + " " + std::to_string(x));
         } else if (key == "flag") {
             std::string flag;
             if (words >> flag) p.flags.insert(flag);
-        } else if (key == "item" || key == "outfit") {
-            std::string name;
-            if (words >> name) (key == "item" ? p.items : p.outfits).insert(name);
-        } else if (key == "wearing") {
-            words >> p.wearing;
+        } else if (key == "record") {
+            std::string route;
+            float seconds;
+            if (words >> route >> seconds && seconds > 0.f) p.records[route] = seconds;
+        } else if (key == "outfit" || key == "wearing") {
+            std::string outfit;
+            if (!(words >> outfit)) return;
+            if (key == "outfit") p.outfits.insert(outfit);
+            else p.outfit = outfit;
         } else if (key == "spent") {
             words >> p.spent;
         } else if (key == "play_time") {
@@ -179,10 +173,10 @@ std::string Progress::serialize() const
     for (const auto& gem : gems) out << "gem " << gem << "\n";
     for (const auto& conversation : conversations) out << "talked " << conversation << "\n";
     for (const auto& flag : flags) out << "flag " << flag << "\n";
-    for (const auto& item : items) out << "item " << item << "\n";
-    for (const auto& outfit : outfits) out << "outfit " << outfit << "\n";
-    out << "wearing " << wearing << "\n";
-    out << "spent " << spent << "\n";
+    for (const auto& [route, seconds] : records) out << "record " << route << " " << seconds << "\n";
+    for (const auto& owned : outfits) out << "outfit " << owned << "\n";
+    if (!outfit.empty()) out << "wearing " << outfit << "\n";
+    if (spent > 0) out << "spent " << spent << "\n";
     out << "play_time " << playTime << "\n";
     out << "deaths " << deaths << "\n";
     out << "finished " << finished << "\n";
@@ -191,14 +185,6 @@ std::string Progress::serialize() const
 
 SaveFiles::SaveFiles(std::string folderPath) : folder(std::move(folderPath))
 {
-    // Before there were slots, everything was in save.txt: it becomes the settings and slot 1.
-    const std::string old = path("save.txt");
-    if (std::filesystem::exists(old) && !std::filesystem::exists(path("settings.txt"))) {
-        const std::string text = read(old);
-        write(path("settings.txt"), Settings::parse(text).serialize());
-        const Progress progress = Progress::parse(text);
-        if (!progress.isEmpty()) write(path("slot1.txt"), progress.serialize());
-    }
 }
 
 std::string SaveFiles::defaultFolder()

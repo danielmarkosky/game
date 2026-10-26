@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/Controls.h"
+#include <map>
 #include <set>
 #include <string>
 
@@ -11,7 +12,6 @@ struct Settings
     bool fullscreen = false;
     bool screenShake = true;
     bool showTimer = true;   // the play time and death counter in the corner
-    std::string skin = "classic"; // one of Player::SKINS
     int lastSlot = 0;        // the slot played last: its room drifts by behind the title screen
     int musicVolume = 6;     // 0 to 10
     int soundVolume = 8;
@@ -23,7 +23,7 @@ struct Settings
 };
 
 // One playthrough. Rooms are named by their identifier in the LDtk project, and a bench by its
-// room and its number in the room, counting from 0: "crossroads 0".
+// room and its number in the room, counting from 0: "lake 0".
 struct Progress
 {
     std::string bench;                    // sat on last: Continue starts there. Empty: at the start
@@ -33,10 +33,10 @@ struct Progress
     std::set<std::string> gems;           // found, as "<room> <tile x> <tile y>"
     std::set<std::string> conversations; // had, as "<dialogue> <number>", counting from 0
     std::set<std::string> flags;          // set in conversations: what's happened in the story
-    std::set<std::string> items;          // carried, for quests: "moss_page"
-    std::set<std::string> outfits;        // owned, besides the classic look everyone has
-    std::string wearing = "classic";      // one of Player::SKINS
-    int spent = 0;                        // gems spent at the shop, less gems given as rewards
+    std::map<std::string, float> records; // the best time for each route run with the stopwatch, seconds, by route
+    std::set<std::string> outfits;        // bought at Mags's stall (see assets/outfits.txt)
+    std::string outfit;                   // the one being worn; empty: what you woke up in
+    int spent = 0;                        // gems spent at the stall
     float playTime = 0.f;                 // seconds
     int deaths = 0;
     bool finished = false;                // got out at the end at least once

@@ -109,9 +109,11 @@ TEST(Level_IsEmptySpace, BoxEndingOnTileEdgeDoesNotTouchIt) {
 }
 
 TEST(Level_Theme, EveryShippedThemeLoads) {
+    // Every theme made (a folder in assets/gfx/themes), and every room uses one of them.
     std::set<std::string> themes;
-    for (const auto& info : loadWorld(config::assetPath("world.ldtk"))) themes.insert(info.theme);
+    for (const auto& folder : std::filesystem::directory_iterator(config::assetPath("gfx/themes"))) themes.insert(folder.path().filename().string());
     EXPECT_GE(themes.size(), 5u);
+    for (const auto& info : loadWorld(config::assetPath("world.ldtk"))) EXPECT_TRUE(themes.count(info.theme)) << info.name << ": " << info.theme;
     for (const auto& name : themes) {
         SCOPED_TRACE(name);
         auto theme = Theme::get(name);
@@ -208,4 +210,15 @@ TEST(Level_ExitThrough, EverySide) {
     EXPECT_FALSE(lvl->exitThrough({20.f, 12.f}).has_value());
     EXPECT_EQ(lvl->exitThrough({20.f, -1.f}), Level::Side::Bottom);
     EXPECT_FALSE(lvl->exitThrough({40.f, 12.f}).has_value()); // exactly on the edge is still inside
+}
+
+TEST(Level_Water, IsntSolidAndKnowsHowDeepAPointIs) {
+    auto lvl = Level::loadFromString("#####\n#.S.#\n#www#\n#www#\n#####\n");
+    EXPECT_TRUE(lvl->isWater(1, 1));
+    EXPECT_FALSE(lvl->isSolid(1, 1));
+    EXPECT_FALSE(lvl->isWater(1, 3));
+    // The surface is the top of the highest water tile: y = 24.
+    ASSERT_TRUE(lvl->depthInWater({12.f, 10.f}));
+    EXPECT_FLOAT_EQ(*lvl->depthInWater({12.f, 10.f}), 14.f);
+    EXPECT_FALSE(lvl->depthInWater({12.f, 26.f}));
 }

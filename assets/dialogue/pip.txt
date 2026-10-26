@@ -1,33 +1,14 @@
-# Pip, a mapmaker who camps in the Crossroads, the hub above The Well.
+# Pip, your dog: lost down in the Hollows since the night you fell, waiting up on a ledge in the
+# den. Talking to him, he's yours again ("set dog"): he follows you from then on, and sniffs out gems.
 
---- !long_rope
-Pip: Oh, hello! A new face. Welcome to the Crossroads. I'm Pip, and I draw maps.
-? Have you seen a climber with a green scarf?   -> ash
-? Where can I go from here?                     -> ways
-= ash
-Pip: Green scarf... Ash? Of course! She bought a map of the mountain from me. Paid in gems, too.
-Pip: She went up through the Tall Hall. But first she spent days in the ruins, west of here, with old Moss.
-set asked_pip
--> ways
-= ways
-Pip: East is the Hook Garden. Lovely place, if you like spikes. West are the old ruins.
-Pip: And up there is the Tall Hall. Crystal walls, nothing to hold on to, and the only hook is way, way up.
-Pip: They say there's a coil of long rope at the far end of the garden. That would reach it.
-Pip: Oh, and sit on any bench you find. Good for resting, and for coming back to.
-Pip: And Tuck has a stall just east of here, at the Market. Bring gems.
-
---- !long_rope
-Pip: The garden's east. The long rope should be at the far end of it. The ruins are west, if you're curious.
-? Tell me about the ruins.     -> ruins
-? Thanks, Pip.                 -> end
-= ruins
-Pip: Nobody knows who built them. Moss lives at the bottom, in the Archive, with all the old books.
-Pip: She keeps something there for anyone who comes looking for Ash. She wouldn't tell me what.
-
---- long_rope
-Pip: You found the long rope! Then the Tall Hall is yours.
-Pip: Aim for the hook block way up there, and reel yourself in. Then out the door at the top.
-Pip: Past the hall are the mountains. I've never been that far. Come back and tell me about it?
-
---- long_rope
-Pip: Up through the Tall Hall, climber. I'll be here, drawing.
+---
+Pip: Wuff!
+You: A dog? All the way down here?
+Pip: Wuff! Wuff!
+You: You're shaking. It's all right. Let me see your collar.
+You: There's a tag. P-I-P. Pip. And on the back: If found, return to the Lantern.
+Pip: ...
+You: I know you. Don't I? A cart, at night. You, with your ears flapping. And a light in my lap.
+You: Come on, Pip. Let's go home.
+set dog
+Pip: Wuff!

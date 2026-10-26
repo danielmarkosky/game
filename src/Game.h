@@ -2,6 +2,7 @@
 
 #include "src/Ambience.h"
 #include "src/Audio.h"
+#include "src/Dog.h"
 #include "src/InputManager.h"
 #include "src/Level.h"
 #include "src/Menu.h"
@@ -35,6 +36,10 @@ public:
         // the functions below instead of run().
         bool headless = false;
         std::string saveFolder; // empty: the usual one
+        // Where to start in `startRoom`, in its pixels, instead of at its Start (the room editor's
+        // "play from here").
+        std::optional<sf::Vector2f> startAt;
+        bool sounds = false; // headless, but heard all the same (the room editor plays it so)
     };
     Game(std::vector<LevelInfo> levels, Options options);
     void run();
@@ -45,6 +50,9 @@ public:
     void pressButton(int button);
     void advance(float seconds, const PlayerInput& held = {});
     sf::Image screenshot();
+    // Driven by someone else's window (the room editor's): one frame of `frameTime` seconds with
+    // that input, and the picture of it. `aim` in the input is in the picture's pixels.
+    const sf::Texture& play(float frameTime, PlayerInput input);
     // What tests look at.
     std::string screenName() const;
     std::string roomName() const;
@@ -53,7 +61,7 @@ public:
     sf::Vector2f playerPosition() const;
 
 private:
-    enum class Screen { Title, Slots, ConfirmErase, Options, Controls, Playing, Paused, Complete, Map, Talking, Shop, Quests };
+    enum class Screen { Title, Slots, ConfirmErase, Options, Controls, Playing, Paused, Complete, Map, Talking, Shop, Records };
 
     // Moving from one room into the next: the camera pans across from the old one.
     struct Transition
@@ -74,8 +82,7 @@ private:
     int maxWindowScale() const;
     bool inGame() const; // a level is being played, possibly paused
     std::string levelKey(size_t index) const;
-    size_t skinIndex() const; // of the saved skin; the first one if the name is unknown
-    std::string slotSummary(const Progress& p) const; // "THE CROSSROADS" and "1:02:03  5/22"
+    std::string slotSummary(const Progress& p) const; // where it'd carry on: "THE HIDDEN LAKE"
     void saveSettings();
     void saveProgress(); // to the slot being played, unless testing
 
@@ -104,14 +111,29 @@ private:
     std::string gemTotal() const;            // "GEMS 5/20"
     std::string gemTally(size_t room) const; // "1/2", or empty if the room has none
 
-    // Quests, races and the shop (see assets/quests.txt and assets/outfits.txt)
-    void act(const std::string& command); // a conversation's command: see Dialogue::isCommand
+    // What a conversation does (see Dialogue::isCommand): "give ability rope", "open shop".
+    void act(const std::string& command);
+    // Whether someone is there now: their `needs` holds and their `until` doesn't.
+    bool isAround(const Npc& npc) const;
+
+    // Mags's stall: outfits for gems. What you're wearing is put on the player.
     int gemsFound() const;
-    int money() const;                    // gems found, less what's been spent
-    std::vector<std::string> ownedOutfits() const; // the classic look first
-    void wear(const std::string& look);
-    void startRace(const std::string& id);
-    void checkQuestItemsAndRaces(float dt); // picking things up, crossing finishing lines, the clock
+    int gemsToSpend() const;
+    void applyOutfit();
+    void shopChoice(size_t outfit); // buy it, or put it on
+    void stallSays(std::string text); // under the list, for a moment
+
+    // Mine carts: getting in, riding, getting out at the end of the line.
+    bool cartReady(const Cart& cart) const; // its `needs` all hold
+    void updateCart();
+
+    // The stopwatch: runs of a route timed from its start post to its finish, and the best kept.
+    void updateTrial(); // starting or finishing one, at a post
+    std::vector<std::string> trialRoutes() const; // every route with a start post, in the world's order
+
+    // Pip, once found.
+    bool hasDog() const;
+    void updateDog(float dt);
 
     // Talking
     void startTalk(const Npc& npc);
@@ -169,6 +191,7 @@ private:
     void drawRooms(sf::Vector2f cam); // the current room and any others on screen
     void drawAir(sf::Vector2f cam);   // what's in front: near motes, the dark and the lights
     void drawBeams();                 // light shafts (see props::LIGHT_SHAFT)
+    void drawFront();                 // in front of the player: the water, and waterfalls (props::WATERFALL)
     void drawTransition();
     void drawBackground(const Theme& theme, float scrollX);
     // Where a rope shot now would go (in the world): at the mouse, or along the stick.
@@ -177,10 +200,13 @@ private:
     void drawCrosshair(sf::Vector2f at, sf::Color color); // at a screen position
     void drawHud();
     void drawMenuScreen();
+    void drawShop();
+    void drawRecords();
 
     std::vector<LevelInfo> levels;
     bool testing;
     bool headless;
+    std::optional<sf::Vector2f> startAt;
     float accumulator = 0.f; // time not yet stepped through
     SaveFiles files;
     Settings settings;
@@ -203,6 +229,14 @@ private:
         float seed;       // so they don't all sway together
     };
     std::vector<Beam> beams;             // the same
+    struct Fall
+    {
+        sf::Vector2f top; // screen pixels, the middle of it
+        float length;
+        float seed;
+    };
+    std::vector<Fall> falls;             // the same
+    std::vector<std::pair<size_t, sf::Vector2f>> roomsDrawn; // and the rooms on screen, with the camera in each one's coordinates
     sf::Vector2f lastCamera;             // world position, to move the motes along with it
     float talkBlips = 0.f; // letters typed since the last talking sound
 
@@ -222,11 +256,24 @@ private:
     Particles particles;
     std::mt19937 rng{7};
     std::optional<Transition> transition;
+    Dog dog;
+    float sniffTimer = 0.f;   // until Pip next points out a gem
+    struct Run
+    {
+        std::string route;
+        float time = 0.f;
+    };
+    std::optional<Run> timedRun; // going on
+    float runShown = 0.f;     // > 0: a finished run's time stays up this long
+    std::string runText;      // and what it says
+    bool cartRefused = false; // said already that this cart won't go, until you step away
+    std::optional<std::pair<size_t, sf::Vector2f>> parked; // where a cart was left at the end of the line: room, its bottom middle
 
     sf::Vector2f camera;
     float lookAhead = 0.f; // how far ahead of you the camera is looking, see updateCamera
     float standingY = 0.f; // the height you last stood at
     sf::Vector2f checkpoint;
+    int checkpointRiding = 0;     // riding a cart that way when the checkpoint was set: back in it
     bool needsSpawnPoint = false; // just came into the room: where the player first lands becomes the checkpoint
     std::optional<size_t> sitting; // the bench in this room the player is sitting on
     bool waking = false;           // a new game: sitting up on the floor until moving
@@ -239,21 +286,17 @@ private:
     float messageTimer = 0.f;
     bool shownRockHint = false;
     std::optional<Talk> talk;
-    bool pendingShop = false;                // asked for in a conversation: opened when it's over
-    std::optional<std::string> pendingRace;  // the same for a race
-    struct Race
-    {
-        std::string id;
-        float left; // seconds
-    };
-    std::optional<Race> race;
+    bool shopping = false;   // the conversation going on opens the stall when it's done
+    std::string stallNote;   // what Mags says about the last choice (see stallSays)
+    float stallNoteUntil = 0.f;
+    sf::Vector2f talkedTo;   // the feet of whoever that is
     std::string notice;      // see showNotice
     float noticeTimer = 0.f;
     float fade = 0.f;        // > 0 while fading in after travelling
-    // What the end screen rolls up: how the story went (assets/dialogue/endings.txt), what became of
-    // the people you helped (epilogue.txt), then how the climb went. A colour for each line, "" a gap.
+    // What the end screen rolls up: how the climb went, and thanks. A colour for each line, "" a gap.
     std::vector<std::pair<std::string, sf::Color>> credits;
     float creditsTime = 0.f; // seconds the end screen's been up
+    std::optional<sf::Vector2f> playedMouse; // driven by play(): where its mouse is, in the picture's pixels
     bool ignoreInputThisFrame = false;   // right after a (re)start, so the key that started it doesn't jump
     bool ignorePressesThisFrame = false; // right after unpausing: held buttons count, new presses don't
 };

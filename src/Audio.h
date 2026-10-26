@@ -20,13 +20,15 @@ public:
     {
         Jump, AirJump, Land, RopeClink, Death, Respawn, Gem, Pickup, Checkpoint,
         Bench, Travel, MenuMove, MenuPick, Talk, Door, Throw, Hooked, Grab,
-        Crack, Crumble, CloudPuff, IcicleShake, Shatter, LampLit, Buy, RaceGo, RaceTick, RaceLost,
+        Crack, Crumble, CloudPuff, IcicleShake, Shatter, LampLit,
+        Splash, Stroke, Bubble, Gasp, Bounce, Bark, Buy, CartStart, Crash, Watch, Record,
         Count // not a sound
     };
-    // Sounds that go on, louder or quieter: the wind, the heat of an updraft.
+    // Sounds that go on, louder or quieter: the wind, the heat of an updraft, a waterfall, a cart
+    // rolling on the rails.
     enum class Loop
     {
-        Wind, Heat,
+        Wind, Heat, Water, Rumble,
         Count // not a sound
     };
 

@@ -1,6 +1,0 @@
-# One of Ash's notes: at her frozen camp in the Frost Caves, by her throwing glove.
-
----
-Ash: Too cold for the glove: my hands climb better bare. I'm leaving it in the ice.
-Ash: If you're reading this, take it. Past the Summit you'll have to throw from the air. - A.
-set read_note_frost

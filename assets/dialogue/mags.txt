@@ -1,0 +1,25 @@
+# Mags, who keeps a stall by the campfire: clothes, for gems. She opens the stall when the talking's
+# done ("open shop"); see assets/outfits.txt for what's on it.
+
+---
+Mags: Gems! I can smell them on you. Well, I can see one sticking out of your pocket.
+Mags: Mags. I sell clothes. Good ones. For gems, since nobody out here has coins.
+Mags: Take a look. Try anything on.
+? What's that brass helmet?            -> helmet
+? I'll just look.                      -> look
+= helmet
+Mags: A diving suit! Brass helmet, air in a tank. Breathe four times as long under water.
+Mags: Not much call for it. Unless there's somewhere deep you can't get to. A lake, say.
+-> look
+= look
+set met_mags
+open shop
+
+--- met_mags !dog
+Mags: Back for another look?
+open shop
+
+--- met_mags dog
+Mags: Hello again. And hello to you, too. Who's a good boy?
+Mags: That dog finds gems, you know. He points his nose and barks. And there's paw prints on your map where there's more.
+open shop

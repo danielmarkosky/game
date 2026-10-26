@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
-#include "src/Catalog.h"
+#include "src/Outfits.h"
+#include "src/Regions.h"
 #include "src/Config.h"
+#include "src/Dialogue.h"
 #include "src/World.h"
 #include <nlohmann/json.hpp>
 #include <filesystem>
@@ -8,7 +10,9 @@
 #include "src/Level.h"
 #include "src/Player.h"
 #include "src/Props.h"
+#include <algorithm>
 #include <cmath>
+#include <map>
 #include <optional>
 #include <set>
 #include <vector>
@@ -201,7 +205,7 @@ TEST(World, BenchesStandOnTheGround) {
             ++benches;
         }
     }
-    EXPECT_GE(benches, 3u);
+    EXPECT_GE(benches, 2u);
 }
 
 TEST(World, TheLDtkProjectDefinesEveryTileTheRoomsUse) {
@@ -221,24 +225,32 @@ TEST(World, TheLDtkProjectDefinesEveryTileTheRoomsUse) {
     }
 }
 
-TEST(World, TheGameStartsInTheCrevasseAndAshsRopeIsFoundThere) {
+TEST(World, TheGameStartsInTheLakeAndOdoGivesYouTheRope) {
     const std::vector<LevelInfo> rooms = loadWorld(config::assetPath("world.ldtk"));
     ASSERT_FALSE(rooms.empty());
-    EXPECT_EQ(rooms.front().name, "crevasse_wake");
-    // The rope's the first thing to find, and found only once, before the way out of the crevasse.
-    std::vector<std::string> where;
+    EXPECT_EQ(rooms.front().name, "lake");
+    // You come to in the water.
+    const Level& lake = *rooms.front().level;
+    const sf::Vector2f start = lake.getStartPos();
+    EXPECT_TRUE(lake.depthInWater(start + sf::Vector2f(4.f, -4.f)));
+    // The rope isn't lying anywhere: Odo hands it over, on the Old Road.
+    bool odo = false;
     for (const LevelInfo& room : rooms) {
-        for (const Pickup& pickup : room.level->pickups()) {
-            if (pickup.ability == "rope") where.push_back(room.name);
-        }
+        for (const Pickup& pickup : room.level->pickups()) EXPECT_NE(pickup.ability, "rope") << room.name;
+        for (const Npc& npc : room.level->npcs()) odo |= room.name == "old_road" && npc.dialogue == "odo";
     }
-    EXPECT_EQ(where, std::vector<std::string>{"crevasse_camp"});
+    EXPECT_TRUE(odo);
+    const Dialogue says = Dialogue::load("odo");
+    bool gives = false;
+    for (const DialogueStep& step : says.conversations().front().steps) gives |= step.kind == DialogueStep::Kind::Do && step.text == "give ability rope";
+    EXPECT_TRUE(gives);
 }
 
 TEST(World, GoingUpThroughAFloorLandsOnSomething) {
     // Coming up into a room through a gap in its floor gives the lift of a jump (see
     // Player::enterLevel), and no more: there has to be something to land on within reach of it, or
-    // you'd drop straight back down. Not for the Drop (down only), nor gaps under a gate.
+    // you'd drop straight back down. Not for the Drop (down only), gaps under a gate, nor flooded
+    // ones (you swim up those).
     for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
         if (room.name == "the_drop") continue;
         const Level& level = *room.level;
@@ -247,6 +259,7 @@ TEST(World, GoingUpThroughAFloorLandsOnSomething) {
         const int width = int(b.width / Level::TILE_SIZE);
         for (int x = left; x < left + width; ++x) {
             if (level.isSolid(x, bottom) || level.isSolid(x - 1, bottom) == false) continue; // a gap's first column
+            if (level.isWater(x, bottom)) continue; // under water, you float up anyway
             int end = x;
             while (end < left + width && !level.isSolid(end, bottom)) ++end;
             bool gated = false;
@@ -271,12 +284,12 @@ TEST(World, GoingUpThroughAFloorLandsOnSomething) {
 }
 
 TEST(World, EveryPropIsInTheSheet) {
-    // Scenery names a picture in assets/gfx/props.txt (or is a light shaft): a typo would draw nothing.
+    // Scenery names a picture in assets/gfx/props.txt (or is a light shaft or a waterfall): a typo would draw nothing.
     ASSERT_FALSE(props::all().empty());
     int count = 0;
     for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
         for (const Prop& prop : room.level->props()) {
-            EXPECT_TRUE(prop.kind == props::LIGHT_SHAFT || props::find(prop.kind)) << room.name << ": " << prop.kind;
+            EXPECT_TRUE(prop.kind == props::LIGHT_SHAFT || prop.kind == props::WATERFALL || props::find(prop.kind)) << room.name << ": " << prop.kind;
             ++count;
         }
     }
@@ -293,6 +306,71 @@ TEST(World, EveryPropIsInTheSheet) {
 TEST(World, EveryRoomIsInANamedRegion) {
     // The map writes the regions' names over them (assets/regions.txt).
     for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
-        EXPECT_FALSE(catalog::regionName(room.region).empty()) << room.name << " is in region \"" << room.region << "\"";
+        EXPECT_FALSE(regions::name(room.region).empty()) << room.name << " is in region \"" << room.region << "\"";
     }
+}
+
+TEST(World, EachRouteEndsInItsAbilityItsBeaconABenchAndAFinish) {
+    // The four routes off the Campfire: at the end of each, its ability lying there once, the
+    // beacon that lights when you've got it, a bench to travel back from, and the finish of its
+    // timed run. The stopwatch, behind the waterfall, the same but for the beacon and the bench.
+    const auto rooms = loadWorld(config::assetPath("world.ldtk"));
+    for (const std::string ability : {"long_rope", "wall_climb", "air_throw", "double_jump", "stopwatch"}) {
+        SCOPED_TRACE(ability);
+        const LevelInfo* end = nullptr;
+        int found = 0;
+        for (const LevelInfo& room : rooms) {
+            for (const Pickup& pickup : room.level->pickups()) {
+                if (pickup.ability != ability) continue;
+                ++found;
+                end = &room;
+            }
+        }
+        ASSERT_EQ(found, 1);
+        const Level& level = *end->level;
+        EXPECT_TRUE(std::any_of(level.trials().begin(), level.trials().end(), [&](const Trial& t) { return t.finish && t.route == end->region; }));
+        if (ability == "stopwatch") continue;
+        EXPECT_FALSE(level.benches().empty());
+        EXPECT_TRUE(std::any_of(level.props().begin(), level.props().end(), [&](const Prop& p) { return p.kind == "beacon" && p.needs == ability; }));
+    }
+}
+
+TEST(World, TheOldLinesCartNeedsAllFour) {
+    int carts = 0;
+    for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
+        for (const Cart& cart : room.level->carts()) {
+            ++carts;
+            for (const std::string ability : {"long_rope", "wall_climb", "air_throw", "double_jump"}) {
+                EXPECT_NE(cart.needs.find(ability), std::string::npos) << room.name << " " << ability;
+            }
+        }
+    }
+    EXPECT_EQ(carts, 1);
+}
+
+TEST(World, EveryTimedRunHasAStartAndAFinish) {
+    std::map<std::string, std::pair<int, int>> posts; // route: starts, finishes
+    for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) {
+        for (const Trial& trial : room.level->trials()) {
+            EXPECT_FALSE(regions::name(trial.route).empty()) << room.name << ": no region called " << trial.route;
+            (trial.finish ? posts[trial.route].second : posts[trial.route].first) += 1;
+        }
+    }
+    EXPECT_GE(posts.size(), 6u);
+    for (const auto& [route, count] : posts) {
+        EXPECT_EQ(count.first, 1) << route;
+        EXPECT_EQ(count.second, 1) << route;
+    }
+}
+
+TEST(World, ThereAreGemsEnoughForEveryOutfit) {
+    int gems = 0;
+    for (const LevelInfo& room : loadWorld(config::assetPath("world.ldtk"))) gems += static_cast<int>(room.level->gems().size());
+    int prices = 0;
+    for (const outfits::Outfit& outfit : outfits::all()) {
+        prices += outfit.price;
+        EXPECT_TRUE(outfit.id == outfits::FIRST || Player::lookNamed(outfit.id) != 0) << outfit.id << " isn't drawn";
+    }
+    EXPECT_GE(outfits::all().size(), 5u);
+    EXPECT_GE(gems, prices);
 }

@@ -61,6 +61,21 @@ Ambience::Style Ambience::styleFor(const std::string& theme)
         s = {50, {-3.f, 6.f}, 5.f, true, {sf::Color(200, 240, 255, 220), sf::Color(140, 210, 255, 190), sf::Color(255, 255, 255, 200)}, 0.5f, sf::Color(170, 220, 255)};
     } else if (theme == "sky") {
         s = {34, {28.f, -2.f}, 3.f, false, {sf::Color(255, 255, 255, 170), sf::Color(230, 240, 255, 130)}, 0.f, sf::Color::White};
+    } else if (theme == "grotto") {
+        // Magic in the air: specks of light, blue, violet and gold, glowing and fading as they drift up.
+        s = {60, {1.f, -5.f}, 8.f, true, {sf::Color(120, 240, 255, 230), sf::Color(200, 150, 255, 220), sf::Color(255, 225, 140, 210), sf::Color(220, 255, 250, 200)},
+             0.45f, sf::Color(150, 220, 255)};
+    } else if (theme == "glade") {
+        // A night outside, the same magic in the air, and fireflies.
+        s = {55, {2.f, -3.f}, 10.f, true, {sf::Color(230, 250, 140, 230), sf::Color(130, 235, 255, 220), sf::Color(210, 160, 255, 210)},
+             0.3f, sf::Color(190, 230, 255)};
+    } else if (theme == "still") {
+        // Between the stars: a few tiny ones adrift, twinkling.
+        s = {30, {0.5f, -0.5f}, 2.f, true, {sf::Color(220, 225, 255, 200), sf::Color(190, 170, 255, 170), sf::Color(255, 250, 220, 160)},
+             0.35f, sf::Color(180, 190, 255)};
+    } else if (theme == "mine") {
+        // Dust in the lamp light, and the cold air of the mountain.
+        s = {30, {-6.f, 2.f}, 4.f, false, {sf::Color(210, 190, 160, 110), sf::Color(170, 160, 150, 90)}, 0.4f, sf::Color(230, 200, 150)};
     } else if (theme == "daylight") {
         s = {24, {10.f, -1.f}, 8.f, false, {sf::Color(255, 250, 210, 200), sf::Color(255, 255, 255, 160)}, 0.f, sf::Color::White};
     }
@@ -72,6 +87,10 @@ void Ambience::setTheme(const std::string& name)
     if (name == theme) return;
     theme = name;
     style = styleFor(name);
+    // Quiet: fewer of them, and fainter, than the styles say, so the air is there without crowding
+    // the screen.
+    style.count = style.count * 3 / 5;
+    for (sf::Color& c : style.colors) c.a = static_cast<sf::Uint8>(c.a * 3 / 4);
     motes.clear();
     std::uniform_real_distribution<float> unit(0.f, 1.f);
     for (int i = 0; i < style.count; ++i) {

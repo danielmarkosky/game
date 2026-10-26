@@ -7,7 +7,7 @@
 
 // What a character says, from a text file: assets/dialogue/<id>.txt. See
 // assets/dialogue/README.md for how they're written: lines, choices, jumps to labels, flags, and
-// commands: giving and taking things, opening the shop, starting a race.
+// commands: giving you an ability.
 
 // One step of a conversation.
 struct DialogueStep
@@ -35,8 +35,8 @@ public:
     // label that isn't there.
     static Dialogue load(const std::string& id);
     static Dialogue parse(const std::string& text);
-    // The commands a conversation can give: "give gems 5", "give outfit fox", "give item lure",
-    // "take item lure", "shop", "race garden". True if `command` is one.
+    // The commands a conversation can give: "give ability rope", "open shop" (Mags's stall, once
+    // the talking's done). True if `command` is one.
     static bool isCommand(const std::string& command);
 
     const std::vector<Conversation>& conversations() const;
@@ -55,7 +55,7 @@ private:
 class DialogueRunner
 {
 public:
-    // `act` is told every command ("give gems 5", "shop"...) as the conversation reaches it.
+    // `act` is told every command ("give ability rope") as the conversation reaches it.
     DialogueRunner(const Conversation& conversation, std::function<void(const std::string&)> setFlag,
                    std::function<void(const std::string&)> act = {});
 

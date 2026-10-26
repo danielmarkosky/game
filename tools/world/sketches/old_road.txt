@@ -1,0 +1,60 @@
+# Made with the room editor: ./build/Release/editor old_road (see tools/editor.cpp)
+title The Old Road
+theme glade
+region vale
+join L 7 lake R 7
+join R 7 gully L 7
+entity 6 25 dialogue=fen look=odo
+entity 7 25 ability=rope
+entity 11 24 ability=rope
+entity 4 23 ability=rope
+entity 6 23 period=4 to=6,0
+entity 8 23 ability=rope
+entity 10 21 ability=rope
+entity 7 19 ability=rope
+entity 8 14 kind=glow_roots
+entity 17 13 kind=glow_roots
+entity 6 7 kind=wheelbarrow
+entity 9 7 kind=planks
+entity 10 7 kind=lantern_post
+entity 12 7 dialogue=odo look=odo
+entity 14 7 kind=rubble
+entity 16 7 kind=road_sign
+entity 27 7 kind=glowshroom
+entity 31 7 kind=bellflowers
+entity 36 7 kind=runestone
+entity 41 7 kind=pine
+entity 45 7 kind=bellflowers
+entity 49 7 kind=glowshroom
+entity 52 7 kind=flowers
+tiles
+########################################################
+#########################..............................#
+#########################..............................#
+#########################..............................#
+######NP#################..............................#
+###########P###B#########..............................#
+#...P#R#P###wwwwww#######..............................#
+############Cwwww#www####..............................#
+##########P####wwwww#####......x.......................#
+#############wwwwwwwww###.....xx.......................#
+#######P##wwwwwwwwwwww###..xxx......=....____..........#
+#########wwwwww##wwww####.x........=........._____.....#
+##########wwwwwwwwwwww###.x.......=..............___...#
+#########wwwwwwwwww######.x....===...........____......#
+#########wwwwwwwwwww#####.x...=.........._____.........#
+##......D..ww..#wwwwwww#xxxxxx=..=======...............#
+##.......ww......D.....x....x====xx....................#
+##......w............xx......xxxxxxx...................#
+#......ww..............................................#
+.........wwwwwwwwwwwwwwwwwww......www...................
+........................wwww.....w......................
+......................ww.......ww.......................
+....S.D..DD.N.D.D...ww.....D..wD....D....D...D...D..D...
+#################-ww....-###ww#######wwwwww#############
+################wwwwwwwwwwwwwww##wwwwwww################
+###############ww........wwwwwwwwww#####################
+###############w###....wwwwwwwwww#######################
+###################.wwwwwwwwwww#########################
+#################wwww##www##############################
+################ww####w#################################

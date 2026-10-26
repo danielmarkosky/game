@@ -75,11 +75,7 @@ bool Dialogue::isCommand(const std::string& command)
     std::istringstream words(command);
     std::string verb, what, name;
     words >> verb >> what >> name;
-    if (verb == "shop") return what.empty();
-    if (verb == "race") return !what.empty() && name.empty();
-    if (verb == "give") return (what == "gems" || what == "outfit" || what == "item") && !name.empty();
-    if (verb == "take") return what == "item" && !name.empty();
-    return false;
+    return (verb == "give" && what == "ability" && !name.empty()) || (verb == "open" && what == "shop" && name.empty());
 }
 
 Dialogue Dialogue::parse(const std::string& text)

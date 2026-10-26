@@ -715,13 +715,15 @@ TEST(PlayerTest, SlickStoneCantBeGrabbed) {
     EXPECT_FALSE(player.isClinging());
 }
 
-TEST(PlayerTest, EverySkinHasARowOfFrames) {
+TEST(PlayerTest, EveryLookHasARowOfFrames) {
     sf::Image sheet;
     ASSERT_TRUE(sheet.loadFromFile(config::assetPath("gfx/player.png")));
-    // 12 frames of 12x14 per look, one look per row: the skins first (see tools/make_art.py).
+    // 12 frames of 12x14 per look, one look per row: the heroine first (see tools/make_art.py).
     EXPECT_EQ(sheet.getSize().x, 12u * 12u);
     EXPECT_EQ(sheet.getSize().y, Player::LOOKS.size() * 14u);
-    for (size_t ii = 0; ii < Player::SKINS.size(); ++ii) EXPECT_STREQ(Player::LOOKS[ii], Player::SKINS[ii]);
+    EXPECT_STREQ(Player::LOOKS[0], "heroine");
+    EXPECT_EQ(Player::lookNamed("fen"), 2u);
+    EXPECT_EQ(Player::lookNamed("nobody"), 0u);
 }
 
 TEST(PlayerTest, EnteringAnotherRoomKeepsTheSpeedButLetsGoOfTheRope) {
@@ -955,4 +957,115 @@ TEST(PlayerTest, ARopeThrownIntoAWallRightBesideYouBouncesOffIt) {
     EXPECT_NE(std::find(happened.begin(), happened.end(), PlayerEvent::Type::RopeBounced), happened.end());
     EXPECT_EQ(player.getRope(), nullptr);
     EXPECT_TRUE(player.canShootRope()); // and back in your hand
+}
+
+namespace
+{
+    // A pool, water 5 tiles deep with its surface at y = 48, and dry ground on the right level with it.
+    const std::string POOL =
+        "########################\n"
+        "#......................#\n"
+        "#......................#\n"
+        "#...S..................#\n"
+        "#......................#\n"
+        "#wwwwwwwwwwwwwww########\n"
+        "#wwwwwwwwwwwwwww########\n"
+        "#wwwwwwwwwwwwwww########\n"
+        "#wwwwwwwwwwwwwww########\n"
+        "#wwwwwwwwwwwwwww########\n"
+        "########################\n";
+    constexpr float SURFACE = 48.f;
+}
+
+TEST(PlayerTest, FallingInWaterYouFloatWithYourHeadOut) {
+    auto level = Level::loadFromString(POOL);
+    Player player(level);
+    hold(player, {}, 3.f);
+    EXPECT_TRUE(player.isSwimming());
+    EXPECT_FALSE(player.isGrounded());
+    // Feet under the surface, head above it, bobbing to a stop.
+    EXPECT_NEAR(player.getPosition().y, SURFACE - Player::FLOAT_DEPTH, 2.f);
+    EXPECT_LT(std::abs(player.getVelocity().y), 10.f);
+}
+
+TEST(PlayerTest, SwimmingAcrossYouStepOutOntoTheBank) {
+    auto level = Level::loadFromString(POOL);
+    Player player(level);
+    hold(player, {}, 2.f);
+    PlayerInput right;
+    right.moveX = 1.f;
+    hold(player, right, 0.5f);
+    EXPECT_NEAR(std::abs(player.getVelocity().x), physics().swimSpeed, 1.f); // slower than running
+    hold(player, right, 4.f);
+    EXPECT_FALSE(player.isSwimming());
+    EXPECT_TRUE(player.isGrounded());
+    EXPECT_EQ(player.getPosition().y, SURFACE);
+    EXPECT_GE(player.getPosition().x, 128.f);
+}
+
+TEST(PlayerTest, DivingDownAndBobbingBackUp) {
+    auto level = Level::loadFromString(POOL);
+    Player player(level);
+    hold(player, {}, 2.f);
+    PlayerInput down;
+    down.moveY = -1.f;
+    hold(player, down, 0.6f);
+    EXPECT_LT(player.getPosition().y, SURFACE - 20.f);
+    hold(player, {}, 3.f);
+    EXPECT_NEAR(player.getPosition().y, SURFACE - Player::FLOAT_DEPTH, 2.f);
+}
+
+TEST(PlayerTest, JumpingAtTheSurfaceLeapsOutOfTheWater) {
+    auto level = Level::loadFromString(POOL);
+    Player player(level);
+    hold(player, {}, 3.f);
+    PlayerInput jump;
+    jump.jumpPressed = jump.jumpHeld = true;
+    float top = player.getPosition().y;
+    for (int i = 0; i < static_cast<int>(0.6f / DT); ++i) {
+        hold(player, jump, DT);
+        jump.jumpPressed = false;
+        top = std::max(top, player.getPosition().y);
+    }
+    EXPECT_GT(top, SURFACE + 12.f); // feet well clear of it: high enough to land on a ledge at the edge
+    bool splashed = false;
+    for (const PlayerEvent& e : player.takeEvents()) splashed |= e.type == PlayerEvent::Type::Splashed;
+    EXPECT_TRUE(splashed);
+}
+
+TEST(PlayerTest, UnderWaterYouHoldYourBreathAndDrownWhenItRunsOut) {
+    auto level = Level::loadFromString(POOL);
+    Player player(level);
+    // Floating, head out: breathing.
+    hold(player, {}, 3.f);
+    EXPECT_FALSE(player.isUnderwater());
+    EXPECT_FLOAT_EQ(player.airLeft(), 1.f);
+    PlayerInput down;
+    down.moveY = -1.f;
+    hold(player, down, physics().airTime * 0.5f);
+    EXPECT_TRUE(player.isUnderwater());
+    EXPECT_GT(player.airLeft(), 0.3f);
+    EXPECT_LT(player.airLeft(), 0.7f);
+    EXPECT_FALSE(player.isOutOfAir());
+    hold(player, down, physics().airTime * 0.5f + 0.2f);
+    EXPECT_TRUE(player.isOutOfAir());
+}
+
+TEST(PlayerTest, ComingUpForAirFillsYourLungsAgain) {
+    auto level = Level::loadFromString(POOL);
+    Player player(level);
+    hold(player, {}, 2.f);
+    PlayerInput down;
+    down.moveY = -1.f;
+    hold(player, down, physics().airTime * 0.75f);
+    bool bubbled = false;
+    for (const PlayerEvent& e : player.takeEvents()) bubbled |= e.type == PlayerEvent::Type::Bubbled;
+    EXPECT_TRUE(bubbled);
+    // Let go: you bob up, gasp, and get your breath back.
+    hold(player, {}, physics().airRefillTime + 2.f);
+    bool gasped = false;
+    for (const PlayerEvent& e : player.takeEvents()) gasped |= e.type == PlayerEvent::Type::Gasped;
+    EXPECT_TRUE(gasped);
+    EXPECT_FALSE(player.isUnderwater());
+    EXPECT_FLOAT_EQ(player.airLeft(), 1.f);
 }

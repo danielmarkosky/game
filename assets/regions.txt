@@ -3,12 +3,13 @@
 #
 #   region <id> | <name on the map>
 
-region crevasse   | THE CREVASSE
-region hollows    | THE HOLLOWS
-region crossroads | THE CROSSROADS
-region ruins      | THE SUNKEN RUINS
+region lake       | THE HIDDEN LAKE
+region vale       | THE VALE
+region spring     | THE HIDDEN SPRING
 region garden     | THE HOOK GARDEN
-region summit     | THE SUMMIT
+region hollows    | THE HOLLOWS
 region frost      | THE FROST CAVES
-region ember      | THE EMBER CHIMNEY
 region sky        | THE SKY
+region still      | THE STILL
+region drowned    | THE DROWNED GROTTO
+region line       | THE OLD LINE

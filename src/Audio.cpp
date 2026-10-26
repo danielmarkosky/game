@@ -48,24 +48,32 @@ namespace
             case Audio::Sfx::IcicleShake: return tone(Wave::Sine, 2600.f, 2500.f, 0.3f, 0.002f, 0.2f, 0.12f, 0.f, {0, 3, 0, 3, 0, 3});
             case Audio::Sfx::Shatter: return tone(Wave::Noise, 5000.f, 1800.f, 0.3f, 0.001f, 0.25f, 0.24f, 0.f, {0, 7, 0, 5});
             case Audio::Sfx::LampLit: return tone(Wave::Triangle, 330.f, 660.f, 0.5f, 0.01f, 0.35f, 0.26f, 0.25f, {0, 7, 12});
-            case Audio::Sfx::Buy: return tone(Wave::Square, 1318.f, 1318.f, 0.3f, 0.002f, 0.15f, 0.18f, 0.f, {0, 5, 12});
-            case Audio::Sfx::RaceGo: return tone(Wave::Square, 523.f, 523.f, 0.35f, 0.002f, 0.12f, 0.22f, 0.f, {0, 0, 12});
-            case Audio::Sfx::RaceTick: return tone(Wave::Square, 1046.f, 1046.f, 0.05f, 0.001f, 0.03f, 0.12f);
-            case Audio::Sfx::RaceLost: return tone(Wave::Saw, 330.f, 160.f, 0.6f, 0.005f, 0.3f, 0.22f, 0.f, {0, -1, -3, -5});
+            case Audio::Sfx::Splash: return tone(Wave::Noise, 1800.f, 300.f, 0.4f, 0.002f, 0.3f, 0.26f);   // into the water
+            case Audio::Sfx::Stroke: return tone(Wave::Noise, 700.f, 400.f, 0.18f, 0.03f, 0.12f, 0.08f);   // a swimming stroke
+            case Audio::Sfx::Bubble: return tone(Wave::Sine, 500.f, 1100.f, 0.07f, 0.002f, 0.05f, 0.12f);   // a bubble rising
+            case Audio::Sfx::Gasp: return tone(Wave::Noise, 1400.f, 2600.f, 0.3f, 0.04f, 0.2f, 0.16f);    // a breath, coming up
+            case Audio::Sfx::Bounce: return tone(Wave::Sine, 180.f, 620.f, 0.22f, 0.002f, 0.15f, 0.3f);      // boing
+            case Audio::Sfx::Bark: return tone(Wave::Saw, 520.f, 330.f, 0.09f, 0.004f, 0.06f, 0.2f, 0.3f, {0, 0, 5}); // woof
+            case Audio::Sfx::Buy: return tone(Wave::Square, 988.f, 988.f, 0.35f, 0.002f, 0.2f, 0.18f, 0.f, {0, 5, 12});  // coins
+            case Audio::Sfx::CartStart: return tone(Wave::Noise, 120.f, 380.f, 0.5f, 0.05f, 0.3f, 0.3f);  // off it rolls
+            case Audio::Sfx::Crash: return tone(Wave::Noise, 900.f, 80.f, 0.6f, 0.001f, 0.45f, 0.4f);     // into the wall
+            case Audio::Sfx::Watch: return tone(Wave::Square, 1760.f, 1760.f, 0.08f, 0.001f, 0.04f, 0.14f); // a beep
+            case Audio::Sfx::Record: return tone(Wave::Triangle, 784.f, 784.f, 0.7f, 0.003f, 0.35f, 0.3f, 0.f, {0, 4, 7, 12, 16});
             case Audio::Sfx::Count: break;
         }
         return {};
     }
 
-    // A loop that goes on: noise, smoothed until it's the wind or the roar of heat, its loudness
-    // swelling and falling, so the end runs back into the start without a seam.
+    // A loop that goes on: noise, smoothed until it's the wind, the roar of heat or the rush of
+    // falling water, its loudness swelling and falling, so the end runs back into the start
+    // without a seam.
     std::vector<sf::Int16> loopSamples(Audio::Loop loop)
     {
-        const bool wind = loop == Audio::Loop::Wind;
-        const float seconds = wind ? 6.f : 3.f;
+        const bool wind = loop == Audio::Loop::Wind, water = loop == Audio::Loop::Water, rumble = loop == Audio::Loop::Rumble;
+        const float seconds = wind ? 6.f : rumble ? 2.f : 3.f;
         const size_t count = static_cast<size_t>(seconds * synth::RATE);
         std::vector<sf::Int16> out(count);
-        unsigned seed = wind ? 12345u : 777u;
+        unsigned seed = wind ? 12345u : water ? 4242u : rumble ? 9090u : 777u;
         float low = 0.f, lower = 0.f;
         for (size_t i = 0; i < count; ++i) {
             seed = seed * 1664525u + 1013904223u;
@@ -73,7 +81,18 @@ namespace
             const float t = static_cast<float>(i) / count;  // 0 to 1, round the loop
             const float pi2 = 6.2831853f;
             float v;
-            if (wind) {
+            if (rumble) {
+                // Wheels on rails: a low rattle, clacking over the joins eight times round the loop.
+                low += (white - low) * 0.04f;
+                lower += (low - lower) * 0.2f;
+                const float join = std::fmod(t * 8.f, 1.f);
+                v = lower * 2.f + (join < 0.03f ? white * 0.5f * (1.f - join / 0.03f) : 0.f);
+            } else if (water) {
+                // A steady hiss with a rumble under it.
+                low += (white - low) * 0.18f;
+                lower += (white - lower) * 0.02f;
+                v = (low * 0.55f + lower * 1.6f) * (0.9f + 0.1f * std::sin(pi2 * 3.f * t));
+            } else if (wind) {
                 // How bright the wind is rises and falls with its gusts.
                 const float gust = 0.55f + 0.3f * std::sin(pi2 * t) + 0.15f * std::sin(pi2 * 3.f * t + 1.f);
                 low += (white - low) * (0.02f + 0.05f * gust);

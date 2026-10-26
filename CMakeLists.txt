@@ -33,6 +33,10 @@ target_link_libraries(game PRIVATE game_core)
 add_executable(levelbot tools/levelbot.cpp)
 target_link_libraries(levelbot PRIVATE game_core)
 
+# Lays rooms out with the mouse: see tools/editor.cpp.
+add_executable(editor tools/editor.cpp)
+target_link_libraries(editor PRIVATE game_core)
+
 find_package(GTest QUIET)
 if (GTest_FOUND)
     file(GLOB TEST_FILES CONFIGURE_DEPENDS tests/*.cpp)

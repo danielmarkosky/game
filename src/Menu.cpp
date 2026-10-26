@@ -63,7 +63,7 @@ std::optional<MenuChoice> Menu::handleMouse(sf::Vector2f mouse, bool moved, bool
 void Menu::draw(sf::RenderTarget& target, float time) const
 {
     const bool columns = hasValues();
-    const float left = LEFT - shift(), right = RIGHT - shift();
+    const float left = LEFT - shift() + offsetX, right = RIGHT - shift() + offsetX;
     for (size_t row = 0; row < visibleCount(); ++row) {
         const size_t index = scroll + row;
         const MenuItem& item = items[index];
@@ -116,7 +116,7 @@ size_t Menu::visibleCount() const
 sf::FloatRect Menu::rowRect(size_t row) const
 {
     const float y = top + row * lineHeight - (lineHeight - hud::GLYPH_HEIGHT) * 0.5f;
-    if (hasValues()) return {LEFT - shift() - 10.f, y, RIGHT - LEFT + 20.f + (shift() > 0.f ? EXTRA_WIDTH : 0.f), lineHeight};
+    if (hasValues()) return {LEFT - shift() + offsetX - 10.f, y, RIGHT - LEFT + 20.f + (shift() > 0.f ? EXTRA_WIDTH : 0.f), lineHeight};
 
     float widest = 0.f;
     for (const auto& item : items) widest = std::max(widest, hud::textWidth(item.label));

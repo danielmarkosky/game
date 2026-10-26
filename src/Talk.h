@@ -38,8 +38,8 @@ public:
     // The mouse highlights the choice it's over, and a click picks it.
     void pointAt(sf::Vector2f mouse, bool clicked);
 
-    // `faces` draws the speakers, `playerSkin` is the look of "You".
-    void draw(sf::RenderTarget& target, const Player& faces, size_t playerSkin, float time) const;
+    // `faces` draws the speakers.
+    void draw(sf::RenderTarget& target, const Player& faces, float time) const;
 
     static constexpr float TYPING_SPEED = 45.f; // letters a second
 

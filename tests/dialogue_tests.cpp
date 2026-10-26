@@ -32,39 +32,39 @@ namespace
 TEST(Dialogue, ReadsSpeakersLinesAndConversations) {
     const Dialogue d = Dialogue::parse(
         "# a comment\n"
-        "Wren: Hello there.\n"
+        "Odo: Hello there.\n"
         "Still me talking.\n"
         "You: Hi: nice to meet you.\n"
         "\n"
         "--- climbing_pick !met\n"
-        "Wren: Nice pick.\n");
+        "Odo: Nice pick.\n");
     ASSERT_EQ(d.conversations().size(), 2u);
     std::set<std::string> flags;
     EXPECT_EQ(play(d.conversations()[0], {}, flags),
-              (std::vector<std::string>{"Wren: Hello there.", "Wren: Still me talking.", "You: Hi: nice to meet you."}));
+              (std::vector<std::string>{"Odo: Hello there.", "Odo: Still me talking.", "You: Hi: nice to meet you."}));
     EXPECT_EQ(d.conversations()[1].needs, (std::vector<std::string>{"climbing_pick", "!met"}));
 }
 
 TEST(Dialogue, ChoicesLeadToTheirLabelsAndSetFlags) {
     const Dialogue d = Dialogue::parse(
-        "Wren: Why are you here?\n"
+        "Odo: Why are you here?\n"
         "? My sister.     -> sister\n"
         "? Just passing.  -> passing\n"
         "= sister\n"
-        "Wren: Ash? I knew her.\n"
-        "set told_wren\n"
+        "Odo: The waterfall? You were lucky.\n"
+        "set told_odo\n"
         "-> after\n"
         "= passing\n"
-        "Wren: Suit yourself.\n"
+        "Odo: Suit yourself.\n"
         "= after\n"
-        "Wren: Off you go.\n");
+        "Odo: Off you go.\n");
     const Conversation& c = d.conversations()[0];
     std::set<std::string> flags;
-    EXPECT_EQ(play(c, {0}, flags), (std::vector<std::string>{"Wren: Why are you here?", "Wren: Ash? I knew her.", "Wren: Off you go."}));
-    EXPECT_EQ(flags, std::set<std::string>{"told_wren"});
+    EXPECT_EQ(play(c, {0}, flags), (std::vector<std::string>{"Odo: Why are you here?", "Odo: The waterfall? You were lucky.", "Odo: Off you go."}));
+    EXPECT_EQ(flags, std::set<std::string>{"told_odo"});
     flags.clear();
     // The other way stops at the next label.
-    EXPECT_EQ(play(c, {1}, flags), (std::vector<std::string>{"Wren: Why are you here?", "Wren: Suit yourself."}));
+    EXPECT_EQ(play(c, {1}, flags), (std::vector<std::string>{"Odo: Why are you here?", "Odo: Suit yourself."}));
     EXPECT_TRUE(flags.empty());
 }
 
@@ -93,8 +93,8 @@ TEST(Dialogue, EveryCharacterInTheWorldHasSomethingToSay) {
         for (const Npc& npc : room.level->npcs()) {
             SCOPED_TRACE(room.name + ": " + npc.dialogue);
             const Dialogue d = Dialogue::load(npc.dialogue);
-            // Someone (one of the looks), or one of Ash's notes.
-            EXPECT_TRUE(npc.look == "note" || std::find(Player::LOOKS.begin(), Player::LOOKS.end(), npc.look) != Player::LOOKS.end()) << npc.look;
+            // Someone, in one of the looks.
+            EXPECT_NE(std::find(Player::LOOKS.begin(), Player::LOOKS.end(), npc.look), Player::LOOKS.end()) << npc.look;
             for (const auto& conversation : d.conversations()) {
                 for (const auto& step : conversation.steps) {
                     // Only what the font can draw.
@@ -105,28 +105,6 @@ TEST(Dialogue, EveryCharacterInTheWorldHasSomethingToSay) {
             }
         }
     }
-}
-
-TEST(Dialogue, ThereIsAlwaysAnEnding) {
-    // The end screen shows the first ending the story's flags allow: the last needs none.
-    const Dialogue endings = Dialogue::load("endings");
-    ASSERT_FALSE(endings.conversations().empty());
-    EXPECT_TRUE(endings.conversations().back().needs.empty());
-}
-
-TEST(Dialogue, WhatYouTellAshDecidesTheEnding) {
-    const Dialogue endings = Dialogue::load("endings");
-    auto endingFor = [&](const std::set<std::string>& facts) {
-        for (const auto& c : endings.conversations()) {
-            if (Dialogue::allowed(c, [&](const std::string& f) { return facts.count(f) > 0; })) return c.steps.front().text;
-        }
-        return std::string();
-    };
-    // Each answer in ash.txt sets one of these.
-    std::set<std::string> seen;
-    for (const char* answer : {"ash_home", "ash_stay", "ash_letgo"}) seen.insert(endingFor({answer, "ash_answered"}));
-    seen.insert(endingFor({}));
-    EXPECT_EQ(seen.size(), 4u); // all different
 }
 
 TEST(Dialogue, ALabelThatIsntThereIsAnError) {
@@ -151,41 +129,18 @@ TEST(Text, WrapsAtSpacesToFitAWidth) {
     EXPECT_EQ(text::width("ab"), text::width("a") + 1.f + text::width("b"));
 }
 
-TEST(Dialogue, CommandsGiveTakeShopAndRace) {
-    EXPECT_TRUE(Dialogue::isCommand("give gems 5"));
-    EXPECT_TRUE(Dialogue::isCommand("give outfit scholar"));
-    EXPECT_TRUE(Dialogue::isCommand("take item moss_page"));
-    EXPECT_TRUE(Dialogue::isCommand("shop"));
-    EXPECT_TRUE(Dialogue::isCommand("race garden"));
+TEST(Dialogue, CommandsGiveAbilities) {
+    EXPECT_TRUE(Dialogue::isCommand("give ability rope"));
     EXPECT_FALSE(Dialogue::isCommand("give"));
+    EXPECT_FALSE(Dialogue::isCommand("give ability"));
     EXPECT_FALSE(Dialogue::isCommand("give hugs 5"));
-    EXPECT_FALSE(Dialogue::isCommand("shop now"));
+    EXPECT_FALSE(Dialogue::isCommand("shop"));
 
-    const Dialogue d = Dialogue::parse("---\nTuck: Have a look.\nshop\nTuck: Here, a gift.\ngive gems 2\nset met_tuck\n");
+    const Dialogue d = Dialogue::parse("---\nOdo: Here, take this.\ngive ability rope\nset met_odo\n");
     std::vector<std::string> done;
     std::set<std::string> flags;
     DialogueRunner run(d.conversations()[0], [&](const std::string& f) { flags.insert(f); }, [&](const std::string& c) { done.push_back(c); });
     while (!run.finished()) run.next();
-    EXPECT_EQ(done, (std::vector<std::string>{"shop", "give gems 2"}));
-    EXPECT_EQ(flags, std::set<std::string>{"met_tuck"});
-}
-
-TEST(Dialogue, TheEpilogueOnlySaysWhatYouDid) {
-    // Every line of the epilogue is about something that happened: none is said whatever you did,
-    // and each flag it needs is set by somebody somewhere.
-    const Dialogue epilogue = Dialogue::load("epilogue");
-    ASSERT_FALSE(epilogue.conversations().empty());
-    std::string everything;
-    for (const auto& entry : std::filesystem::directory_iterator(config::assetPath("dialogue"))) {
-        std::ifstream file(entry.path());
-        everything += std::string(std::istreambuf_iterator<char>(file), {});
-    }
-    for (const auto& c : epilogue.conversations()) {
-        ASSERT_FALSE(c.needs.empty());
-        for (const std::string& need : c.needs) {
-            const bool setByTalk = everything.find("set " + need) != std::string::npos;
-            const bool setByWinning = need.rfind("won_", 0) == 0; // a race, won
-            EXPECT_TRUE(setByTalk || setByWinning) << need;
-        }
-    }
+    EXPECT_EQ(done, (std::vector<std::string>{"give ability rope"}));
+    EXPECT_EQ(flags, std::set<std::string>{"met_odo"});
 }

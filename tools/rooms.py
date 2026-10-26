@@ -28,12 +28,14 @@ GRID = 8
 # IntGrid values of the Tiles layer, and the text characters for them.
 TILES = [(1, '#', 'rock', '#6A5C7A'), (2, '%', 'hook_block', '#A6B6CC'), (3, '-', 'platform', '#B47C48'),
          (4, '^', 'spikes', '#EEF1F8'), (5, 'x', 'crystal', '#E5487A'), (6, '=', 'gate', '#8899AA'), (7, 'o', 'slick', '#9AC0E0'),
-         (8, '~', 'ice', '#CFEFFF'), (9, '&', 'crumble', '#A8886C'), (10, '_', 'cloud', '#FFFFFF')]
+         (8, '~', 'ice', '#CFEFFF'), (9, '&', 'crumble', '#A8886C'), (10, '_', 'cloud', '#FFFFFF'),
+         (11, 'w', 'water', '#3A8FD0'), (12, 'm', 'bounce', '#E86A9A'), (13, '?', 'hidden', '#5A4E6A'),
+         (14, 't', 'rail', '#8A7A6A')]
 CHAR_OF = {value: char for value, char, _, _ in TILES}
 VALUE_OF = {char: value for value, char, _, _ in TILES}
 
-THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight', 'ruins', 'ice', 'sky']
-ABILITIES = ['rope', 'long_rope', 'wall_climb', 'air_throw', 'double_jump']
+THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight', 'ruins', 'ice', 'sky', 'grotto', 'glade', 'still', 'mine']
+ABILITIES = ['rope', 'long_rope', 'wall_climb', 'air_throw', 'double_jump', 'stopwatch']
 
 # Entities: identifier, text character, colour, at most one per room, fields.
 ENTITIES = [
@@ -42,31 +44,33 @@ ENTITIES = [
     ('Goal', 'G', '#FFD85A', False, []),
     ('Pickup', 'P', '#E8B94A', False, [('ability', 'Ability')]),
     ('Gem', '*', '#4FD0E8', False, []),
-    ('Npc', 'N', '#D77BBA', False, [('dialogue', 'String'), ('look', 'String')]),
+    ('Npc', 'N', '#D77BBA', False, [('dialogue', 'String'), ('look', 'String'), ('pose', 'String'), ('needs', 'String'), ('until', 'String')]),
     ('Bench', 'B', '#B47C48', False, []),
     ('Lever', 'L', '#E8443A', False, []),
-    ('Prop', 'D', '#8A8AA0', False, [('kind', 'String')]),
+    ('Prop', 'D', '#8A8AA0', False, [('kind', 'String'), ('needs', 'String')]),
     ('Icicle', 'Y', '#CFEFFF', False, []),
     ('Updraft', 'U', '#FF8C3C', False, []),
     ('Ring', 'R', '#E8B94A', False, [('to', 'String'), ('period', 'String')]),
     ('Lamp', 'Q', '#FFD86A', False, []),
-    ('Item', 'I', '#E8C04A', False, [('item', 'String')]),
-    ('Finish', 'F', '#FFFFFF', False, [('race', 'String')]),
+    ('Cart', 'K', '#8A7A6A', False, [('dir', 'String'), ('needs', 'String')]),
+    ('CartStop', 'E', '#6A5A4A', False, []),
+    ('Trial', 'T', '#7EF08E', False, [('route', 'String'), ('mark', 'String')]),
 ]
 ENTITY_OF_CHAR = {char: ident for ident, char, *_ in ENTITIES}
 CHAR_OF_ENTITY = {ident: char for ident, char, *_ in ENTITIES}
 DEFAULT_FIELDS = {'Pickup': {'ability': 'rope'}}
 
 # Fixed uids, so the definitions are the same in every project this makes.
-UID = {'Tiles': 1, 'Entities': 2, 'Theme': 3, 'Ability': 4, 'title': 5, 'theme': 6, 'wind': 7, 'dark': 8, 'region': 9}
+UID = {'Tiles': 1, 'Entities': 2, 'Theme': 3, 'Ability': 4, 'title': 5, 'theme': 6, 'wind': 7, 'dark': 8, 'region': 9, 'space': 100}
 # A room's own settings besides its title and theme: in rooms.txt as "room <name> wind=40 dark=1".
-ROOM_FIELDS = ['wind', 'dark', 'region']
+ROOM_FIELDS = ['wind', 'dark', 'region', 'space']
 for n, (ident, *_rest) in enumerate(ENTITIES):
     UID[ident] = 10 + n
 FIELD_UID = {}
 for n, (ident, _, _, _, fields) in enumerate(ENTITIES):
     for m, (name, _) in enumerate(fields):
-        FIELD_UID[(ident, name)] = 30 + 4 * n + m
+        # Four to an entity at first; more than that, further on (so the first four keep their uids).
+        FIELD_UID[(ident, name)] = 30 + 4 * n + m if m < 4 else 300 + 8 * n + m
 
 
 def new_iid():

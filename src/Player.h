@@ -25,10 +25,10 @@ struct PlayerInput
 struct PlayerEvent
 {
     enum class Type { Jumped, AirJumped, WallJumped, Landed, Stepped, Grabbed, RopeThrown, RopeAttached, RopeWrapped, RopeBounced,
-                      LeverTugged, LampTugged };
+                      LeverTugged, LampTugged, Splashed, Stroked, Bubbled, Gasped, Bounced, Pushed };
     Type type;
     sf::Vector2f position;
-    float strength = 0.f; // Landed: how fast the player was falling
+    float strength = 0.f; // Landed, Splashed: how fast the player was falling (Splashed: or leaping out)
     int index = -1;       // LeverTugged, LampTugged: which, in the level's list
 };
 
@@ -37,26 +37,25 @@ class Player
 public:
     explicit Player(std::shared_ptr<const Level> lvl);
 
-    // The looks to choose from, in the order of the rows in assets/gfx/player.png (made by
-    // tools/make_art.py). Only the sprite changes: every skin has the same hitbox.
-    static constexpr std::array<const char*, 15> SKINS = {
-        "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom",
-        "scholar", "gardener", "fisher", "smith", "scarf"};
-    // Every look in player.png: the skins, then the people you meet, who aren't for choosing.
-    static constexpr std::array<const char*, 24> LOOKS = {
-        "classic", "kid", "climber", "explorer", "astronaut", "frog", "knight", "fox", "robot", "mushroom",
-        "scholar", "gardener", "fisher", "smith", "scarf",
-        "wren", "pip", "moss", "juniper", "ash", "tuck", "bramble", "pell", "cinder"};
-    void setSkin(size_t index);
-    // The skin running on the spot, standing at `feet`, for the options screen.
-    void drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scale, float time) const;
+    // Every look in assets/gfx/player.png, in the order of its rows (made by tools/make_art.py):
+    // the heroine, who you are, then the people (and the dog) you meet, then the heroine in the
+    // other outfits there are (see assets/outfits.txt).
+    static constexpr std::array<const char*, 10> LOOKS = {"heroine", "odo", "fen", "mags", "pip",
+                                                          "ranger", "diver", "fox", "miner", "starlight"};
     // Someone else standing still in one of the LOOKS, breathing, with their feet at `feet`
     // (screen pixels): the characters in the world and their faces in conversations.
-    void drawFigure(sf::RenderTarget& target, size_t lookIndex, sf::Vector2f feet, bool facingLeft, float time, float scale = 1.f) const;
+    void drawFigure(sf::RenderTarget& target, size_t lookIndex, sf::Vector2f feet, bool facingLeft, float time, float scale = 1.f,
+                    bool sittingDown = false) const;
+    // Any pose of one of the LOOKS, its frames turning over with `time`: for the dog, and for you
+    // in another outfit at the stall. (For the dog, Swing is pointing its nose and Climb barking.)
+    enum class Pose { Idle, Run, Jump, Fall, Swing, Sit, Climb };
+    void drawPose(sf::RenderTarget& target, size_t lookIndex, Pose pose, sf::Vector2f feet, bool facingLeft, float time, float scale = 1.f) const;
     // The index of a look in LOOKS by its name, or 0 if there's none called that.
     static size_t lookNamed(const std::string& name);
     // Sitting on a bench: drawn sitting, until moving again.
     void setSitting(bool sit);
+    // Which of the LOOKS you're drawn in: the outfit you're wearing.
+    void setLook(size_t lookIndex);
 
     // Once per rendered frame: takes the buttons held and pressed (a rope press waits to be thrown,
     // a jump press is buffered).
@@ -78,7 +77,27 @@ public:
     sf::Vector2f getVelocity() const;
     void setVelocity(sf::Vector2f v);
     bool isGrounded() const;
+    // In water deep enough to float in.
+    bool isSwimming() const;
+    // Your mouth under the water: holding your breath.
+    bool isUnderwater() const;
+    // How much breath is left, 0 to 1: it lasts physics().airTime under water. Out of it, you drown.
+    float airLeft() const;
+    bool isOutOfAir() const;
     bool isTouchingDanger() const;
+    // Where the room has no gravity (Level::isSpace): floating, pushed about by the arrows.
+    bool isFloating() const;
+    // In a mine cart: it rolls on `dir`-wards (1 right, -1 left) at physics().cartSpeed until it's
+    // stopped, and all you can do is jump. The rope stays in your hand. Hitting a wall wrecks it.
+    void startRiding(int dir);
+    void stopRiding();
+    bool isRiding() const;
+    int ridingDir() const;
+    bool hasCrashed() const;
+    // Breath lasts physics().airTime times this under water (the diving suit makes it longer).
+    void setBreathScale(float scale);
+    // For the level bot, carrying on from where it left off: this much of your breath left (0 to 1).
+    void setAirLeft(float left);
     const Rope* getRope() const;
     // What a rope thrown towards `aim` now would meet first, within reach() (see Level::ropeHit).
     std::optional<RopeHit> aimHit(sf::Vector2f aim) const;
@@ -130,6 +149,14 @@ public:
     static constexpr int CORNER_CORRECTION = 4;
     // Holding down on a one-way platform drops through it for this long.
     static constexpr float DROP_THROUGH_TIME = 0.15f;
+    // Floating, the water's surface is this far above your feet: head and shoulders out.
+    static constexpr float FLOAT_DEPTH = 7.f;
+    // Feet this deep in water, you're swimming; any shallower, you're wading.
+    static constexpr float SWIM_DEPTH = 4.f;
+    // Swimming into a ledge this far above your feet climbs you onto it: a step out of the water.
+    static constexpr int WATER_STEP = 9;
+    // Your mouth is this far above your feet: under the water's surface, you're holding your breath.
+    static constexpr float MOUTH_HEIGHT = 8.5f;
 
 private:
     // Pixel-by-pixel movement, so the player always ends up exactly touching what it hits.
@@ -188,9 +215,18 @@ private:
     bool canDoubleJump = false;
     bool sitting = false;
     bool airJumped = false; // used the double jump since last on the ground or the rope
+    int riding = 0;         // in a mine cart, rolling this way; 0 not
+    bool crashed = false;   // the cart ran into a wall
+    float breathScale = 1.f;
+    size_t look = 0;        // the row of player.png
+    bool swimming = false;  // as of the last update
+    float strokeTimer = 0.f;
+    bool underwater = false; // the same
+    float air = 0.f;         // seconds of breath left
+    float maxAir() const;
+    float bubbleTimer = 0.f;
 
     // Looks
-    size_t skin = 0;
     std::vector<PlayerEvent> events;
     float animTime = 0.f;
     float stepTimer = 0.f;

@@ -1,109 +1,95 @@
 # The world of Tether
 
-The plan for the whole world: its regions, how they join, what each one teaches, where everything
-is. [`tools/make_world.py`](../tools/make_world.py) builds it, and
+The plan for the world, and where everything is. The rooms are made in
+[`tools/world/`](../tools/world/), a file per part of the world (or by hand, in the room editor:
+[`tools/world/rooms/`](../assets/levels/README.md#the-room-editor)), and
+[`tools/make_world.py`](../tools/make_world.py) joins them and builds the project;
 [`tools/check_world.py`](../tools/check_world.py) checks every route in it with the level bot. Change
 this first when the plan changes.
 
+## The story
+
+The Lantern on the mountain held the stars up, for as long as anyone remembers. Its keeper, an old
+woman hard as rope, tended it; then one night it went dark, and the stars started coming loose: the
+lights drifting in the air everywhere tonight are them. The keeper's granddaughter was taking a new
+spark up the old mine line to light it again, her dog in the cart with her, when the bridge over the
+falls gave way. She fell, over the falls, into the Hidden Lake, and woke with no memory.
+
+That's you. Odo, mending the old road, gives you a rope. Fen, reading the stars by the campfire,
+tells you about the Lantern and the line: its cart won't run until the four beacons burn, one at the
+end of each way out of the camp. Down in the Hollows you find Pip, who has waited on a ledge since the
+night you fell, and remembers you before you remember yourself. Behind the waterfall, in the Still
+where the falls begin, your Gran's stopwatch has been waiting too. With all four beacons lit, the
+cart climbs the mountain, over the broken bridge where you fell, and you light the Lantern. The stars
+go home. (The lines are in [`assets/dialogue/`](../assets/dialogue/), the ending in
+`Game::finishGame`.)
+
+## How it's laid out
+
+```
+                         The Sky Road (D) ── The Updraft Cliffs ── The Sky's Edge: the feather
+                                 │
+ The Frozen Falls ── The Icicle Hall ── The Frost Caves (C) ─┤          The Old Station ── The Old Line ── The Broken Bridge ── The Lantern: the end
+   the glove                                                  │          (E, the cart)
+ Hidden Spring                                                │                 │
+     │                                                        │                 │
+ The Still ── Where the Falls Begin    The Hidden Lake ── The Old Road ── The Gully ── The Campfire ── The Hook Garden (A) ── The Mushroom Glade ── The Ring Orchard: the long rope
+     (behind the waterfall)                │                                   │
+                                     The Drowned Grotto                The Hollows (B) ── The Dark Hollow ── Pip's Den: the chalk bag, and Pip
+```
+
+**The routes.** Two are open from the start, A and B; what's at the end of each opens one of the
+other two: the long rope (A) the Frost Caves (C), the chalk bag (B) the Sky Road (D). The glove (C)
+and the feather (D) are for the secrets, and with all four the beacons all burn and the Old Line (E)
+runs. Each route is three rooms, its first an ability's gate where it is one, its last a hill with
+its ability, its beacon (lit once you've the ability), a bench to travel back from, and the finish
+of its timed run (the start is in its first room).
+
+| Route | Way in | Region, theme | Needs | Mechanics | At its end |
+|---|---|---|---|---|---|
+| **A. The Hook Garden** ([`garden.py`](../tools/world/garden.py)) | East, along the road | The Hook Garden, garden | The rope | Swings over spikes; bounce mushrooms; hook rings that carry you | **The long rope** |
+| **B. The Hollows** ([`hollows.py`](../tools/world/hollows.py)) | Down the sinkhole | The Hollows, cave | The rope | Crumbling stone; a dark hollow lit by lamps you light with the rope; climbing out (with what's at the bottom) | **The chalk bag**, and **Pip** up on a ledge (climb to him) |
+| **C. The Frost Caves** ([`frost.py`](../tools/world/frost.py)) | Off the lookout, left | The Frost Caves, ice | The long rope (a chasm only it crosses) | Ice underfoot; icicles that fall as you pass; hook-to-hook up a frozen waterfall | **The throwing glove** |
+| **D. The Sky Road** ([`sky.py`](../tools/world/sky.py)) | Up through the top of the lookout | The Sky, sky | The chalk bag (a wall nothing else gets you up) | Clouds that fade under you; updrafts in the wind | **The updraft feather** |
+| **E. The Old Line** ([`line.py`](../tools/world/line.py)) | Up the planks to the station | The Old Line, mine | All four beacons (the cart won't move till then) | Riding a mine cart: jump the gaps, don't jump under crystals, the broken bridge (jump twice); then up to the Lantern with all four | **The Lantern**, and the way out: the end of the game |
+
+**The secrets**, behind and under the Hidden Lake:
+
+| Room | What it is | Needs |
+|---|---|---|
+| The wall behind the waterfall | Rock that isn't there (`?`): swim into the falls and step into it. Inside, on the left, the way to the Still; and steps up inside the wall to where the long rope reaches the rock over the crack, and the passage at its top | Nothing; the long rope, up |
+| **The Still**, **Where the Falls Begin** ([`still.py`](../tools/world/still.py)) | No gravity at all: black, stars, rocks adrift with crystals on them. At the end, the rift the falls pour out of, and **Gran's stopwatch**. A pocket of rock that isn't there, with a gem | Nothing |
+| **The Hidden Spring** ([`secret.py`](../tools/world/secret.py)) | A bench of its own, the stream that becomes the falls, gems | The long rope; the feather for one gem |
+| **The Drowned Grotto** ([`drowned.py`](../tools/world/drowned.py)) | Down a crack in the lake bed, a flooded tunnel longer than a breath, to a pocket of air with gems | The diving suit (Mags's stall) |
+
+**Secrets along the routes**, each a gem in sight that waits for something you'll only have later:
+the garden's pillar by the way in (the chalk bag, or the long rope), the hollow in the glade's roof
+(the feather, or the long rope), the dark hollow's ledge (the long rope), the den's gem under the
+roof (climbing to Pip's rock, then the long rope), the slick shelf in the Frost Caves and the shelf
+over the Frozen Falls (the feather), the hook blocks over the Sky's Edge (a throw from a jump: the
+glove). And here and there, gems behind rock that isn't there.
+
+## The opening
+
+| Room | Region | What happens | Teaches |
+|---|---|---|---|
+| **The Hidden Lake** (`lake`) | The Hidden Lake | You come to floating in the lake, under the waterfall you fell from (left). Swim to a rock in the middle, then ashore on the right, where the lake bed rises. A bench on the shore. Behind the falls and under the lake, the secrets above | Swimming, diving and coming up for air; walking |
+| **The Old Road** (`old_road`) | The Vale | Out of the cave mouth into the night. Odo is mending the road where the bridge washed out, and gives you a rope with a hook. Hook blocks under the cave's lip, over the ditch. Once you've the long rope, he's gone up to the station | Throwing the rope standing, one swing |
+| **The Gully** (`gully`) | The Vale | Odo's practice ground: a swing over a ditch; an overhang with hook blocks over a ledge too high to jump, to reel in up to; a long swing over a pool | Swinging, reeling in, letting go at the right time |
+| **The Campfire** (`camp`) | The Vale | Fen by the fire, Mags at her stall, a bench. The hub: the road east, a sinkhole down, the old lookout up the cliff on the left (off it the Frost Caves, at its top the Sky Road), and planks up the right to the Old Station | Jumping up through planks |
+
 ## How rooms are made
 
-- **One idea a room.** A room teaches one thing, or tests one thing it's already taught. A new
-  mechanic first appears where failing is safe, then over a fall, then mixed with what came before.
-- **Small.** Most rooms are one or two screens. Big rooms are for places, not for challenges.
-- **Readable.** Hook blocks are where the rope is meant to go. Slick stone is where it isn't.
-  Danger is red, pink or sharp.
-- **Both ways.** Every room can be walked back through, unless it's a one-way shortcut on purpose.
+- **One idea a room.** A room teaches one thing, or tests one thing it's already taught. A route's
+  mechanic first appears where failing is safe, then over a fall, then mixed with what came before,
+  then at its hardest just before the end.
+- **Small.** Most rooms are one or two screens. Dying puts you back where you came into the room.
+- **Readable.** Hook blocks are where the rope is meant to go. Slick stone (polished, with a sheen)
+  is where it isn't. Danger is red, pink or sharp.
+- **Forward.** A route's rooms only have to be climbed one way: its last room has a bench to travel
+  back from. Going back through one is allowed, but never needed.
 - **Fair.** Sized to what `levelbot --measure` says the moves reach, checked by the bot with exactly
   the abilities you'd have when you get there.
-- **Worth going back.** Every ability opens something in a place already seen: a gem, a shortcut,
-  a challenge room.
-
-## The regions
-
-| Region | Theme, music | Its idea | Who's there | What you find |
-|---|---|---|---|---|
-| **The Crevasse** | cave | Walking, jumping, the rope thrown standing | (nobody: Ash's cold camp) | **Ash's rope** |
-| **The Hollows** | cave | Climbing up with the rope, ledge by ledge | **Wren** by the bench | a way up |
-| **The Crossroads** | garden | The hub: everything starts here | **Pip** the mapmaker, **Tuck** the trader (the shop) | outfits, for gems |
-| **The Sunken Ruins** (west) | ruins | Dark rooms lit by lanterns the rope lights; levers the rope pulls from afar | **Moss** in the Archive | **Ash's chalk bag** (climbing) |
-| **The Hook Garden** (east) | garden | Hook rings moving on tracks; timing a throw | **Bramble** the gardener: a race | **the long rope** |
-| **The Summit** (up) | snow | Long-rope climbs: the Tall Hall | **Juniper** at the high camp | the Drop, a shortcut home |
-| **The Frost Caves** (off the Summit) | ice | Ice that slides, icicles that fall when you pass | **Pell**, an ice fisher | **the throwing glove** |
-| **The Ember Chimney** (on from the Summit) | ember | Heat that lifts you; blocks that crumble; a race upward | **Cinder** the smith: a race | **the updraft feather** |
-| **The Sky** (above it all) | sky | Wind that pushes your swing; clouds that fade under you | **Ash**, at the signal fire | the way out: the end |
-
-## How they join
-
-```
-                                                    THE SKY ── Daylight (Ash, the end)
-                                                       ▲ (feather)
-   FROST CAVES ◄──(chalk)── THE SUMMIT ──(glove)──► EMBER CHIMNEY
-                                 ▲     │ the Drop (one way, a lever)
-                     (long rope) │     ▼
-   SUNKEN RUINS ◄──────────── THE CROSSROADS ──── The Market ──► HOOK GARDEN
-                                       ▲
-                    The Cave ── The Well (The Deep below)
-                       ▲
-   THE CREVASSE (where a new game starts)
-```
-
-The rooms, region by region (their identifiers in the LDtk project; `REGIONS` in the world script
-gives each room its region, and [`assets/regions.txt`](../assets/regions.txt) their names on the
-map):
-
-- **The Crevasse**: crevasse_wake, crevasse_steps, crevasse_gaps, crevasse_camp, crevasse_dips, crevasse_chasm
-- **The Hollows**: level1 (The Cave), level2 (The Well), the_deep
-- **The Crossroads**: crossroads, market
-- **The Sunken Ruins**: ruins_gate, lever_works, the_vault (up a chimney from the Lever Works), ruins_hollow, dark_stair, ruins_archive
-- **The Hook Garden**: level3 (Hook Garden), garden_rings, greenhouse, thorn_walk (above it), trellis, level4 (Curtains)
-- **The Summit**: tall_hall, level5 (The Summit), the_drop
-- **The Frost Caves**: icefall, frozen_lake, frost_camp, hall_of_icicles (above it), icicle_gallery, frozen_camp
-- **The Ember Chimney**: level6 (Stepping Stones), forge, level7 (The Chimney), level8 (Pendulums), crumbling_halls, furnace (below them), the_updraft
-- **The Sky**: level9 (Backtrack), windy_ledge, cloud_steps, gusts, last_ledge, eye_of_storm (above it), level10 (Daylight)
-
-**Gates.** The Tall Hall needs the long rope. Into the Frost Caves you climb a wall: the chalk bag.
-Out of the Summit towards the Ember Chimney is a hook too high to throw to from the ground: the
-glove. The Sky's gaps need the feather.
-
-**Order.** The rope, then the long rope (east) and the chalk bag (west) in either order, then the
-glove (Frost Caves), then the feather (Ember Chimney), then the Sky. On the way west, the Lever
-Works' gate only opens to a rope tugging its lever through a slit: the first place that's needed.
-
-**Shortcuts**: the Drop, from the Summit straight down to the Crossroads, opened by a lever at the
-top. (A shortcut from the ruins to the Cave and a slide from the garden into the Well were planned;
-they'd have needed odd shapes of room to line up on the map, and the ruins and garden are close to
-the hub anyway.)
-
-**Benches**: The Cave, the Crossroads, the Market, the Archive, the Greenhouse, the Summit, the Frost Camp, the
-Forge, Pendulums, the Last Ledge. Travel between any you've sat on.
-
-## Quests
-
-Kept in the pause menu's QUESTS list. Their state is story flags; the rewards are outfits and gems.
-
-| Quest | Given by | What | Reward |
-|---|---|---|---|
-| **The Last Page** | Moss | A page torn from Moss's oldest book, blown away to the Frost Caves | the Scholar outfit |
-| **Through the Garden** | Bramble | A race: from the Greenhouse to Curtains, before the time runs out | the Gardener outfit |
-| **Wren's Lantern** | Wren | Wren's old lantern, dropped down The Deep years ago | 5 gems |
-| **Lost Lure** | Pell | Pell's lucky lure, carried off to the Ember Chimney | the Fisher outfit |
-| **Up the Chimney** | Cinder | A race up the Ember Chimney | the Smith outfit |
-| **Ash's notes** | (Ash) | Ash left a note in six places on her way up: read them all, and she gives you her scarf | the Green Scarf outfit |
-
-## The shop
-
-Tuck sells outfits for gems at the Market, next to the Crossroads. The classic look is yours from the
-start; the rest are bought or won. Gems are found in every room worth exploring, one or two each, and
-more in the challenge rooms. What you've bought shows in OPTIONS, SKIN.
-
-## Challenge rooms
-
-Off the main path, one a region, hard, each with a cache of gems: The Deep (Hollows, below the
-Well), The Vault (Ruins, up a chimney only hands climb), the Thorn Walk (Garden, above the
-Greenhouse), the Hall of Icicles (Frost Caves, above the camp), the Furnace (Ember, below the
-Crumbling Halls), the Eye of the Storm (Sky, above the Last Ledge).
-
-## Ash's notes
-
-One in each region she passed through, where she rested. Together they tell her climb, and why she
-stayed at the top.
+- **Secrets say so.** A secret you can't reach yet is in sight: a gem on a shelf too high, a hook too
+  high to throw to from the ground, a gem in a hole in the rock. You know to come back, and what
+  for. Only the waterfall's keeps quiet: Fen hints at it, once you've the long rope.

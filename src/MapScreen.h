@@ -21,14 +21,13 @@ public:
         size_t currentRoom = 0;
         sf::Vector2f player;
         std::vector<sf::Vector2f> pickups; // still to pick up, in explored rooms
-        std::vector<sf::Vector2f> items;   // things to find for people, still lying there
         std::vector<sf::Vector2f> people;  // someone to talk to
-        std::vector<sf::Vector2f> notes;   // Ash's notes, not read yet
+        std::vector<sf::Vector2f> gemRooms; // the middles of rooms with gems still to find (Pip knows)
         std::vector<std::string> regions;  // per room, the name of its region
         std::vector<sf::Vector2f> benches; // sat on, in the order travel goes through them
         std::vector<size_t> benchRooms;    // the room of each
         size_t benchHere = 0;              // in `benches`: the one sat on now
-        std::function<std::string(size_t room)> describe; // e.g. "THE CROSSROADS  GEMS 1/2"
+        std::function<std::string(size_t room)> describe; // e.g. "THE VALE: THE GULLY  GEMS 1/2"
         std::string hint; // which keys or buttons do what, along the bottom
     };
 

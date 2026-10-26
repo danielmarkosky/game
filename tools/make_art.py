@@ -218,16 +218,23 @@ gate = ['.1..1..1',
         '.1..1..1']
 
 
-# Slick stone, polished smooth by the wind: solid, but the rope slides off it.
-SLICK = {'1': rgb('#7a90b0'), '2': rgb('#a8c0dc'), '3': rgb('#d8e8f8'), 'w': rgb('#ffffff')}
-slick = ['3333333w',
+# Slick stone, polished smooth by the wind: solid, but the rope slides off it. The rock of its
+# theme, only smooth, with a sheen running across it: you can tell, if you look.
+slick = ['33333332',
+         '3222222w',
+         '322222w1',
          '32222w21',
          '3222w221',
          '322w2221',
          '32w22221',
-         '3w222221',
-         '32222221',
          '21111111']
+
+
+def slick_palette(rock):
+    """The theme's rock, a shade lighter and polished: a soft sheen, not a white block."""
+    def lighter(c, t):
+        return tuple(round(c[i] + (255 - c[i]) * t) for i in range(3)) + (255,)
+    return {'1': lighter(rock['1'], 0.08), '2': lighter(rock['2'], 0.12), '3': lighter(rock['3'], 0.2), 'w': lighter(rock['3'], 0.45)}
 
 
 # Ice: solid and grabbable by the rope, but you slide on it and hands don't hold on it.
@@ -264,6 +271,29 @@ cloud_tile = ['.33.333.',
               '........']
 
 
+# A bounce mushroom's cap: soft, springy, spotted. Land on it and up you go.
+BOUNCE = {'1': rgb('#7a2a4e'), '2': rgb('#c44a74'), '3': rgb('#e87a9e'), 'w': rgb('#ffe2ec')}
+bounce_tile = ['.333333.',
+               '33w23333',
+               '3www2223',
+               '32w22w23',
+               '2222www2',
+               '22222w22',
+               '12222221',
+               '11111111']
+
+# Rails for the mine carts, on wooden sleepers: a one-way platform.
+RAIL = {'2': rgb('#6a7080'), '3': rgb('#aab2c0'), 'w': rgb('#7a5030'), 'W': rgb('#4a2e1e')}
+rail_tile = ['33333333',
+             '22222222',
+             'WwwWWwwW',
+             '.W....W.',
+             '.W....W.',
+             '........',
+             '........',
+             '........']
+
+
 def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip), spike=SPIKE,
                rocks=(rock_a, rock_b, rock_c, rock_deep)):
     """The tiles of one theme: `rock` is the palette for the rock and everything growing on it."""
@@ -276,8 +306,8 @@ def tile_sheet(rock, grass=(grass_top, grass_top_b), decor=(tuft, flower, drip),
         (spikes_up, CRYSTAL), (flip_v(spikes_up), CRYSTAL),                             # 16-17
         (rotate(spikes_up), CRYSTAL), (rotate(rotate(rotate(spikes_up))), CRYSTAL),     # 18-19
         (plank_left, WOOD), (plank_mid, WOOD), (plank_right, WOOD), (hook_block, METAL),  # 20-23
-        (gate, METAL), (slick, SLICK), (ice_tile, ICE), (crumble_tile, CRUMBLE),                  # 24-27
-        (cloud_tile, CLOUD),                                                            # 28
+        (gate, METAL), (slick, slick_palette(rock)), (ice_tile, ICE), (crumble_tile, CRUMBLE),    # 24-27
+        (cloud_tile, CLOUD), (bounce_tile, BOUNCE), (rail_tile, RAIL),                  # 28-30
     ]
 
 
@@ -291,7 +321,7 @@ def make_tiles(name, tiles):
 
 
 # ----------------------------------------------------------------------------------------------
-# Player: assets/gfx/player.png, one row per look (the skins, then the people you meet), 12x14
+# Player: assets/gfx/player.png, one row per look (the heroine, then the people you meet), 12x14
 # frames. The order of both is mirrored in src/Player.h and .cpp: idle (2), run (4), jump, fall,
 # swing, sitting, climbing (2, facing the wall, hands up on it).
 # ----------------------------------------------------------------------------------------------
@@ -299,258 +329,37 @@ def make_tiles(name, tiles):
 FRAME_W, FRAME_H = 12, 14
 OUTLINE = rgb('#16131f')
 
-# Classic: the original character, based on the first hand-drawn player sprite. Spiky green/pink hair,
-# cyan band, beak facing right. Drawn 9x12 without an outline, frame by frame.
-PLAYER = {'a': rgb('#d77bba'), 'b': rgb('#99e550'), 'c': rgb('#5fcde4'), 'd': rgb('#eec39a'),
-          'e': rgb('#5b6ee1'), 'f': rgb('#323c39'), 'g': rgb('#fbf236'), 'G': rgb('#d9b52c'),
-          'y': rgb('#fffbb0'), 'h': rgb('#000000')}
-
-HEAD = ['.ab.b.ba.',
-        '.abbbbba.',
-        '.cddeddc.',
-        '.cdddedc.',
-        '.cddffff.']
-HEAD_WIND = ['ab.b.ba..',   # hair blown back while moving fast
-             '.abbbbba.',
-             '.cddeddc.',
-             '.cdddedc.',
-             '.cddffff.']
-BODY = ['...ggg...',
-        '.gyggggg.',
-        'gygggggGg',
-        'gggggggGg',
-        '..GgggG..']
-
-
-def frame(head, body, feet, drop=0):
-    rows = ['.' * 9] * drop + head + body + feet
-    return rows[:12] if len(rows) >= 12 else rows + ['.' * 9] * (12 - len(rows))
-
-
-PLAYER_FRAMES = [
-    frame(HEAD, BODY, ['..h...h..', '.hhh.hhh.']),                      # 0 idle
-    frame(HEAD, ['.gyggggg.'] + BODY[2:], ['..h...h..', '.hhh.hhh.'], drop=1),  # 1 idle, breathing out
-    frame(HEAD, BODY, ['..h..h...', '.hh..hh..']),                      # 2 run
-    frame(HEAD, ['.gyggggg.'] + BODY[2:], ['...hh....', '...hhh...'], drop=1),  # 3 run (pass, bob)
-    frame(HEAD, BODY, ['...h..h..', '..hh..hh.']),                      # 4 run
-    frame(HEAD, ['.gyggggg.'] + BODY[2:], ['....hh...', '...hhh...'], drop=1),  # 5 run (pass, bob)
-    frame(HEAD, BODY, ['..hh.hh..', '.........']),                      # 6 jump (feet tucked)
-    frame(HEAD_WIND, BODY, ['..h...h..', '..h...h..']),                 # 7 fall
-    frame(HEAD_WIND, BODY, ['...hhh...', '...h.h...']),                 # 8 swing
-    frame(HEAD, ['.gyggggg.'] + BODY[2:], ['...hhhh..'], drop=2),       # 9 sitting
-    frame(HEAD, ['...gggyy.'] + BODY[1:], ['...h.h...', '..hh..h..']),  # 10 climbing
-    frame(HEAD, ['...ggg.yy'] + BODY[1:], ['...hh.h..', '....h.hh.']),  # 11 climbing, the other foot up
-]
-
-
-def classic_frames():
-    """The 9x12 classic frames in the middle of the bigger frames, feet on the same row as the
-    other skins (which have their outline in the bottom row)."""
-    return [['.' * FRAME_W] + ['.' + r + '..' for r in f] + ['.' * FRAME_W] for f in PLAYER_FRAMES]
-
-
-# The other skins are drawn once, standing, as a 10x12 fill facing right: `head` rows on top of
-# `body` rows (10 rows together), then 2 rows of legs drawn by the code below in the skin's leg
-# (L) and foot (F) colours. Every pose is made from that, and outlined automatically.
-SKINS = [
-    dict(name='kid',  # the classic character, cleaned up
-         palette={'b': '#9be550', 'B': '#5ea83a', 'a': '#e07bbd', 'c': '#5fcde4', 'd': '#f1c9a0',
-                  'D': '#c98f72', 'e': '#16131f', 'g': '#fbe246', 'G': '#d99a2c', 'y': '#fffbd0',
-                  'h': '#5a4a6e'},
-         head=['a.b.b.ba..',
-               'abbbbbbba.',
-               'bBbbbbbbb.',
-               'cccccccc..',
-               '.ddddded..',
-               '.dddddddD.',
-               '..DdddD...'],
-         body=['.gygggGg..',
-               'dgggggggd.',
-               '.ggggggG..'],
-         legs='hh', hand='d'),
-    dict(name='climber',  # messy hair, yellow scarf, red-orange jacket
-         palette={'h': '#5a3a33', 'H': '#3d2626', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f',
-                  's': '#ffd34d', 'S': '#d99a2c', 'r': '#e8553a', 'R': '#a8352a', 'n': '#2c3a5c',
-                  'k': '#6a4434'},
-         head=['..hhhhh...',
-               '.hhhhhhhh.',
-               'Hhhhhdhhd.',
-               '.Hhddddede',
-               '..hdddddd.',
-               '...DdddD..'],
-         body=['SssssssS..',
-               '.Srrrrrr..',
-               '..rrrrrRd.',
-               '..rrrrRR..'],
-         legs='nk', hand='d'),
-    dict(name='explorer',  # pointed teal hood, face in shadow, glowing eyes
-         palette={'t': '#3fc1a5', 'T': '#23806f', 'l': '#a6f0dc', 'f': '#2a2440', 'w': '#fff6c8',
-                  'm': '#e8a33a'},
-         head=['....t.....',
-               '...tlt....',
-               '..tlttt...',
-               '.ttttttt..',
-               '.tTffffft.',
-               '.tTfwffwt.',
-               '.tTffffft.'],
-         body=['.Tttttttt.',
-               'mTttttttTm',
-               '.TttttttT.'],
-         legs='TT', hand='m'),
-    dict(name='astronaut',  # white suit, blue visor, orange badge
-         palette={'w': '#eef0f6', 'W': '#a9aec4', 'v': '#3f8fd8', 'V': '#bfe8ff', 'p': '#f08a2c',
-                  'G': '#6b6f86'},
-         head=['..wwwww...',
-               '.wwwwwwww.',
-               '.wwvvvvvw.',
-               '.wwvVvvvw.',
-               '.wwvvvvvw.',
-               '..wwwwww..'],
-         body=['.WwwwwwwW.',
-               'wWwpwwwwWw',
-               '.Wwwwwwww.',
-               '..wwwwwW..'],
-         legs='GG', hand='w'),
-    dict(name='frog',  # big eyes on top, pale belly, red neckerchief
-         palette={'g': '#5cc95a', 'G': '#2f8a45', 'w': '#ffffff', 'k': '#16131f', 'l': '#d9f2a0',
-                  'r': '#e8553a', 'm': '#1f5a33'},
-         head=['..gg..gg..',
-               '.gwkg.gwkg',
-               '.ggggggggg',
-               '.ggggggggg',
-               '.Ggmmmmmmg',
-               '..GGgggGG.'],
-         body=['..rrrrrr..',
-               '.grllllgg.',
-               'g.lllllG.g',
-               '..lllllG..'],
-         legs='gG', hand='g'),
-    dict(name='knight',  # steel helmet with a red plume, blue tabard
-         palette={'r': '#e8443a', 's': '#c8ccd8', 'S': '#7d8299', 'k': '#16131f', 'b': '#3e6fd8',
-                  'B': '#27458f', 'Y': '#ffd34d'},
-         head=['..rrr.....',
-               '.rr.rr....',
-               '..ssssss..',
-               '.ssssssss.',
-               '.sSkkkkks.',
-               '.ssssssss.',
-               '..SSSSSS..'],
-         body=['.bbbbbbb..',
-               'sbbbYbbbbs',
-               '.bbbbbbB..'],
-         legs='SS', hand='s'),
-    dict(name='fox',  # orange, white snout, belly and tail tip
-         palette={'f': '#f08a2c', 'F': '#b85a1f', 'w': '#fff3e0', 'k': '#16131f', 'p': '#f7b2a0'},
-         head=['..f...f...',
-               '..ff.fpf..',
-               '..ffffff..',
-               '.fffffkf..',
-               '..fffwwwwk',
-               '...fwwww..'],
-         body=['w..ffffff.',
-               'wF.fwwwff.',
-               '.FFfwwwf..',
-               '...ffffF..'],
-         legs='Fw', hand='F'),
-    dict(name='robot',  # orange box, screen face with cyan eyes, antenna light
-         palette={'y': '#ffe066', 'm': '#f0a03a', 'M': '#a8642a', 'k': '#1d2333', 'c': '#5ff0f0',
-                  'p': '#e8443a', 'a': '#9aa0b4'},
-         head=['....y.....',
-               '....a.....',
-               '.mmmmmmmm.',
-               '.mkkkkkkm.',
-               '.mkkckkcm.',
-               '.mkkkkkkm.'],
-         body=['.MmmmmmmM.',
-               '..MMMMMM..',
-               'aMmmpmmMa.',
-               '.MmmmmmM..'],
-         legs='aM', hand='a'),
-    dict(name='mushroom',  # red cap with white spots
-         palette={'r': '#e8443a', 'R': '#a02a2a', 'w': '#fff6e0', 'c': '#f4dcb8', 'C': '#c9a57e',
-                  'k': '#16131f', 'g': '#6fbf5a', 'b': '#6b4a3a'},
-         head=['...rrrr...',
-               '.rrwwrrrr.',
-               'rrrwwrrwwr',
-               'rrrrrrrwwr',
-               'RRRRRRRRRR',
-               '.cccccccc.',
-               '.cccccckck',
-               '.cccccccc.'],
-         body=['..CccccC..',
-               '.gcccccCg.'],
-         legs='bb', hand='g'),
-    # The outfits that are only won, not bought (see assets/outfits.txt).
-    dict(name='scholar',  # Moss's reward: round glasses, a plum robe, a book under the arm
-         palette={'h': '#3a2a2a', 'd': '#f1c9a0', 'D': '#c98f72', 'o': '#e8e8f0', 'e': '#16131f',
-                  'p': '#7a4a9a', 'P': '#4a2a6a', 'b': '#c8a050', 'n': '#2c2a3c'},
-         head=['...hhhh...',
-               '..hhhhhh..',
-               '..hddddh..',
-               '..oedoed..',
-               '..dddddd..',
-               '...DddD...'],
-         body=['.pppppp...',
-               'dpPpppbbd.',
-               '.ppPppbb..',
-               '..pppppP..'],
-         legs='nn', hand='d'),
-    dict(name='gardener',  # Bramble's reward: a straw hat, a green apron
-         palette={'y': '#e8c860', 'Y': '#b89038', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f',
-                  'g': '#5a9a4a', 'G': '#3a6a2a', 'w': '#e8e0d0', 'k': '#6a4434'},
-         head=['...yyyy...',
-               '.yyyyyyyy.',
-               'YYYYYYYYYY',
-               '..dddded..',
-               '..dddddd..',
-               '...DddD...'],
-         body=['.wggggww..',
-               'dwgggggwd.',
-               '.wggGggw..',
-               '..gggggG..'],
-         legs='kk', hand='d'),
-    dict(name='fisher',  # Pell's reward: a yellow rain hat and coat
-         palette={'y': '#f0d040', 'Y': '#c0a020', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 'n': '#3a4a6a'},
-         head=['...yyyy...',
-               '..yyyyyy..',
-               '.YYYYYYYY.',
-               '..dddded..',
-               '..dddddd..',
-               '...DddD...'],
-         body=['.yyyyyyy..',
-               'dyyYyyyyd.',
-               '.yyYyyyy..',
-               '..yyyyyY..'],
-         legs='nn', hand='d'),
-    dict(name='smith',  # Cinder's reward: a red headband, a leather apron, soot
-         palette={'h': '#2a2020', 'r': '#c8443a', 'd': '#e0a878', 'D': '#a87048', 'e': '#16131f',
-                  'l': '#8a5a34', 'L': '#5a3a20', 'w': '#d8d0c8', 'k': '#3a3030'},
-         head=['...hhhh...',
-               '..hhhhhh..',
-               '..rrrrrr..',
-               '..dddded..',
-               '..dDdddd..',
-               '...DddD...'],
-         body=['.wllllww..',
-               'dwlLlllwd.',
-               '.wllLllw..',
-               '..llllll..'],
-         legs='kk', hand='d'),
-    dict(name='scarf',  # for finding all of Ash's notes: her green scarf, on you
-         palette={'h': '#5a3a33', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 's': '#4ac08a',
-                  'S': '#2a8a5a', 'w': '#e8eef8', 'W': '#a9aec4', 'n': '#2c3a5c', 'k': '#6a4434'},
-         head=['..hhhhh...',
-               '.hhhhhhhh.',
-               '.hhddddhd.',
-               '..hdddded.',
-               '..dddddd..',
-               '...DddD...'],
-         body=['ssssssss..',
-               '.Swwwwww..',
-               '..wwwwwWd.',
-               '..wwwwWW..'],
-         legs='nk', hand='d'),
-]
+# The heroine: you. Long black hair with a red ribbon in it, a teal dress with a white collar and a
+# gold clasp. Drawn once, standing, as a 10x12 fill facing right: `head` rows on top of `body` rows
+# (10 rows together), then 2 rows of legs drawn by the code below in her leg (L) and foot (F)
+# colours. Every pose is made from that, and outlined automatically. `wind_head` and `wind_body`
+# are the same with her hair streaming out behind her, for running, falling and swinging.
+HEROINE = dict(
+    name='heroine',
+    palette={'h': '#15121f', 'H': '#2e2a48', 'i': '#6466a0', 'd': '#f8dcc4', 'D': '#dba38c', 'e': '#2a1f45',
+             'p': '#f0909c', 'r': '#e0455a', 'R': '#a02840', 'c': '#2fb3a6', 'C': '#1d7a7c', 'g': '#f2c95a',
+             'n': '#3a2f52', 'k': '#6b4430', 'w': '#f4efe4'},
+    head=['.r.hhhhh..',
+          'rRhHiihhh.',
+          '.hHhhhhhhh',
+          '.hhhdhddhh',
+          '.hhdeddedh',
+          '.hhpddddph'],
+    body=['.hhhDdDhh.',
+          '.hhcwwwch.',
+          '.hdcCgccd.',
+          '..cccccC..'],
+    wind_head=['.r.hhhhh..',
+               'rRhHiihhh.',
+               'hhHhhhhhhh',
+               'hhhhdhddhh',
+               '.hhdeddedh',
+               '..hpddddph'],
+    wind_body=['..hhDdDhh.',
+               '..hcwwwch.',
+               '..dcCgccd.',
+               '..cccccC..'],
+    legs='nk', hand='d')
 
 # Legs for each pose, in leg (L) and foot (F) colours. A '-' row means the body bobs down a pixel.
 LEGS = {
@@ -568,8 +377,10 @@ LEGS = {
 }
 
 
-def pose(skin, legs, breathe=False, hand_up=False):
+def pose(skin, legs, breathe=False, hand_up=False, wind=False):
     head, body = list(skin['head']), list(skin['body'])
+    if wind and 'wind_head' in skin:  # hair streaming out behind
+        head, body = list(skin['wind_head']), list(skin['wind_body'])
     assert len(head) + len(body) == 10 and all(len(r) == 10 for r in head + body), skin['name']
     if breathe:  # the head sinks a pixel into the body
         head, body = ['.' * 10] + head, body[1:]
@@ -599,149 +410,167 @@ def outlined(fill):
 
 def skin_frames(skin):
     poses = [pose(skin, 'idle'), pose(skin, 'idle', breathe=True),
-             pose(skin, 'run_a'), pose(skin, 'pass_a'), pose(skin, 'run_b'), pose(skin, 'pass_b'),
-             pose(skin, 'jump'), pose(skin, 'fall'), pose(skin, 'swing', hand_up=True), pose(skin, 'sit'),
+             pose(skin, 'run_a', wind=True), pose(skin, 'pass_a', wind=True), pose(skin, 'run_b', wind=True),
+             pose(skin, 'pass_b', wind=True), pose(skin, 'jump'), pose(skin, 'fall', wind=True),
+             pose(skin, 'swing', hand_up=True, wind=True), pose(skin, 'sit'),
              pose(skin, 'climb_a', hand_up=True), pose(skin, 'climb_b', hand_up=True)]
     return [outlined(p) for p in poses]
 
 
-# The people you meet: drawn like the skins, and after them in player.png, but not for choosing.
+# The people you meet: drawn like the heroine, and after her in player.png.
 # Their names are what an Npc's `look` field says, and mirrored in Player::LOOKS.
 NPCS = [
-    dict(name='wren',  # an old climber: grey bun, worn green jacket
-         palette={'w': '#d8d8e0', 'W': '#a0a0b0', 'd': '#e8b890', 'D': '#b8865e', 'e': '#16131f',
-                  'g': '#5f8a4a', 'G': '#3f6a35', 'k': '#5a4030'},
-         head=['...www....',
-               '..wwwww...',
-               '.wwWwwww..',
-               '.wwddddd..',
+    dict(name='odo',  # the road mender at the cave's mouth: a straw hat, a grey beard, a work shirt, a tool belt
+         palette={'y': '#e8c870', 'Y': '#b8944a', 'd': '#e0a878', 'D': '#b07850', 'e': '#16131f', 'b': '#b8b8c0',
+                  's': '#4a7ab0', 'S': '#2f5582', 'l': '#7a4e2c', 'k': '#4a3a30'},
+         head=['...yyy....',
+               '..yYYYy...',
+               'yyyyyyyyy.',
                '..dddded..',
-               '...DddD...'],
-         body=['.gggggg...',
-               'dgggggggd.',
-               '.gGggggg..',
-               '..gggggG..'],
+               '..bbbbbb..',
+               '...bbbb...'],
+         body=['.ssssss...',
+               'dsSssssd..',
+               '.llllll...',
+               '..ssssS...'],
          legs='kk', hand='d'),
-    dict(name='pip',  # the mapmaker: red beret, round glasses, satchel
-         palette={'r': '#c8443a', 'd': '#f1c9a0', 'D': '#c98f72', 'o': '#3a2a2a', 'y': '#e8c04a',
-                  'Y': '#b8902a', 'B': '#7a4e2c', 'n': '#3a4060'},
-         head=['...rrrr...',
-               '..rrrrrrr.',
-               '..dddddd..',
-               '..oodood..',
-               '..dddddd..',
-               '...DddD...'],
-         body=['.yyyyyyy..',
-               'dyByyyyyd.',
-               '.yyBBByy..',
-               '..yyyyyY..'],
-         legs='nn', hand='d'),
-    dict(name='moss',  # the scholar of the ruins: mossy hood, eyes glowing in the dark, a lantern
-         palette={'M': '#3f6a4a', 'm': '#5f9a5a', 'f': '#1d1a2a', 'w': '#c8ffd0', 'l': '#ffd86a'},
-         head=['...MMM....',
-               '..MMmMM...',
-               '.MMmmmMM..',
-               '.MMffffM..',
-               '.MMfwfwM..',
-               '..MMMMM...'],
-         body=['.MMmmmMM..',
-               'lMmmmmmMl.',
-               '.MmmmmmM..',
-               '.MMmmmMM..'],
-         legs='MM', hand='l'),
-    dict(name='juniper',  # the hermit of the high camp: fur hat, white beard, blue coat
-         palette={'f': '#e8e0d0', 'F': '#b8a890', 'd': '#e0b088', 'e': '#16131f', 'b': '#d8d8d8',
-                  'c': '#3a6aa8', 'C': '#2a4a78', 'k': '#4a3a30'},
-         head=['..ffffff..',
-               '.fFffffFf.',
-               '..dddddd..',
-               '..dddded..',
-               '.bbbbbbb..',
-               '..bbbbb...'],
-         body=['.cccccccc.',
-               'dccbcccccd',
-               '.ccccccc..',
-               '..cccccC..'],
+    dict(name='fen',  # by the campfire: a deep blue hooded cloak sewn with little stars, a glowing pendant
+         palette={'c': '#3a3a8a', 'C': '#26266a', 'v': '#f0e8a0', 'd': '#e8c09a', 'D': '#b88a68', 'e': '#16131f',
+                  'g': '#7af0e0', 'k': '#2a2440'},
+         head=['...cccc...',
+               '..ccvccc..',
+               '.ccddddcc.',
+               '.ccdddedc.',
+               '.ccddddcc.',
+               '..cDddDc..'],
+         body=['.cccgccc..',
+               'dcvcccccd.',
+               '.ccccvcc..',
+               '.cCcccCc..'],
          legs='kk', hand='d'),
-    dict(name='ash',  # the one you came looking for: long auburn hair, green scarf, white jacket
-         palette={'a': '#a8482a', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 's': '#4ac08a',
-                  'S': '#2a8a5a', 'w': '#e8eef8', 'W': '#a9aec4', 'n': '#2c3a5c', 'k': '#6a4434'},
-         head=['..aaaaa...',
-               '.aaaaaaaa.',
-               'aaaaadaad.',
-               'aaddddded.',
-               'a.dddddd..',
-               '...DdddD..'],
-         body=['ssssssss..',
-               '.Swwwwww..',
-               '..wwwwwWd.',
-               '..wwwwWW..'],
-         legs='nk', hand='d'),
-    dict(name='tuck',  # the trader at the Market: an orange hat, a big moustache, a pack of wares
-         palette={'o': '#e8803a', 'O': '#a8502a', 'd': '#f1c9a0', 'D': '#c98f72', 'e': '#16131f', 'm': '#5a3a2a',
-                  'c': '#7a8a5a', 'C': '#4a5a3a', 'k': '#4a3a30', 'b': '#a87a48'},
-         head=['...ooo....',
-               '..ooooo...',
-               '.OOOOOOO..',
-               '..dddded..',
-               '..mmmmmm..',
-               '...DddD...'],
-         body=['bccccccc..',
-               'bcCcccccd.',
-               'bcccccc...',
-               'b.cccccC..'],
-         legs='kk', hand='d'),
-    dict(name='bramble',  # the gardener of the Greenhouse: a crown of leaves and flowers, green overalls
-         palette={'j': '#5a9a3a', 'J': '#3a6a2a', 'p': '#e87bd0', 'd': '#d8a878', 'D': '#a87850', 'e': '#16131f',
-                  'g': '#6aa84a', 'G': '#3f7a35', 'w': '#e8d8b0', 'k': '#5a4030'},
-         head=['.jpjjjpj..',
-               '.jjjjjjjj.',
-               '..jddddj..',
-               '..dddded..',
-               '..dddddd..',
-               '...DddD...'],
-         body=['.wwggggw..',
-               'dgggGgggd.',
-               '.gggGggg..',
-               '..gggggG..'],
-         legs='kk', hand='d'),
-    dict(name='pell',  # the ice fisher of the Frost Caves: a fur-trimmed hood, a blue parka
-         palette={'f': '#e8e0d0', 'F': '#b8a890', 'b': '#3a6aa8', 'B': '#2a4a78', 'd': '#e8b890', 'D': '#b8865e',
-                  'e': '#16131f', 'k': '#3a3a4a'},
-         head=['..ffffff..',
-               '.fbbbbbbf.',
-               '.fbddddbf.',
-               '.fbdeddbf.',
-               '..fddddf..',
-               '...ffff...'],
-         body=['.bbbbbbb..',
-               'dbbBbbbbd.',
-               '.bbBbbbb..',
-               '..bbbbbB..'],
-         legs='kk', hand='d'),
-    dict(name='cinder',  # the smith at the Forge: a red bandana, a black beard, a leather apron
-         palette={'r': '#c8443a', 'R': '#8a2a2a', 'd': '#d89868', 'D': '#a86848', 'e': '#16131f', 'h': '#1a1414',
-                  'l': '#8a5a34', 'L': '#5a3a20', 'w': '#6a6060', 'k': '#2a2424'},
-         head=['...rrrr...',
-               '..rrrrrrR.',
-               '..dddddd..',
-               '..dddded..',
-               '..hhhhhh..',
-               '...hhhh...'],
-         body=['.wllllww..',
-               'dwlLlllwd.',
-               '.wllLllw..',
-               '..llllll..'],
+    dict(name='mags',  # keeps the stall by the campfire: a wide purple hat with a red feather, spectacles, a patchwork shawl
+         palette={'h': '#6a3a7a', 'H': '#e8b94a', 'f': '#e8445a', 'd': '#e8b890', 'D': '#b88a68', 'g': '#c8d8f0',
+                  'w': '#e8e4ec', 's': '#c86a3a', 'S': '#3a8a8a', 'p': '#e8c04a', 'k': '#3a2a40'},
+         head=['.....f....',
+               '..hhhhf...',
+               'hhHHHHHhh.',
+               '..wddddw..',
+               '..wgdgdw..',
+               '...dDdd...'],
+         body=['.sSsSsSs..',
+               'dsSpSsSsd.',
+               '.SsSsSpS..',
+               '..sSsSs...'],
          legs='kk', hand='d'),
 ]
 
 
+# You, in the other outfits: the heroine's drawing with her clothes changed. Their names are
+# what assets/outfits.txt calls them, and mirrored in Player::LOOKS.
+def _dressed(name, palette, head=None, body=None, wind=True, legs='nk'):
+    look = dict(HEROINE, name=name, palette=dict(HEROINE['palette'], **palette), legs=legs)
+    if head:
+        look['head'] = head
+    if body:
+        look['body'] = body
+    if not wind or head:  # a hood or a helmet doesn't stream out behind you
+        look.pop('wind_head', None)
+        look.pop('wind_body', None)
+    return look
+
+
+OUTFITS = [
+    # A green hooded cloak, a leaf clasp.
+    _dressed('ranger', {'v': '#2f6a40', 'V': '#1f4a2c', 'c': '#3f8a50', 'C': '#2a6a3a', 'g': '#a8d46a', 'w': '#8a6a40', 'n': '#4a3a2a'},
+             head=['..vvvvv...',
+                   '.vVVVVVv..',
+                   'vVhhhhhVv.',
+                   'vVhdhddhv.',
+                   'vhhdeddev.',
+                   '.vhpddddp.'],
+             body=['.vvhDdDvv.',
+                   '.vvcwwwcv.',
+                   '.vdcCgccd.',
+                   '..cccccC..']),
+    # The diving suit: a brass helmet with a round window, a grey suit, an air tank on the back.
+    _dressed('diver', {'y': '#d8a84a', 'Y': '#8a6420', 'G': '#9ad0e8', 'c': '#5a6a7a', 'C': '#3a4656', 'k': '#2a2a34',
+                       't': '#c8c8d0', 'n': '#3a4656'},
+             head=['..yyyyy...',
+                   '.yYYYYYy..',
+                   'yYGGGGGYy.',
+                   'yYGdedGYy.',
+                   'yYGGdGGYy.',
+                   '.yyyyyyy..'],
+             body=['tccyyycc..',
+                   'tcccccccc.',
+                   'tdcCcccd..',
+                   '..cccccC..'], legs='nk'),
+    # A fox hood, ears and all, and an orange coat.
+    _dressed('fox', {'o': '#e8823a', 'O': '#a8501e', 'w': '#f4ecdc', 'c': '#e8823a', 'C': '#a8501e', 'g': '#f4ecdc'},
+             head=['.o.....o..',
+                   '.oO...Oo..',
+                   '.ooooooo..',
+                   'oohdhddho.',
+                   'owhdeddew.',
+                   '.wwpddddp.'],
+             body=['.ooowwwoo.',
+                   '.oowwwwwo.',
+                   '.dcCgccd..',
+                   '..cccccC..']),
+    # The miner's hat: a yellow helmet with a lamp on the front, and brown overalls.
+    _dressed('miner', {'y': '#e8c84a', 'Y': '#a8862a', 'L': '#fff8c0', 'c': '#7a5a3a', 'C': '#5a3e26', 'g': '#c8c8d0', 'w': '#c8b8a0'},
+             head=['...yyyL...',
+                   '..yYyyLL..',
+                   '.yyyyyyyy.',
+                   '.hhhdhddhh',
+                   '.hhdeddedh',
+                   '.hhpddddph']),
+    # Starlight: a dress of night blue, sewn with stars.
+    _dressed('starlight', {'c': '#2a2a6a', 'C': '#1a1a4a', 'w': '#f0e8a0', 'g': '#fff8d0', 'r': '#f0e8a0', 'R': '#a8a060'},
+             body=['.hhhDdDhh.',
+                   '.hhcwcwch.',
+                   '.hdcCgcwd.',
+                   '..cwcccC..'],
+             wind=False),
+]
+
+
+# Pip, your dog: a little tan terrier with a red collar. Not drawn like the people: his twelve
+# frames are here as they are, in the same slots (idle 2, run 4, jump, fall, then pointing his
+# nose where the swing would be, sitting, and barking where climbing would be).
+PIP = dict(name='pip', palette={'o': '#d8a060', 'O': '#9a6a3a', 'w': '#f4ecdc', 'e': '#16131f', 'n': '#3a2a2a',
+                                 'c': '#e0455a', 'm': '#a02840'})
+_pip_top = ['..........'] * 5
+_pip_up = ['..........'] * 4
+PIP_FRAMES = [
+    _pip_top + ['......O.O.', '......oooo', 'O.....oeon', '.ooooocoo.', '.oooooww..', '.oo..oo...', '.OO..OO...'],   # idle
+    _pip_top + ['......O.O.', '......oooo', '......oeon', 'Oooooocoo.', '.oooooww..', '.oo..oo...', '.OO..OO...'],   # idle, wagging
+    _pip_top + ['......O.O.', '......oooo', 'O.....oeon', '.ooooocoo.', '.oooooww..', 'o.....o.o.', 'O......O..'],   # run
+    _pip_up + ['......O.O.', '......oooo', 'O.....oeon', '.ooooocoo.', '.oooooww..', '..oooo....', '..OO.O....', '..........'],
+    _pip_top + ['......O.O.', '......oooo', '.O....oeon', '.ooooocoo.', '.oooooww..', 'o.....o.o.', 'O......O..'],
+    _pip_up + ['......O.O.', '......oooo', '.O....oeon', '.ooooocoo.', '.oooooww..', '..oooo....', '..OO.O....', '..........'],
+    _pip_up + ['......O.O.', '......oooo', 'O.....oeon', '.ooooocoo.', '.oooooww..', '..oo.oo...', '..........', '..........'],  # jump
+    _pip_top + ['......O.O.', '......oooo', '......oeon', 'Oooooocoo.', '.oooooww..', '.o.....o..', '.O.....O..'],   # fall
+    _pip_top + ['.......O.O', '.......ooo', 'OO.....oeo', '.ooooocoon', '.oooooww..', '.oo...o.o.', '.OO....O..'],  # pointing
+    _pip_up + ['......O.O.', '......oooo', '......oeon', '.....ocoo.', 'O...ooww..', '.oooooww..', '.ooooo.o..', '.OOOO.OO..'],  # sitting
+    _pip_top + ['......O.O.', '......oooo', 'O.....oeon', '.ooooocomm', '.oooooww..', '.oo..oo...', '.OO..OO...'],  # barking
+    _pip_top + ['.....O.O..', '.....oooo.', '.O...oeon.', '.oooocoo..', '.ooooww...', '.oo..oo...', '.OO..OO...'],
+]
+
+
 def make_player():
-    rows = [('classic', PLAYER, classic_frames())]
-    for skin in SKINS + NPCS:
+    rows = []
+    for skin in [HEROINE] + NPCS:
         palette = {k: rgb(v) for k, v in skin['palette'].items()}
         palette['#'] = OUTLINE
         rows.append((skin['name'], palette, skin_frames(skin)))
+    palette = {k: rgb(v) for k, v in PIP['palette'].items()}
+    palette['#'] = OUTLINE
+    rows.append(('pip', palette, [outlined(f) for f in PIP_FRAMES]))
+    for outfit in OUTFITS:
+        palette = {k: rgb(v) for k, v in outfit['palette'].items()}
+        palette['#'] = OUTLINE
+        rows.append((outfit['name'], palette, skin_frames(outfit)))
     c = Canvas(FRAME_W * 12, FRAME_H * len(rows))
     for r, (name, palette, frames) in enumerate(rows):
         assert len(frames) == 12, name
@@ -792,24 +621,26 @@ def make_objects():
 
 # ----------------------------------------------------------------------------------------------
 # Items: assets/gfx/items.png, 10x10 frames, things to pick up that give an ability. The order is
-# mirrored in src/Level.cpp (namespace `sheet`). 0: Ash's rope, 1: a gem, 2: the long rope,
-# 3-4: a lever up and pulled down, 5: the updraft feather, 6: the chalk bag, 7: the throwing hand.
+# mirrored in src/Level.cpp (namespace `sheet`). 0: the rope, 1: a gem, 2: the long rope,
+# 3-4: a lever up and pulled down, 5: the updraft feather, 6: the chalk bag, 7: the throwing hand,
+# 8: the stopwatch.
 # ----------------------------------------------------------------------------------------------
 
 ITEM = {'3': rgb('#e8eef8'), '2': rgb('#9aa6bc'), 'w': rgb('#b47c48'), 'W': rgb('#7a4e2c'), '#': OUTLINE,
         'a': rgb('#eaffff'), 'b': rgb('#9ff0ff'), 'c': rgb('#4fd0e8'), 'd': rgb('#2a8fb0'),
         'r': rgb('#e6d6b4'), 'R': rgb('#9a8460'), 'k': rgb('#e8443a'), 'K': rgb('#9a2a2a'),
         'f': rgb('#ffffff'), 'F': rgb('#bfe6ff'), 'q': rgb('#7ab8e8'),
-        'g': rgb('#4ac08a'), 'G': rgb('#2a8a5a'), 'l': rgb('#c89a6a'), 'L': rgb('#8a5e3a')}
-# Ash's rope: a coil like the long rope, with a green thread woven through it (her scarf's green).
-ash_rope = ['..rgrr..',
-            '.rRRGRr.',
-            'gR.rr.Rr',
-            'rR.RG.Rg',
-            'rG.rr.Rr',
-            '.rRRgRr.',
-            '..rrgrR.',
-            '.......g']
+        'g': rgb('#4ac08a'), 'G': rgb('#2a8a5a'), 'l': rgb('#c89a6a'), 'L': rgb('#8a5e3a'),
+        'y': rgb('#e8c84a'), 'Y': rgb('#a8862a')}
+# The rope Odo gives you: a coil like the long rope, with a green thread woven through it.
+rope = ['..rgrr..',
+        '.rRRGRr.',
+        'gR.rr.Rr',
+        'rR.RG.Rg',
+        'rG.rr.Rr',
+        '.rRRgRr.',
+        '..rrgrR.',
+        '.......g']
 
 
 def item_frame(grid):
@@ -883,7 +714,17 @@ throwing_hand = ['.l.l.l..',
                  '.rRrRr..',
                  '..rRr...']
 
-ITEMS = [ash_rope, gem, long_rope, lever_up, lever_down, feather, chalk_bag, throwing_hand]
+# Gran's stopwatch: brass, on a loop of ribbon.
+stopwatch = ['...yy...',
+             '..YyyY..',
+             '.y3333y.',
+             'y33233fy',
+             'y33233fy',
+             'y33322fy',
+             '.y3333y.',
+             '..yyyy..']
+
+ITEMS = [rope, gem, long_rope, lever_up, lever_down, feather, chalk_bag, throwing_hand, stopwatch]
 
 
 def make_items():
@@ -1625,6 +1466,8 @@ PROP = {k: rgb(v) for k, v in {
     'e': '#a8483a', 'n': '#3a5a9a', 'h': '#4a8a4a', 'x': '#e8dcc0',
     'z': '#9aa6bc', 'Z': '#5a6478', 'q': '#2f6a4a', 'Q': '#1f4a34', 'v': '#f0f4ff',
     'j': '#5a9a3a', 'J': '#3a6a2a', 'L': '#8ac850', 'd': '#e8c04a', 'D': '#4a7ac8',
+    '1': '#7af0e0', '2': '#2aa8a0', '3': '#c8a0ff', '4': '#7a50c8', '6': '#e8fff8',
+    '7': '#2f6a40', '8': '#4f9a5a',
 }.items()}
 PROP['#'] = OUTLINE
 
@@ -1875,28 +1718,6 @@ PROPS = [
     ('lamp', [['..Z..', '.ZZZ.', 'ZsSsZ', 'ZSsSZ', 'ZsSsZ', '.ZZZ.']], 0, True, None),
     ('lamp_lit', [['..Z..', '.ZZZ.', 'ZyfyZ', 'ZfyfZ', 'ZyfyZ', '.ZZZ.']], 0, True, (255, 200, 110, 60)),
     ('icicle', [['iIi', 'iIi', 'iI.', '.I.', '.I.', '.i.']], 0, True, None),
-    ('note', [['....sS....',
-               '..xxsSx...',
-               '.xxxxxxx..',
-               'xKKxKKxx..',
-               'xxxxxxxxx.',
-               '.xxKKKxxx.',
-               'xxxxxxxx..']], 0, False, None),
-    ('page', [['.xxxxx', 'xKKxKx', 'xxxxxx', 'xKxKKx', 'xxxxx.']], 0, False, None),
-    ('lantern', [['..Z..', '.ZZZ.', 'ZyfyZ', 'ZfyfZ', 'ZyfyZ', 'ZZZZZ']], 0, False, (255, 200, 110, 24)),
-    ('lure', [['...z', '..z.', 'rdd.', 'rDdr', '.rr.']], 0, False, None),
-    ('finish_flag', [['WKfKf',
-                      'WfKfK',
-                      'WKfKf',
-                      'WfKfK',
-                      'W....',
-                      'W....',
-                      'W....',
-                      'W....',
-                      'W....',
-                      'W....',
-                      'W....',
-                      'WW...']], 0, False, None),
     ('stall', [['rrrrrrrrrrrrrrrrrrrrrr',
                 'rffrffrffrffrffrffrffr',
                 'rrrrrrrrrrrrrrrrrrrrrr',
@@ -1929,6 +1750,231 @@ PROPS = [
                   '..I.i....I..I.',
                   '..I......I....',
                   '.........I....']], 0, True, None),
+    # The Hidden Lake and the Glade: magic, glowing.
+    ('lily', [['...3..3...',
+               '..3663663.',
+               '...36663..',
+               '.778777877',
+               '7788787887']], 0, False, (200, 160, 255, 18)),
+    ('glowshroom', [['...1111.....',
+                     '..112211....',
+                     '.11222211...',
+                     '.22222222...',
+                     '....66...11.',
+                     '....66..1221',
+                     '....66..2222',
+                     '...666...66.',
+                     '...66....66.',
+                     '..6666..666.']], 0, False, (122, 240, 224, 30)),
+    ('bellflowers', [['.3.....3.',
+                      '343...343',
+                      '.3..3..3.',
+                      '.8.343.8.',
+                      '.8..3..8.',
+                      '..8.8.8..',
+                      '..88888..',
+                      '...878...']], 0, False, (200, 160, 255, 20)),
+    ('runestone', [['...uuuu...',
+                    '..uuuuuu..',
+                    '.uuUuuuuu.',
+                    '.uu1uuUuu.',
+                    '.uu11uuuu.',
+                    '.uuu1uuuu.',
+                    '.uuUuu1uu.',
+                    '.uuuu11uu.',
+                    '.uuuuu1uU.',
+                    '.uU1uuuuu.',
+                    '.uu11uuuu.',
+                    '.uuu1uuUu.',
+                    '.uuuuuuuu.',
+                    'uuUuuuuuuu',
+                    'UUUUUUUUUU']], 0, False, (122, 240, 224, 26)),
+    ('glow_roots', [['WWwWWwWWwWWw',
+                     '.W..w.W..w..',
+                     '.W..w..W.w..',
+                     '.w..W..W..w.',
+                     '..w.W..w..w.',
+                     '..1.w...w.1.',
+                     '.....w..1...',
+                     '.....1......']], 0, True, (122, 240, 224, 22)),
+    ('violet_crystals', [['.....3......',
+                          '....343.....',
+                          '....343..3..',
+                          '.3..343.343.',
+                          '343.343.343.',
+                          '343.3443343.',
+                          '3433443.343.',
+                          '34434443443.',
+                          '444444444444']], 0, False, (200, 160, 255, 32)),
+    # Odo's road works.
+    ('wheelbarrow', [['.wwwwwwwwww.....',
+                      'wWlllllllllw....',
+                      '.wWllllllllw....',
+                      '..wWWWWWWWw.....',
+                      '...W...W...WWWWW',
+                      '..ZZZ..W........',
+                      '.ZzzzZ.W........',
+                      '.ZzKzZ.W........',
+                      '..ZZZ..W........']], 0, False, None),
+    ('rubble', [['..........zZ....',
+                 '.........zZW....',
+                 '..........W.....',
+                 '.........W......',
+                 '........W.......',
+                 '......aaW.......',
+                 '....aasaWaa.....',
+                 '...asSaasaaS....',
+                 '..aSaasSaaSaa...',
+                 '.aasaSaasaasSa..']], 0, False, None),
+    ('planks', [['..llllllllllll..',
+                 '..WwwwwwwwwwwW..',
+                 'llllllllllllll..',
+                 'WwwwwwwwwwwwwW..',
+                 '.lllllllllllllll',
+                 '.WwwwwwwwwwwwwwW']], 0, False, None),
+    ('road_sign', [['rfrfrfrfrfrfrf',
+                    'frfrfrfrfrfrfr',
+                    'rfrfrfrfrfrfrf',
+                    '.W..........W.',
+                    '.W..........W.',
+                    '.W..........W.',
+                    '.W..........W.',
+                    '.W..........W.',
+                    'WWW........WWW']], 0, False, None),
+    # The camp.
+    ('log', [['..WWWWWWWWWWWW..',
+              '.WwwlwwwwwlwwwCC',
+              'WwwwwwwlwwwwwCcC',
+              'WwlwwwwwwwwlwCCc',
+              '.WWWWWWWWWWWWWCC']], 0, False, None),
+    # The old line: a mine cart (asleep, chained, until the beacons wake it; rolling, with you in
+    # it), the buffer at the end of the line, and the timbers holding the tunnels up.
+    ('cart', [['ZzzzzzzzzzzZ',
+               'ZwWwwwwWwwwZ',
+               'ZwwwWwwwwWwZ',
+               'ZWwwwwWwwwwZ',
+               'ZZZZZZZZZZZZ',
+               '.ZKZ....ZKZ.',
+               '..Z......Z..']], 0, False, None),
+    ('cart_off', [['ZzzzzzzzzzzZ',
+                   'ZwWzwwwWzwwZ',
+                   'ZwwwzwwzwWwZ',
+                   'ZWwwwddwwwwZ',
+                   'ZZZZZddZZZZZ',
+                   '.ZKZ.zz.ZKZ.',
+                   '..Z..zz..Z..']], 0, False, None),
+    ('cart_rolling', [['ZzzzzzzzzzzZ',
+                       'ZwWwwwwWwwwZ',
+                       'ZwwwWwwwwWwZ',
+                       'ZWwwwwWwwwwZ',
+                       'ZZZZZZZZZZZZ',
+                       '.ZKZ....ZKZ.',
+                       '..Z......Z..'],
+                      ['ZzzzzzzzzzzZ',
+                       'ZwWwwwwWwwwZ',
+                       'ZwwwWwwwwWwZ',
+                       'ZWwwwwWwwwwZ',
+                       'ZZZZZZZZZZZZ',
+                       '.KZK....KZK.',
+                       '.Z.Z....Z.Z.']], 10, False, None),
+    ('buffer', [['rfrfrfrf',
+                 'frfrfrfr',
+                 'WwwwwwwW',
+                 'WwlwwlwW',
+                 '.W....W.',
+                 '.W....W.',
+                 'WWW..WWW']], 0, False, None),
+    ('mine_frame', [['WWWWWWWWWWWWWWWWWWWW',
+                     'WwwlwwwwwwwwwwwlwwwW',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     '.Ww..............wW.',
+                     'WWWW............WWWW']], 0, False, None),
+    # The stopwatch's posts: a green ribbon where a timed run starts, a chequered flag where it ends.
+    ('trial_start', [['8888.',
+                      '88888',
+                      '8888.',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'W....',
+                      'WW...']], 0, False, None),
+    ('trial_finish', [['KvKvK.',
+                       'vKvKvK',
+                       'KvKvK.',
+                       'W.....',
+                       'W.....',
+                       'W.....',
+                       'W.....',
+                       'W.....',
+                       'WW....'],
+                      ['.KvKvK',
+                       'vKvKv.',
+                       '.KvKvK',
+                       'W.....',
+                       'W.....',
+                       'W.....',
+                       'W.....',
+                       'W.....',
+                       'WW....']], 3, False, None),
+    # A beacon on a hilltop, one at the end of each route: cold until you've been there.
+    ('beacon_off', [['..........',
+                     '..........',
+                     '..........',
+                     '..........',
+                     '..KkaKk...',
+                     '.sSsSsSsS.',
+                     '..sSsSsS..',
+                     '...W..W...',
+                     '..W....W..',
+                     '.W......W.']], 0, False, None),
+    ('beacon', flame_frames(['.sSsSsSsS.',
+                             '..sSsSsS..',
+                             '...W..W...',
+                             '..W....W..',
+                             '.W......W.'],
+                            [['....y.....', '...yoy....', '..yorroy..', '..orRro...', '..WwlwW...'],
+                             ['...y......', '...oyy....', '..yoroy...', '..orRrro..', '..WwlwW...'],
+                             ['.....y....', '....yoy...', '..yorrroy.', '..oRrRo...', '..WwlwW...']]), 8, False, (255, 170, 90, 56)),
+    # At the top of the old line: the Lantern, dark.
+    ('great_lantern_off', [['.......ZZZZZZ.......',
+                            '......ZzzzzzzZ......',
+                            '.....ZZZZZZZZZZ.....',
+                            '....Z.z..z..z..Z....',
+                            '....Z.z..z..z..Z....',
+                            '....ZuuuuuuuuuuZ....',
+                            '....ZuUuuuuuUuuZ....',
+                            '....ZuuuuuuuuuuZ....',
+                            '....Z.z..z..z..Z....',
+                            '....Z.z..z..z..Z....',
+                            '...ZZZZZZZZZZZZZZ...',
+                            '....sSsSsSsSsSsS....',
+                            '....SsSsSsSsSsSs....',
+                            '....sSsSsSsSsSsS....',
+                            '...sSsSsSsSsSsSsS...',
+                            '..sSsSsSsSsSsSsSsS..',
+                            '.sSsSsSsSsSsSsSsSsS.',
+                            'sSsSsSsSsSsSsSsSsSsS']], 0, False, None),
+    # The Still: a cluster of stars come down to rest, and the rift the waterfall pours from.
+    ('star_cluster', [['...6.....',
+                       '..616..3.',
+                       '...6..343',
+                       '.3.....3.',
+                       '343..6...',
+                       '.3..616..',
+                       '.....6...']], 0, False, (200, 210, 255, 26)),
+    ('rift', [['..3..', '.343.', '.363.', '34643', '.363.', '.343.', '..3..'],
+              ['..3..', '.363.', '.343.', '36463', '.343.', '.363.', '..3..'],
+              ['..4..', '.343.', '.363.', '34643', '.363.', '.343.', '..4..']], 4, False, (200, 160, 255, 34)),
 ]
 
 
@@ -2086,7 +2132,220 @@ def make_sky():
     c.save('themes/sky/near.png')
 
 
-THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight, make_ruins, make_ice, make_sky]
+# Grotto: the Hidden Lake, where it all starts. Deep blue rock under glowing moss, bellflowers and
+# roots tipped with light, crystals glinting in the far walls, and magic drifting in the air.
+GROTTO = {'0': rgb('#121629'), '1': rgb('#1f2a44'), '2': rgb('#2a3a5c'), '3': rgb('#3d5078'),
+          'g': rgb('#1d5058'), 'G': rgb('#2a8a86'), 'h': rgb('#4fd8c8'), 'H': rgb('#b4fff2'),
+          'f': rgb('#fff3a0'), 'p': rgb('#b08aff'), 'P': rgb('#6a4ac0'), 'r': rgb('#2a3a5c')}
+grotto_bell = ['........',
+               '........',
+               '...p....',
+               '..pfp.p.',
+               '..PpP.pP',
+               '...G..G.',
+               '..hG.Gh.',
+               '.GhGhG..']
+grotto_drip = ['0110110.',
+               '.01.10..',
+               '..1..0..',
+               '..h..1..',
+               '.....h..',
+               '........',
+               '........',
+               '........']
+
+
+def make_grotto():
+    make_tiles('grotto', tile_sheet(GROTTO, (glow_moss, glow_moss_b), (sprouts, grotto_bell, grotto_drip)))
+    c = sky('#0b0f22', '#122a3a')
+    stars(c, count=70, seed=31, color='#9af0ff', below=H)
+    sparks(c, seed=32, count=28, colors=('#7af0e0', '#c8a0ff', '#fff0a0'), above=0)
+    c.save('themes/grotto/sky.png')
+    c = cave_layer('#18233c', top_depth=34, bottom_height=40, seed=3.7, jag=1)
+    stalactites(c, '#18233c', seed=33, count=20, length=(16, 50))
+    # Crystals glinting in the far walls.
+    rng = random.Random(34)
+    for _ in range(16):
+        cx, cy = rng.randrange(W), rng.choice((rng.randrange(10, 36), rng.randrange(150, 172)))
+        col = rgb(rng.choice(('#3a9ab0', '#7a5ac0', '#4fd8c8')))
+        for i in range(rng.randrange(3, 8)):
+            c.put(cx % W, cy - i, col)
+            if i < 4:
+                c.put((cx + 2) % W, cy - i, col)
+    c.save('themes/grotto/far.png')
+    c = cave_layer('#0f1528', top_depth=20, bottom_height=24, seed=7.9, jag=2)
+    vines(c, '#0f1528', '#2a8a86', seed=35, count=22, length=(8, 46))
+    c.save('themes/grotto/near.png')
+
+
+# Glade: out in the open at night, by the fire. Dark earth under blue-green grass, glowing flowers,
+# hills and pines against the stars, and an aurora rippling over them.
+GLADE = {'0': rgb('#14141f'), '1': rgb('#242536'), '2': rgb('#32344a'), '3': rgb('#46496a'),
+         'g': rgb('#1d4a3a'), 'G': rgb('#2c7050'), 'h': rgb('#58b878'), 'H': rgb('#a8f0b4'),
+         'f': rgb('#fff0a0'), 'p': rgb('#8ad8ff')}
+glade_flower = ['........',
+                '........',
+                '....p...',
+                '...pfp..',
+                '.p..p...',
+                'pfp.G...',
+                '.G..G.h.',
+                '.GhGhGG.']
+
+
+def make_glade():
+    make_tiles('glade', tile_sheet(GLADE, decor=(tuft, glade_flower, vine)))
+    c = sky('#070b22', '#1a2850')
+    stars(c, count=140, seed=41, color='#ffffff', below=120)
+    # The aurora: a rippling band of green fading down into violet.
+    for x in range(W):
+        top = int(28 + 10 * periodic_noise(x, 1.1, ((1, 1.0), (2, 0.6), (5, 0.2))))
+        for dy in range(30):
+            fade = 1 - dy / 30
+            c.mix(x, top + dy, rgb('#5af0b0' if dy < 16 else '#a070ff', int(28 * fade * (0.6 + 0.4 * math.sin(x * 0.09 + dy * 0.2)))))
+    glow(c, 262, 30, 7, '#f4f0d8', rings=4)
+    c.save('themes/glade/sky.png')
+    c = Canvas(W, H)
+    fill_up(c, rgb('#1a2240'), peaks(seed=42, count=7, height=(70, 115), slope=(0.5, 1.0)))
+    c.save('themes/glade/far.png')
+    c = Canvas(W, H)
+    ground = lambda x: 24 + 8 * periodic_noise(x, 6.1)
+    tree_line(c, '#0e1424', ground, seed=43, spacing=26, radius=(8, 14))
+    pines(c, '#0e1424', ground, seed=44, spacing=34, height=(30, 52))
+    sparks(c, seed=45, count=22, colors=('#e8f08c', '#8ad8ff'), above=70)  # fireflies
+    c.save('themes/glade/near.png')
+
+
+# The Still: behind the waterfall, the place between the stars it pours from. No ground, no sky:
+# black all round, stars near and far, and stone the colour of the night floating in it, crusted
+# with starlight.
+STILL = {'0': rgb('#07060d'), '1': rgb('#110e22'), '2': rgb('#1b1736'), '3': rgb('#2a2450'),
+         'g': rgb('#2a2a5a'), 'G': rgb('#4a4aa0'), 'h': rgb('#8a8ae8'), 'H': rgb('#d8d8ff'),
+         'f': rgb('#fff6d0'), 'p': rgb('#b89aff')}
+still_moss = ['H..h..H.',
+              'hGhhGhhG',
+              'GgGGgGgG',
+              'g1gg1g1g',
+              '.g...g..',
+              '........',
+              '........',
+              '........']
+still_moss_b = ['.H...h.H',
+                'GhGhhGhG',
+                'gGgGGgGg',
+                '1g1gg1g1',
+                '..g...g.',
+                '........',
+                '........',
+                '........']
+still_star = ['........',
+              '........',
+              '....f...',
+              '...fHf..',
+              '....f...',
+              '........',
+              '........',
+              '........']
+still_sprout = ['........',
+                '........',
+                '........',
+                '........',
+                '........',
+                '..h.....',
+                '..G..h..',
+                '.GhG.G..']
+still_drip = ['0001000.',
+              '.00100..',
+              '..h10...',
+              '...0....',
+              '...h....',
+              '........',
+              '........',
+              '........']
+
+
+def make_still():
+    make_tiles('still', tile_sheet(STILL, (still_moss, still_moss_b), (still_sprout, still_star, still_drip)))
+    c = sky('#020208', '#05040c')
+    stars(c, count=170, seed=91, color='#ffffff')
+    stars(c, count=40, seed=92, color='#b8c8ff')
+    c.save('themes/still/sky.png')
+    # Far: faint drifts of stars, and a thin veil of violet across them.
+    c = Canvas(W, H)
+    for x in range(W):
+        mid = int(90 + 30 * periodic_noise(x, 9.1, ((1, 1.0), (2, 0.4))))
+        for dy in range(-14, 15):
+            c.mix(x, mid + dy, rgb('#5a3a9a', int(10 * (1 - abs(dy) / 15))))
+    stars(c, count=60, seed=93, color='#d8d0ff')
+    c.save('themes/still/far.png')
+    # Near: rocks adrift in the dark, black on black, a star glinting on one now and then.
+    c = Canvas(W, H)
+    rng = random.Random(94)
+    for _ in range(9):
+        cx, cy, r = rng.randrange(W), rng.randrange(10, H - 10), rng.uniform(3, 9)
+        disc(c, cx, cy, r, rgb('#0c0a18'))
+        disc(c, cx + r * 0.3, cy - r * 0.6, r * 0.5, rgb('#0c0a18'))
+        c.put(int(cx - r * 0.4) % W, int(cy - r * 0.5), rgb('#8a8ae8', 160))
+    c.save('themes/still/near.png')
+
+
+# The Mine: the old line up the mountain. Brown rock propped up with timbers, gravel and ore in it,
+# and outside, snowy peaks and pines under the night.
+MINE = {'0': rgb('#1a1612'), '1': rgb('#2c251e'), '2': rgb('#3e3428'), '3': rgb('#554636'),
+        'g': rgb('#4a3e30'), 'G': rgb('#6a5a44'), 'h': rgb('#94805e'), 'H': rgb('#c4ae86'),
+        'f': rgb('#e8c84a'), 'p': rgb('#7ad0e8')}
+gravel_top = ['HhHhHHhH',
+              'hGhGhhGh',
+              'GgGgGGgG',
+              'g1gg1g1g',
+              '.g...g..',
+              '........',
+              '........',
+              '........']
+gravel_top_b = ['hHhHhhHh',
+                'GhGhGhGh',
+                'gGgGgGgG',
+                '1g1gg1g1',
+                '..g...g.',
+                '........',
+                '........',
+                '........']
+ore = ['........',
+       '........',
+       '........',
+       '........',
+       '........',
+       '...f....',
+       '..ffG...',
+       '.GgGgG..']
+pebbles = ['........',
+           '........',
+           '........',
+           '........',
+           '........',
+           '........',
+           '.h...G..',
+           'GhG.GhG.']
+
+
+def make_mine():
+    make_tiles('mine', tile_sheet(MINE, (gravel_top, gravel_top_b), (pebbles, ore, drip)))
+    c = sky('#0a0e22', '#232846')
+    stars(c, count=110, seed=81, color='#ffffff', below=110)
+    glow(c, 60, 34, 6, '#e8e4d0', rings=3)
+    c.save('themes/mine/sky.png')
+    c = Canvas(W, H)
+    snowy_peaks(c, '#1c2036', '#3e4462', peaks(seed=82, count=7, height=(70, 120), slope=(0.8, 1.4)), snowline=14)
+    c.save('themes/mine/far.png')
+    c = Canvas(W, H)
+    ground = lambda x: 30 + 10 * periodic_noise(x, 8.3)
+    fill_up(c, rgb('#12141e'), ground)
+    pines(c, '#12141e', ground, seed=83, spacing=22, height=(26, 48))
+    c.save('themes/mine/near.png')
+
+
+THEMES = [make_cave, make_garden, make_snow, make_ember, make_daylight, make_ruins, make_ice, make_sky, make_grotto, make_glade,
+          make_still, make_mine]
 
 
 if __name__ == '__main__':

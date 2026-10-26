@@ -1,7 +1,7 @@
 // Level: what moves or changes in a room. Crumbling blocks and clouds that give way under you,
-// icicles that fall, hook rings sliding on their tracks, updrafts, lamps, wind and the dark.
+// icicles that fall, hook rings sliding on their tracks, updrafts, lamps, mine carts, hidden
+// passages, wind, the dark and no gravity.
 #include "Level.h"
-#include "src/Catalog.h"
 #include "src/Config.h"
 #include "src/Props.h"
 #include "src/utils.h"
@@ -42,6 +42,18 @@ namespace
         sprite.setPosition(std::floor(middle.x), std::floor(middle.y));
         target.draw(sprite);
     }
+
+    // The same, standing with its bottom (inside the outline) at `feet`, screen pixels.
+    void drawStanding(sf::RenderTarget& target, const std::string& name, sf::Vector2f feet, float time = 0.f)
+    {
+        const PropInfo* info = props::find(name);
+        if (!info) return;
+        const int frame = info->frames > 1 ? static_cast<int>(time * info->fps) % info->frames : 0;
+        sf::Sprite sprite(props::texture(), {info->rect.left + frame * info->rect.width, info->rect.top, info->rect.width, info->rect.height});
+        sprite.setOrigin(std::floor(info->rect.width * 0.5f), static_cast<float>(info->rect.height) - 1.f);
+        sprite.setPosition(std::floor(feet.x), std::floor(feet.y));
+        target.draw(sprite);
+    }
 }
 
 void Level::addIcicle(sf::Vector2i tile)
@@ -68,52 +80,82 @@ void Level::addLamp(sf::Vector2i tile)
     m_lamps.push_back({sf::Vector2f(tile) * TILE_SIZE});
 }
 
-void Level::addQuestItem(const std::string& item, sf::Vector2i tile)
+void Level::addCart(sf::Vector2i tile, int dir, const std::string& needs)
 {
-    m_questItems.push_back({item, sf::Vector2f(tile) * TILE_SIZE});
+    m_carts.push_back({sf::Vector2f(tile) * TILE_SIZE, dir < 0 ? -1 : 1, needs});
 }
 
-void Level::addFinish(const std::string& race, sf::Vector2i tile)
+void Level::addCartStop(sf::Vector2i tile)
 {
-    m_finishes.push_back({race, sf::Vector2f(tile) * TILE_SIZE});
+    m_cartStops.push_back(sf::Vector2f(tile) * TILE_SIZE);
 }
 
-const std::vector<QuestItem>& Level::questItems() const { return m_questItems; }
-const std::vector<Finish>& Level::finishes() const { return m_finishes; }
-
-std::optional<size_t> Level::questItemAt(sf::FloatRect box) const
+void Level::addTrial(const std::string& route, bool finish, sf::Vector2i tile)
 {
-    for (size_t ii = 0; ii < m_questItems.size(); ++ii) {
-        if (box.intersects({m_questItems[ii].position.x, m_questItems[ii].position.y, TILE_SIZE, TILE_SIZE})) return ii;
-    }
-    return std::nullopt;
-}
-
-std::optional<size_t> Level::finishAt(sf::FloatRect box) const
-{
-    for (size_t ii = 0; ii < m_finishes.size(); ++ii) {
-        if (box.intersects({m_finishes[ii].position.x, m_finishes[ii].position.y, TILE_SIZE, 2.f * TILE_SIZE})) return ii;
-    }
-    return std::nullopt;
-}
-
-void Level::drawQuestItems(sf::RenderTarget& target, sf::Vector2f centr, float time, const std::function<bool(size_t)>& found) const
-{
-    for (size_t ii = 0; ii < m_questItems.size(); ++ii) {
-        if (found(ii)) continue;
-        const catalog::Item* info = catalog::item(m_questItems[ii].item);
-        const float bob = std::round(std::sin(time * 3.f + ii) * 1.5f);
-        drawProp(target, info ? info->sprite : "page", viewCoordinates(m_questItems[ii].position + sf::Vector2f(TILE_SIZE * 0.5f, 5.f + bob), centr));
-    }
-    for (const Finish& finish : m_finishes) {
-        drawProp(target, "finish_flag", viewCoordinates(finish.position + sf::Vector2f(TILE_SIZE * 0.5f, 12.f), centr));
-    }
+    m_trials.push_back({route, finish, sf::Vector2f(tile) * TILE_SIZE});
 }
 
 void Level::setWind(float wind) { m_wind = wind; }
 void Level::setDark(bool dark) { m_dark = dark; }
+void Level::setSpace(bool space) { m_space = space; }
 float Level::wind() const { return m_wind; }
 bool Level::isDark() const { return m_dark; }
+bool Level::isSpace() const { return m_space; }
+const std::vector<Cart>& Level::carts() const { return m_carts; }
+const std::vector<sf::Vector2f>& Level::cartStops() const { return m_cartStops; }
+const std::vector<Trial>& Level::trials() const { return m_trials; }
+
+namespace
+{
+    // What a cart, a stop or a trial's post takes up: its tile and the one above.
+    bool touches(sf::Vector2f pos, float height, float width, sf::Vector2f tile)
+    {
+        return pos.x < tile.x + Level::TILE_SIZE && pos.x + width > tile.x && pos.y < tile.y + 2.f * Level::TILE_SIZE && pos.y + height > tile.y;
+    }
+}
+
+std::optional<size_t> Level::cartAt(sf::Vector2f pos, float height, float width) const
+{
+    for (size_t ii = 0; ii < m_carts.size(); ++ii) {
+        if (touches(pos, height, width, m_carts[ii].position)) return ii;
+    }
+    return std::nullopt;
+}
+
+bool Level::isAtCartStop(sf::Vector2f pos, float height, float width) const
+{
+    return std::any_of(m_cartStops.begin(), m_cartStops.end(), [&](sf::Vector2f stop) { return touches(pos, height, width, stop); });
+}
+
+const Trial* Level::trialAt(sf::Vector2f pos, float height, float width) const
+{
+    for (const Trial& trial : m_trials) {
+        if (touches(pos, height, width, trial.position)) return &trial;
+    }
+    return nullptr;
+}
+
+void Level::drawCarts(sf::RenderTarget& target, sf::Vector2f centr, const std::function<bool(const Cart&)>& ready) const
+{
+    for (const Cart& cart : m_carts) {
+        drawStanding(target, ready(cart) ? "cart" : "cart_off", viewCoordinates(cart.position + sf::Vector2f(TILE_SIZE * 0.5f, 0.f), centr));
+    }
+    for (const sf::Vector2f& stop : m_cartStops) {
+        drawStanding(target, "buffer", viewCoordinates(stop + sf::Vector2f(TILE_SIZE * 0.5f, 0.f), centr));
+    }
+}
+
+void Level::drawRiddenCart(sf::RenderTarget& target, sf::Vector2f centr, sf::Vector2f bottom, float time) const
+{
+    drawStanding(target, "cart_rolling", viewCoordinates(bottom, centr), time);
+}
+
+void Level::drawTrials(sf::RenderTarget& target, sf::Vector2f centr, float time) const
+{
+    for (const Trial& trial : m_trials) {
+        drawStanding(target, trial.finish ? "trial_finish" : "trial_start", viewCoordinates(trial.position + sf::Vector2f(TILE_SIZE * 0.5f, 0.f), centr), time);
+    }
+}
 float Level::time() const { return m_time; }
 const std::vector<Ring>& Level::rings() const { return m_rings; }
 const std::vector<Lamp>& Level::lamps() const { return m_lamps; }
@@ -158,6 +200,60 @@ bool Level::isIce(int x, int y) const
     return tileAt(x, y) == TILE_ICE;
 }
 
+bool Level::isWater(int x, int y) const
+{
+    return tileAt(x, y) == TILE_WATER;
+}
+
+std::optional<float> Level::depthInWater(sf::Vector2f point) const
+{
+    auto [x, y] = tailNumbers(point);
+    if (!isWater(x, y)) return std::nullopt;
+    while (isWater(x, y + 1)) ++y;
+    return (y + 1) * TILE_SIZE - point.y;
+}
+
+void Level::drawWater(sf::RenderTarget& target, sf::Vector2f centr, float time) const
+{
+    const sf::Vector2f halfScreen(config::GAME_WIDTH * 0.5f, config::GAME_HEIGHT * 0.5f);
+    auto [x0, y0] = tailNumbers(centr - halfScreen);
+    auto [x1, y1] = tailNumbers(centr + halfScreen);
+    sf::VertexArray quads(sf::Quads);
+    auto rect = [&](float left, float top, float width, float height, sf::Color colour) {
+        quads.append({{left, top}, colour});
+        quads.append({{left + width, top}, colour});
+        quads.append({{left + width, top + height}, colour});
+        quads.append({{left, top + height}, colour});
+    };
+    for (int x = x0 - 1; x <= x1 + 1; ++x) {
+        for (int y = y0 - 1; y <= y1 + 1; ++y) {
+            if (!isWater(x, y)) continue;
+            // Deeper is darker; a band of light along the top, and the surface rippling.
+            int depth = 0;
+            while (depth < 6 && isWater(x, y + depth + 1)) ++depth;
+            const sf::Vector2f at = viewCoordinates(sf::Vector2f(x * TILE_SIZE, (y + 1) * TILE_SIZE), centr);
+            const float left = std::floor(at.x), top = std::floor(at.y);
+            rect(left, top, TILE_SIZE, TILE_SIZE, sf::Color(30, 110 - 8 * depth, 150 - 6 * depth, static_cast<sf::Uint8>(120 + 14 * depth)));
+            if (depth > 0) continue;
+            for (int px = 0; px < static_cast<int>(TILE_SIZE); ++px) {
+                const float wx = x * TILE_SIZE + static_cast<float>(px);
+                const float wave = std::sin(wx * 0.35f + time * 2.2f) + std::sin(wx * 0.13f - time * 1.3f);
+                const float lift = std::round(wave * 0.5f); // -1, 0 or 1 px
+                rect(left + static_cast<float>(px), top + lift, 1.f, 1.f, sf::Color(170, 245, 255, static_cast<sf::Uint8>(110 + 35 * std::sin(wx * 0.7f + time * 3.f))));
+                rect(left + static_cast<float>(px), top + lift + 1.f, 1.f, 2.f - lift, sf::Color(90, 210, 230, 45));
+            }
+            // Now and then a glint drifting along under the surface.
+            const unsigned h = static_cast<unsigned>(x) * 2654435761u;
+            const float glint = std::fmod(time * 0.8f + static_cast<float>(h % 1000) * 0.01f, 5.f);
+            if (glint < 1.f) {
+                const float gx = static_cast<float>((h >> 8) % 7);
+                rect(left + gx, top + 3.f + static_cast<float>((h >> 4) % 3), 1.f, 1.f, sf::Color(220, 255, 255, static_cast<sf::Uint8>(200.f * (1.f - glint))));
+            }
+        }
+    }
+    target.draw(quads);
+}
+
 bool Level::isOnIce(sf::Vector2f feet, float width) const
 {
     const float row = feet.y / TILE_SIZE;
@@ -172,6 +268,15 @@ bool Level::isOnIce(sf::Vector2f feet, float width) const
 void Level::update(float dt, sf::FloatRect player)
 {
     m_time += dt;
+
+    // In a hidden passage, it fades away round you; out of it, it closes up again.
+    bool inPassage = false;
+    for (int x = static_cast<int>(std::floor(player.left / TILE_SIZE)); x * TILE_SIZE < player.left + player.width && !inPassage; ++x) {
+        for (int y = static_cast<int>(std::floor(player.top / TILE_SIZE)); y * TILE_SIZE < player.top + player.height; ++y) {
+            if (isHidden(x, y)) inPassage = true;
+        }
+    }
+    m_reveal = inPassage ? std::min(1.f, m_reveal + dt * 4.f) : std::max(0.f, m_reveal - dt * 2.f);
 
     // Crumbling blocks and clouds: stood on, they start to give; once started, they go.
     const float feetRow = player.top / TILE_SIZE;
@@ -261,6 +366,7 @@ std::vector<LevelSound> Level::takeSounds()
 void Level::reset()
 {
     m_time = 0.f;
+    m_reveal = 0.f;
     m_crumbling.clear();
     m_sounds.clear();
     for (Icicle& icicle : m_icicles) {
@@ -292,7 +398,8 @@ std::optional<RopeHit> Level::ropeHit(sf::Vector2f from, sf::Vector2f to, float 
             if (inside({at.x + 1.f, at.y, TILE_SIZE - 2.f, TILE_SIZE}, p)) return RopeHit{RopeHit::Kind::Lamp, p, static_cast<int>(ii), d};
         }
         const auto [tx, ty] = tailNumbers(p);
-        if (isSolid(tx, ty)) return RopeHit{isSlick(tx, ty) ? RopeHit::Kind::Slick : RopeHit::Kind::Rock, lastEmpty, -1, d};
+        // Slick stone and soft mushroom caps: nothing to bite.
+        if (isSolid(tx, ty)) return RopeHit{isSlick(tx, ty) || isBounce(tx, ty) ? RopeHit::Kind::Slick : RopeHit::Kind::Rock, lastEmpty, -1, d};
         lastEmpty = p;
     }
     return std::nullopt;

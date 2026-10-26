@@ -18,7 +18,7 @@ namespace
         return v < 0.f ? -1.f : 1.f;
     }
 
-    // Frames in assets/gfx/player.png (12x14 each, one row per skin), made by tools/make_art.py.
+    // Frames in assets/gfx/player.png (12x14 each, one row per look), made by tools/make_art.py.
     namespace frames
     {
         constexpr int WIDTH = 12;
@@ -74,14 +74,42 @@ void Player::update(float dt)
         airJumped = false;
         stamina = p.climbStamina;
     }
-    coyoteTimer = grounded ? p.coyoteTime : std::max(0.f, coyoteTimer - dt);
+    // In water: how deep your feet are under the surface.
+    const bool wasSwimming = swimming;
+    swimming = isSwimming();
+    const float depth = swimming ? *level->depthInWater({position.x + WIDTH * 0.5f, position.y + 0.5f}) + 0.5f : 0.f;
+    if (swimming && !wasSwimming) {
+        events.push_back({PlayerEvent::Type::Splashed, position + sf::Vector2f(WIDTH * 0.5f, depth), std::max(0.f, -velocity.y)});
+    }
+    if (swimming) {
+        airJumped = false;
+        riding = 0; // a cart doesn't float
+    }
+    // Holding your breath: under water the air runs out, bubbles rising as it goes; at the surface
+    // it comes back quickly.
+    const bool wasUnderwater = underwater;
+    underwater = isUnderwater();
+    if (underwater) {
+        air = std::max(0.f, air - dt);
+        bubbleTimer -= dt;
+        if (bubbleTimer <= 0.f) {
+            bubbleTimer = airLeft() < 0.25f ? 0.25f : 0.8f;
+            events.push_back({PlayerEvent::Type::Bubbled, position + sf::Vector2f(WIDTH * 0.5f + (facingLeft ? -2.f : 2.f), MOUTH_HEIGHT)});
+        }
+    } else {
+        if (wasUnderwater && airLeft() < 0.5f) events.push_back({PlayerEvent::Type::Gasped, position + sf::Vector2f(WIDTH * 0.5f, MOUTH_HEIGHT)});
+        air = std::min(maxAir(), air + dt * maxAir() / std::max(0.01f, p.airRefillTime));
+        bubbleTimer = 0.3f;
+    }
+    coyoteTimer = grounded && !swimming ? p.coyoteTime : swimming ? 0.f : std::max(0.f, coyoteTimer - dt);
     jumpBufferTimer = std::max(0.f, jumpBufferTimer - dt);
     dropThroughTimer = std::max(0.f, dropThroughTimer - dt);
     ropeJumpTimer = std::max(0.f, ropeJumpTimer - dt);
     regrabTimer = std::max(0.f, regrabTimer - dt);
-    if (grounded && !rope && input.moveY < 0.f && level->isOnPlatform(position, WIDTH)) {
+    if (grounded && !rope && !riding && input.moveY < 0.f && level->isOnPlatform(position, WIDTH)) {
         dropThroughTimer = DROP_THROUGH_TIME;
     }
+    const bool floating = isFloating();
 
     const float inputX = input.moveX;
     if (inputX != 0.f) facingLeft = inputX < 0.f;
@@ -91,12 +119,35 @@ void Player::update(float dt)
     const bool swinging = rope && !grounded;
 
     // --- Horizontal ---
-    if (clinging) {
+    if (floating) {
+        // Pushed about by the arrows, any way, drifting to a stop with nothing held. On the rope,
+        // up and down reel it in and out instead.
+        const sf::Vector2f push(inputX, rope ? 0.f : input.moveY);
+        for (auto [speed, along] : {std::pair{&velocity.x, push.x}, std::pair{&velocity.y, push.y}}) {
+            if (along != 0.f) *speed = approach(*speed, along * p.floatSpeed, p.floatAcceleration * dt);
+            else *speed -= *speed * std::min(1.f, p.floatDrag * dt);
+        }
+        strokeTimer -= dt;
+        if (push != sf::Vector2f() && strokeTimer <= 0.f) {
+            strokeTimer = 0.5f;
+            events.push_back({PlayerEvent::Type::Pushed, exactCentre() - push * 4.f});
+        }
+    } else if (riding) {
+        velocity.x = static_cast<float>(riding) * p.cartSpeed;
+    } else if (clinging) {
         // Held still against the wall by updateClimbing.
     } else if (swinging) {
         // Pushing the swing along, like legs on a playground swing: only below where the rope hangs
         // from, never up and over the top. Most of the speed comes from falling.
         if (exactCentre().y < rope->pivot().y) velocity.x += inputX * p.swingPush * dt;
+    } else if (swimming) {
+        velocity.x = approach(velocity.x, inputX * p.swimSpeed, p.swimAcceleration * dt);
+        // A stroke now and then, to see and hear.
+        strokeTimer -= dt;
+        if (inputX != 0.f && strokeTimer <= 0.f) {
+            strokeTimer = 0.45f;
+            events.push_back({PlayerEvent::Type::Stroked, position + sf::Vector2f(WIDTH * 0.5f, depth)});
+        }
     } else {
         const float speed = std::abs(velocity.x);
         const bool along = inputX * velocity.x > 0.f; // holding the way you're going
@@ -118,13 +169,30 @@ void Player::update(float dt)
         }
     }
     // Wind pushes whatever's in the air: jumping, falling, swinging.
-    if (!grounded && !clinging) {
+    if (!grounded && !clinging && !swimming && !riding) {
         velocity.x += level->wind() * dt;
     }
 
     // --- Vertical ---
     if (velocity.y <= 0.f) jumping = false;
-    if (!clinging) {
+    if (floating) {
+        jumping = false; // pushed about above, nothing pulls
+    } else if (swimming && !clinging && !rope) {
+        // Floating: the water lifts you back up to the surface like a spring, and slows you, so you
+        // bob there. Holding down dives; up swims back up.
+        jumping = false;
+        if (input.moveY < 0.f) {
+            velocity.y = approach(velocity.y, -p.swimSpeed, p.swimAcceleration * dt);
+        } else if (input.moveY > 0.f && depth > FLOAT_DEPTH + 2.f) {
+            velocity.y = approach(velocity.y, p.swimSpeed, p.swimAcceleration * dt);
+        } else if (velocity.y < -p.swimSpeed) {
+            // Falling in: the water stops you soon after the splash.
+            velocity.y = approach(velocity.y, -p.swimSpeed, 1500.f * dt);
+        } else {
+            velocity.y += std::clamp((depth - FLOAT_DEPTH) * p.buoyancy, -400.f, 400.f) * dt;
+            velocity.y -= velocity.y * std::min(1.f, p.waterDrag * dt);
+        }
+    } else if (!clinging) {
         float gravity = p.gravity;
         if (jumping && !input.jumpHeld) gravity *= p.jumpReleaseGravity;
         velocity.y -= gravity * dt;
@@ -135,13 +203,25 @@ void Player::update(float dt)
             jumping = false;
         }
     }
-    if (grounded && velocity.y < 0.f) {
+    if (grounded && velocity.y < 0.f && !floating) {
         // Standing: don't let gravity pile up in the sub-pixel remainder.
         velocity.y = 0.f;
         remainder.y = 0.f;
     }
+    if (grounded && !floating && !riding && !rope && input.moveY >= 0.f && velocity.y <= 0.f && level->isOnBounce(position, WIDTH)) {
+        // On a bounce mushroom: thrown up, high (holding down, you stand on it).
+        velocity.y = p.bounceSpeed;
+        jumping = false;
+        airJumped = false;
+        coyoteTimer = 0.f;
+        jumpBufferTimer = 0.f;
+        squash = {0.7f, 1.35f};
+        events.push_back({PlayerEvent::Type::Bounced, position + sf::Vector2f(WIDTH * 0.5f, 0.f)});
+    }
 
-    if (jumpBufferTimer > 0.f) {
+    if (jumpBufferTimer > 0.f && floating) {
+        jumpBufferTimer = 0.f; // nothing to jump off
+    } else if (jumpBufferTimer > 0.f) {
         if (clinging) {
             // Leaping off the wall, away from it.
             velocity = {-static_cast<float>(clinging) * p.wallJumpPush, p.jumpSpeed};
@@ -153,6 +233,19 @@ void Player::update(float dt)
             jumpBufferTimer = 0.f;
             squash = {0.75f, 1.3f};
             events.push_back({PlayerEvent::Type::WallJumped, position + sf::Vector2f(WIDTH * 0.5f, HEIGHT * 0.5f)});
+        } else if (swimming && !rope) {
+            jumpBufferTimer = 0.f;
+            if (depth <= FLOAT_DEPTH + 3.f) {
+                // At the surface: a leap out of the water.
+                velocity.y = p.swimJumpSpeed;
+                jumping = true;
+                squash = {0.8f, 1.25f};
+                events.push_back({PlayerEvent::Type::Splashed, position + sf::Vector2f(WIDTH * 0.5f, depth), p.swimJumpSpeed});
+            } else {
+                // Under it: a kick up.
+                velocity.y = std::max(velocity.y, p.swimSpeed * 1.5f);
+                events.push_back({PlayerEvent::Type::Stroked, position + sf::Vector2f(WIDTH * 0.5f, HEIGHT)});
+            }
         } else if (coyoteTimer > 0.f) {
             velocity.y = p.jumpSpeed;
             jumping = true;
@@ -232,10 +325,11 @@ void Player::update(float dt)
 void Player::updateThrow(float dt, bool grounded)
 {
     const Physics& p = physics();
-    const bool footing = grounded || clinging != 0;
+    // Floating, there's nothing to stand on, and nothing to fall off either.
+    const bool footing = grounded || clinging != 0 || isFloating();
     switch (hook) {
         case Hook::InHand:
-            if (ropeShotQueued && !rope && hasRope && (footing || throwsInAir)) {
+            if (ropeShotQueued && !rope && hasRope && !riding && (footing || throwsInAir)) {
                 ropeShotQueued = false;
                 // Not yet sure-handed: swung round a few times first, standing.
                 if (!throwsInAir && p.throwWindup > 0.f) {
@@ -359,7 +453,7 @@ bool Player::wallToGrab(int side) const
 void Player::updateClimbing(float dt, bool grounded)
 {
     const Physics& p = physics();
-    if (!canClimb || rope) {
+    if (!canClimb || rope || riding || isFloating()) {
         clinging = 0;
         return;
     }
@@ -410,13 +504,15 @@ void Player::moveX(float amount)
     remainder.x -= static_cast<float>(move);
 
     const int step = move > 0 ? 1 : -1;
-    const bool airborne = !isGrounded();
+    // Swimming, a ledge at the water's edge is a step up out of it.
+    const bool airborne = !isGrounded() || swimming;
+    const int popHeight = swimming ? WATER_STEP : CORNER_CORRECTION;
     while (move != 0) {
         sf::Vector2f next = position + sf::Vector2f(static_cast<float>(step), 0.f);
         if (!fits(next)) {
             // In the air, a ledge lip just below your feet pops you up onto it instead of stopping you.
             bool popped = false;
-            for (int up = 1; airborne && up <= CORNER_CORRECTION && !popped; ++up) {
+            for (int up = 1; airborne && up <= popHeight && !popped; ++up) {
                 sf::Vector2f lifted(0.f, static_cast<float>(up));
                 if (fits(position + lifted) && fits(next + lifted)) {
                     next += lifted;
@@ -426,6 +522,7 @@ void Player::moveX(float amount)
             if (!popped) {
                 velocity.x = 0.f;
                 remainder.x = 0.f;
+                if (riding) crashed = true; // a cart doesn't stop for walls
                 return;
             }
         }
@@ -506,8 +603,19 @@ void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     }
 
     int frame;
+    bool lyingInWater = false;
     if (sitting && isGrounded()) {
         frame = frames::SIT;
+    } else if (sitting && swimming) {
+        // Coming to, floating on your back.
+        frame = frames::IDLE;
+        lyingInWater = true;
+    } else if (riding) {
+        frame = frames::IDLE; // standing in the cart, holding on
+    } else if (isFloating() && !rope) {
+        frame = frames::FALL; // hair and arms adrift
+    } else if (swimming && !rope) {
+        frame = std::abs(velocity.x) > 5.f ? frames::RUN + static_cast<int>(animTime * 7.f) % 4 : frames::IDLE + static_cast<int>(animTime * 2.f) % 2;
     } else if (clinging) {
         frame = frames::CLIMB + (velocity.y != 0.f ? static_cast<int>(animTime * 6.f) % 2 : 0);
     } else if (hook == Hook::WindingUp) {
@@ -521,18 +629,42 @@ void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
     }
 
     sf::Sprite sprite(texture);
-    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(skin) * frames::HEIGHT, frames::WIDTH, frames::HEIGHT));
+    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(look) * frames::HEIGHT, frames::WIDTH, frames::HEIGHT));
     // Anchored at the middle of the feet, so squashing and flipping keep the player planted.
     // The frames have a 1px outline below the feet, so they sit one pixel lower.
     sprite.setOrigin(frames::WIDTH * 0.5f, frames::HEIGHT - 1.f);
     sprite.setScale(facingLeft ? -squash.x : squash.x, squash.y);
-    sprite.setPosition(viewCoordinates(position + sf::Vector2f(WIDTH * 0.5f, 0.f), centr));
+    // In a cart, up on its floor, its sides in front of your legs.
+    sprite.setPosition(viewCoordinates(position + sf::Vector2f(WIDTH * 0.5f, riding ? 3.f : 0.f), centr));
+    if (lyingInWater) {
+        // Head to the left, face up, the middle of you at the surface.
+        sprite.setOrigin(frames::WIDTH * 0.5f, frames::HEIGHT * 0.5f);
+        sprite.setScale(1.f, 1.f);
+        sprite.setRotation(-90.f);
+        const sf::Vector2f at = viewCoordinates(position + sf::Vector2f(WIDTH * 0.5f, FLOAT_DEPTH + 1.f), centr);
+        sprite.setPosition(std::floor(at.x), std::floor(at.y));
+    }
     target.draw(sprite);
 }
 
-void Player::drawFigure(sf::RenderTarget& target, size_t lookIndex, sf::Vector2f feet, bool facingLeft, float time, float scale) const
+void Player::drawFigure(sf::RenderTarget& target, size_t lookIndex, sf::Vector2f feet, bool facingLeft, float time, float scale,
+                        bool sittingDown) const
 {
-    const int frame = frames::IDLE + static_cast<int>(time * 2.f) % 2;
+    drawPose(target, lookIndex, sittingDown ? Pose::Sit : Pose::Idle, feet, facingLeft, time, scale);
+}
+
+void Player::drawPose(sf::RenderTarget& target, size_t lookIndex, Pose pose, sf::Vector2f feet, bool facingLeft, float time, float scale) const
+{
+    int frame = frames::IDLE;
+    switch (pose) {
+        case Pose::Idle: frame = frames::IDLE + static_cast<int>(time * 2.f) % 2; break;
+        case Pose::Run: frame = frames::RUN + static_cast<int>(time * 12.f) % 4; break;
+        case Pose::Jump: frame = frames::JUMP; break;
+        case Pose::Fall: frame = frames::FALL; break;
+        case Pose::Swing: frame = frames::SWING; break;
+        case Pose::Sit: frame = frames::SIT; break;
+        case Pose::Climb: frame = frames::CLIMB + static_cast<int>(time * 6.f) % 2; break;
+    }
     sf::Sprite sprite(texture);
     sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(std::min(lookIndex, LOOKS.size() - 1)) * frames::HEIGHT,
                                       frames::WIDTH, frames::HEIGHT));
@@ -555,20 +687,9 @@ void Player::setSitting(bool sit)
     sitting = sit;
 }
 
-void Player::setSkin(size_t index)
+void Player::setLook(size_t lookIndex)
 {
-    skin = std::min(index, SKINS.size() - 1);
-}
-
-void Player::drawPreview(sf::RenderTarget& target, sf::Vector2f feet, float scale, float time) const
-{
-    const int frame = frames::RUN + static_cast<int>(time * 12.f) % 4;
-    sf::Sprite sprite(texture);
-    sprite.setTextureRect(sf::IntRect(frame * frames::WIDTH, static_cast<int>(skin) * frames::HEIGHT, frames::WIDTH, frames::HEIGHT));
-    sprite.setOrigin(frames::WIDTH * 0.5f, frames::HEIGHT - 1.f);
-    sprite.setScale(scale, scale);
-    sprite.setPosition(feet);
-    target.draw(sprite);
+    look = std::min(lookIndex, LOOKS.size() - 1);
 }
 
 void Player::enterLevel(std::shared_ptr<const Level> lvl, sf::Vector2f shift, bool fromBelow)
@@ -597,6 +718,8 @@ void Player::respawn(sf::Vector2f pos)
     loose.reset();
     hook = Hook::InHand;
     clinging = 0;
+    riding = 0;
+    crashed = false;
     stamina = physics().climbStamina;
     regrabTimer = 0.f;
     coyoteTimer = 0.f;
@@ -607,6 +730,11 @@ void Player::respawn(sf::Vector2f pos)
     airJumped = false;
     squash = {1.f, 1.f};
     jumping = false;
+    swimming = isSwimming();
+    strokeTimer = 0.f;
+    underwater = false;
+    air = maxAir();
+    bubbleTimer = 0.3f;
     events.clear();
 }
 
@@ -632,6 +760,79 @@ bool Player::isGrounded() const
 {
     if (!level->isEmptySpace(position + sf::Vector2f(0.f, -1.f), 1.f, WIDTH)) return true;
     return dropThroughTimer <= 0.f && level->isOnPlatform(position, WIDTH);
+}
+
+bool Player::isSwimming() const
+{
+    const auto depth = level->depthInWater({position.x + WIDTH * 0.5f, position.y + 0.5f});
+    return depth && *depth + 0.5f >= SWIM_DEPTH;
+}
+
+bool Player::isUnderwater() const
+{
+    return level->depthInWater(position + sf::Vector2f(WIDTH * 0.5f, MOUTH_HEIGHT)).has_value();
+}
+
+float Player::maxAir() const
+{
+    return physics().airTime * breathScale;
+}
+
+float Player::airLeft() const
+{
+    return maxAir() > 0.f ? std::clamp(air / maxAir(), 0.f, 1.f) : 1.f;
+}
+
+void Player::setAirLeft(float left)
+{
+    air = std::clamp(left, 0.f, 1.f) * maxAir();
+}
+
+void Player::setBreathScale(float scale)
+{
+    const float left = airLeft();
+    breathScale = scale;
+    air = left * maxAir();
+}
+
+bool Player::isFloating() const
+{
+    return level->isSpace();
+}
+
+void Player::startRiding(int dir)
+{
+    riding = dir < 0 ? -1 : 1;
+    crashed = false;
+    clinging = 0;
+    facingLeft = riding < 0;
+    if (rope) letGoOfRope();
+}
+
+void Player::stopRiding()
+{
+    riding = 0;
+    velocity.x = 0.f;
+}
+
+bool Player::isRiding() const
+{
+    return riding != 0;
+}
+
+int Player::ridingDir() const
+{
+    return riding;
+}
+
+bool Player::hasCrashed() const
+{
+    return crashed;
+}
+
+bool Player::isOutOfAir() const
+{
+    return air <= 0.f;
 }
 
 bool Player::isTouchingDanger() const
@@ -698,7 +899,7 @@ std::optional<sf::Vector2f> Player::ropeBounce(sf::Vector2f aim) const
 
 float Player::reach() const
 {
-    return isGrounded() || clinging ? ropeRange : ropeRange * physics().airThrowRange;
+    return isGrounded() || clinging || isFloating() ? ropeRange : ropeRange * physics().airThrowRange;
 }
 
 void Player::setHasRope(bool has)
@@ -741,7 +942,7 @@ bool Player::hasAirJump() const
 
 bool Player::canShootRope() const
 {
-    return hasRope && hook == Hook::InHand && !rope && (throwsInAir || isGrounded() || clinging);
+    return hasRope && hook == Hook::InHand && !rope && !riding && (throwsInAir || isGrounded() || clinging || isFloating());
 }
 
 bool Player::isClinging() const

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <algorithm>
 #include "src/Config.h"
+#include "src/Dog.h"
 #include "src/Level.h"
 #include "src/Physics.h"
 #include "src/Player.h"
@@ -285,4 +286,104 @@ TEST(Mechanics, IceCantBeGrabbed) {
     in.jumpPressed = in.jumpHeld = true;
     run(*level, player, in, 1.f);
     EXPECT_FALSE(player.isClinging());
+}
+
+TEST(Mechanics, ABounceMushroomThrowsYouUpHigherThanAJump) {
+    // Standing on mushrooms: thrown up, over and over, higher than a jump goes; holding down, you stay.
+    std::string rows;
+    for (int i = 0; i < 20; ++i) rows += "#" + std::string(20, '.') + "#\n";
+    auto level = Level::loadFromString(rows + "#....S...............#\n#mmmmmmmmmmmmmmmmmmmm#\n" + std::string(22, '#') + "\n");
+    Player player(level);
+    const float floor = player.getPosition().y;
+    float top = floor;
+    for (int ii = 0; ii < static_cast<int>(1.f / DT); ++ii) {
+        run(*level, player, {}, DT);
+        top = std::max(top, player.getPosition().y);
+    }
+    const float jump = physics().jumpSpeed * physics().jumpSpeed / (2.f * physics().gravity);
+    EXPECT_GT(top - floor, jump * 1.5f);
+    EXPECT_TRUE(has(eventsOf(player), PlayerEvent::Type::Bounced));
+    // Holding down: standing on it.
+    PlayerInput down;
+    down.moveY = -1.f;
+    run(*level, player, down, 2.f);
+    EXPECT_TRUE(player.isGrounded());
+    EXPECT_EQ(player.getPosition().y, floor);
+}
+
+TEST(Mechanics, AHiddenPassageIsNotThere) {
+    // '?' looks like rock, but you walk straight through it, and the rope doesn't bite it.
+    auto level = Level::loadFromString("##########\n#........#\n#.S...??.#\n##########\n");
+    Player player(level);
+    run(*level, player, moving(1.f), 1.5f);
+    EXPECT_GT(player.getPosition().x, 7.f * Level::TILE_SIZE);
+    EXPECT_FALSE(level->ropeHit({20.f, 12.f}, {60.f, 12.f}, 50.f).has_value());
+}
+
+TEST(Mechanics, WithNoGravityYouFloatWhereverYouPush) {
+    auto level = Level::loadFromString("##########\n#........#\n#........#\n#........#\n#.S......#\n#........#\n##########\n");
+    level->setSpace(true);
+    Player player(level);
+    player.respawn({16.f, 24.f});
+    run(*level, player, {}, 1.f);
+    EXPECT_FLOAT_EQ(player.getPosition().y, 24.f); // nothing pulls you down
+    PlayerInput up;
+    up.moveY = 1.f;
+    run(*level, player, up, 0.3f);
+    EXPECT_GT(player.getPosition().y, 26.f);
+    run(*level, player, {}, 4.f); // drifting to a stop
+    EXPECT_LT(std::abs(player.getVelocity().y), 2.f);
+    EXPECT_TRUE(player.isFloating());
+}
+
+TEST(Mechanics, ACartRollsOnUntilAWallWrecksIt) {
+    auto level = Level::loadFromString("#################\n#...............#\n#S..............#\nttttttttttttttt.#\n#################\n");
+    Player player(level);
+    run(*level, player, {}, 0.5f);
+    player.startRiding(1);
+    run(*level, player, moving(-1.f), 0.5f); // holding back does nothing
+    EXPECT_NEAR(player.getVelocity().x, physics().cartSpeed, 1.f);
+    EXPECT_GT(player.getPosition().x, 40.f);
+    run(*level, player, {}, 2.f);
+    EXPECT_TRUE(player.hasCrashed());
+}
+
+TEST(Mechanics, TheDivingSuitHoldsMoreBreath) {
+    const auto drownsAfter = [](float scale) {
+        // Held down on the bottom of a pool.
+        auto level = Level::loadFromString("#######\n#S....#\n##www##\n##www##\n##www##\n#######\n");
+        Player player(level);
+        player.setBreathScale(scale);
+        player.respawn({24.f, 8.f});
+        PlayerInput down;
+        down.moveY = -1.f;
+        float t = 0.f;
+        while (!player.isOutOfAir() && t < 60.f) {
+            run(*level, player, down, DT);
+            t += DT;
+        }
+        return t;
+    };
+    EXPECT_NEAR(drownsAfter(physics().divingAir), physics().divingAir * drownsAfter(1.f), 0.5f);
+}
+
+
+TEST(Mechanics, PipFollowsTheWayYouWent) {
+    // He keeps a little way behind along your path, and stays put when you stop.
+    Dog dog;
+    dog.reset({10.f, 8.f});
+    sf::Vector2f you(10.f, 8.f);
+    for (int i = 0; i < 120; ++i) {
+        you.x += 1.f;
+        if (i > 40 && i < 60) you.y += 1.f; // up a step
+        dog.follow(you, DT);
+    }
+    EXPECT_LT(dog.feet().x, you.x);
+    EXPECT_NEAR(you.x - dog.feet().x, Dog::BEHIND, 2.f);
+    EXPECT_FLOAT_EQ(dog.feet().y, you.y); // up the step behind you
+    const sf::Vector2f stopped = dog.feet();
+    for (int i = 0; i < 60; ++i) dog.follow(you, DT);
+    EXPECT_EQ(dog.feet(), stopped);
+    dog.point(you + sf::Vector2f(40.f, 0.f));
+    EXPECT_TRUE(dog.isPointing());
 }

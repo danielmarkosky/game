@@ -43,6 +43,19 @@ namespace
         {"wall_slide_speed", &Physics::wallSlideSpeed},
         {"wall_jump_push", &Physics::wallJumpPush},
         {"climb_over_speed", &Physics::climbOverSpeed},
+        {"swim_speed", &Physics::swimSpeed},
+        {"swim_acceleration", &Physics::swimAcceleration},
+        {"buoyancy", &Physics::buoyancy},
+        {"water_drag", &Physics::waterDrag},
+        {"swim_jump_speed", &Physics::swimJumpSpeed},
+        {"air_time", &Physics::airTime},
+        {"air_refill_time", &Physics::airRefillTime},
+        {"diving_air", &Physics::divingAir},
+        {"bounce_speed", &Physics::bounceSpeed},
+        {"cart_speed", &Physics::cartSpeed},
+        {"float_acceleration", &Physics::floatAcceleration},
+        {"float_speed", &Physics::floatSpeed},
+        {"float_drag", &Physics::floatDrag},
     };
 
     Physics current;

@@ -4,17 +4,24 @@
 // is probably too hard, or impossible.
 //
 // usage: levelbot <room> [--start COL ROW] [--goal L|R|T|B | --goal pickup | --goal gem N]
-//                        [--abilities a,b,...] [--explore]
+//                        [--abilities a,b,...] [--explore] [--riding 1|-1]
 //        levelbot --measure
 //   <room>       a room's identifier in assets/world.ldtk, or a text room file
 //   --start      where to start: the tile to stand in, column and row from the top-left
 //                (default: the room's Start)
-//   --goal       which way out counts (default: any), or touching a pickup, or gem N, or "tug": the
-//                rope tugging a lever or a lamp, or "item": touching a quest item
-//   --abilities  the ones the player has (default: all). "none" for none.
+//   --goal       which way out counts (default: any; "L:21" only the left door starting 21 up), or
+//                touching a pickup, or gem N, or "tug": the
+//                rope tugging a lever or a lamp, or "cart": getting into a mine cart, or "stop":
+//                riding one to the end of the line, or "at COL ROW": standing in that tile
+//   --abilities  the ones the player has (default: all). "none" for none. "diver" is wearing the
+//                diving suit: breath lasting longer
 //   --explore    don't stop at the goal: list every spot that can be stood on
 //   --open       with the room's gates open, as if its lever had been pulled
+//   --riding     starting in a mine cart rolling that way: all there is to try is when to jump
 //   --measure    how far the moves reach with the physics in assets/physics.txt, for designing rooms
+//
+// In a room with no gravity (a `space` room) the spots are where you drift to a stop, not where
+// you stand, and the moves are pushes every way as well as the rope.
 //
 // Prints the route it found and exits with 0, or prints a map of where it got to and exits with 1.
 #include "src/Config.h"
@@ -22,9 +29,11 @@
 #include "src/Physics.h"
 #include "src/Player.h"
 #include "src/World.h"
+#include "src/utils.h"
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <deque>
 #include <iostream>
 #include <map>
 #include <queue>
@@ -43,15 +52,20 @@ namespace
     {
         Out out;
         sf::Vector2f pos;
+        float air = 1.f; // breath left at the end, 0 to 1
     };
 
     struct Goal
     {
         std::optional<Level::Side> side; // none and no pickup or gem: any way out
+        int door = -1;                   // and only the door on that side starting there (as make_world.py counts), if not -1
         bool pickup = false;
         int gem = -1;
-        bool tug = false; // the rope tugging a lever or a lamp
-        bool item = false; // touching a quest item
+        bool tug = false;  // the rope tugging a lever or a lamp
+        bool cart = false; // getting into a mine cart
+        bool stop = false; // riding one to the end of the line
+        std::optional<sf::Vector2i> at; // standing in this tile (column, and row from the top)
+        bool any() const { return pickup || gem >= 0 || tug || cart || stop || at; } // something other than a way out
     };
 
     // A run, then maybe a jump, held for a while, steering in the air, maybe jumping again.
@@ -89,6 +103,13 @@ namespace
         bool leap;
         float steer;
         int leaps = 0; // first, leaping back and forth to the wall across this many times
+    };
+
+    // With no gravity: pushing one way for a while, then drifting to a stop.
+    struct Drift
+    {
+        sf::Vector2f push; // -1, 0 or 1 each way
+        float time;
     };
 
     constexpr float THROW_WAIT = 1.5f; // the longest a throw is waited on to catch
@@ -223,6 +244,18 @@ namespace
             return settle(s.steer, true);
         }
 
+        Result drift(sf::Vector2f spot, const Drift& d)
+        {
+            start(spot);
+            PlayerInput in;
+            in.moveX = d.push.x;
+            in.moveY = d.push.y;
+            for (int i = 0; i < int(d.time / DT); ++i) {
+                if (auto o = step(in)) return {*o, player.getPosition()};
+            }
+            return settle(0.f, true);
+        }
+
         Result climb(sf::Vector2f spot, const Climb& c)
         {
             start(spot);
@@ -271,43 +304,82 @@ namespace
             return settle(c.steer, true);
         }
 
-        // Every try from a spot starts with the room as it was: icicles up, blocks whole, rings at the start.
+        // Every try from a spot starts with the room as it was: icicles up, blocks whole, rings at
+        // the start, and with as much breath as there was at the spot.
+        float air = 1.f;
         void start(sf::Vector2f spot)
         {
             level->reset();
             player.respawn(spot);
+            player.setAirLeft(air);
         }
 
-    private:
         std::optional<Out> step(const PlayerInput& in)
         {
             player.handleInput(in);
             level->update(DT, player.hitbox());
             player.update(DT);
+            // What the game does with carts: in one, walking into it; out of one, at the end of the line.
+            if (player.isRiding() && player.isGrounded() && level->isAtCartStop(player.getPosition(), Player::HEIGHT, Player::WIDTH)) {
+                player.stopRiding();
+                if (goal.stop) return Out::Reached;
+            }
+            if (!player.isRiding()) {
+                if (const auto cart = level->cartAt(player.getPosition(), Player::HEIGHT, Player::WIDTH); cart && player.isGrounded()) {
+                    if (goal.cart) return Out::Reached;
+                }
+            }
+            if (player.hasCrashed()) return Out::Died;
+            if (goal.at && player.isGrounded()) {
+                const sf::FloatRect b = level->bounds();
+                const int rows = int(b.height / Level::TILE_SIZE);
+                const int column = int((player.getPosition().x + Player::WIDTH * 0.5f) / Level::TILE_SIZE);
+                const int row = rows - 1 - int((player.getPosition().y - b.top) / Level::TILE_SIZE);
+                if (column == goal.at->x && row == goal.at->y) return Out::Reached;
+            }
             bool tugged = false;
             for (const PlayerEvent& e : player.takeEvents()) {
                 tugged |= e.type == PlayerEvent::Type::LeverTugged || e.type == PlayerEvent::Type::LampTugged;
             }
             ++steps;
             if (goal.tug && tugged) return Out::Reached;
-            if (goal.item && level->questItemAt(player.hitbox())) return Out::Reached;
             if (goal.pickup && level->pickupAt(player.getPosition(), Player::HEIGHT, Player::WIDTH)) return Out::Reached;
             if (goal.gem >= 0 && level->gemAt(player.getPosition(), Player::HEIGHT, Player::WIDTH) == size_t(goal.gem)) return Out::Reached;
-            if (player.isTouchingDanger() || player.getPosition().y < level->bounds().top - 64.f) return Out::Died;
+            if (player.isTouchingDanger() || player.isOutOfAir() || player.getPosition().y < level->bounds().top - 64.f) return Out::Died;
             if (auto side = level->exitThrough(player.centre())) {
-                const bool wanted = !goal.pickup && !goal.tug && !goal.item && goal.gem < 0 && (!goal.side || *side == *goal.side);
+                bool wanted = !goal.any() && (!goal.side || *side == *goal.side);
+                if (wanted && goal.door >= 0) {
+                    // Which door: where along the side you went through it, from the bottom or the left.
+                    const bool upright = *side == Level::Side::Left || *side == Level::Side::Right;
+                    const float along = upright ? player.centre().y - level->bounds().top : player.centre().x - level->bounds().left;
+                    const int tile = int(along / Level::TILE_SIZE);
+                    wanted = tile >= goal.door && tile < goal.door + 6;
+                }
                 return wanted ? Out::Reached : Out::Died;
             }
             return std::nullopt;
         }
 
-        // Steers until landing, then waits to come to rest.
+    private:
+        // Steers until landing, then waits to come to rest. With no gravity, until drifting to a stop.
         Result settle(float steer, bool airborne)
         {
+            if (player.isFloating() || (player.isUnderwater() && !player.getRope())) {
+                // Drifting, or afloat under the water (up against a roof, or rising): wherever it
+                // comes to rest, holding its breath meanwhile.
+                PlayerInput none;
+                for (int i = 0; i < int(5.f / DT); ++i) {
+                    if (auto o = step(none)) return {*o, player.getPosition()};
+                    if (i > 3 && !player.getRope() && magnitude(player.getVelocity()) < 3.f) return {Out::Landed, player.getPosition(), player.airLeft()};
+                    if (player.isGrounded() && !player.isUnderwater()) break; // out of it, onto something
+                }
+                if (!player.isGrounded()) return {Out::Timeout, {}};
+            }
             PlayerInput in;
             in.moveX = steer;
             for (int i = 0; i < int(4.f / DT); ++i) {
-                const bool grounded = player.isGrounded() && !player.getRope();
+                // A bounce mushroom isn't somewhere to land: it throws you on.
+                const bool grounded = player.isGrounded() && !player.getRope() && !level->isOnBounce(player.getPosition(), Player::WIDTH);
                 if (grounded && (airborne || i > 0)) break;
                 airborne |= !grounded;
                 if (auto o = step(in)) return {*o, player.getPosition()};
@@ -317,7 +389,7 @@ namespace
                 if (auto o = step({})) return {*o, player.getPosition()};
             }
             if (!player.isGrounded()) return {Out::Timeout, {}};
-            return {Out::Landed, player.getPosition()};
+            return {Out::Landed, player.getPosition(), player.airLeft()};
         }
 
     };
@@ -361,10 +433,79 @@ namespace
 
 namespace
 {
+    // A ride in a mine cart from `start`, rolling `dir`-wards: it goes where it goes, and all there is
+    // to choose is when to jump, and for how long. Every choice, a few steps apart, breadth first.
+    int ride(Bot& bot, sf::Vector2f start, int dir, const std::string& name)
+    {
+        struct Press
+        {
+            int at, hold; // steps
+        };
+        struct Plan
+        {
+            std::vector<Press> presses;
+            int next; // the step to choose at
+        };
+        constexpr int EVERY = 3;
+        const int longest = int(40.f / DT);
+        const int holds[] = {int(0.06f / DT), int(0.14f / DT), int(0.3f / DT), int(0.5f / DT)};
+        // Plays a plan from the start up to step `until`: how it ended, if it has.
+        auto replay = [&](const Plan& plan, int until) -> std::optional<Out> {
+            bot.start(start);
+            bot.player.startRiding(dir);
+            size_t next = 0;
+            int holding = 0;
+            for (int i = 0; i < until; ++i) {
+                PlayerInput in;
+                if (next < plan.presses.size() && plan.presses[next].at == i) {
+                    in.jumpPressed = true;
+                    holding = plan.presses[next++].hold;
+                }
+                in.jumpHeld = holding > 0;
+                holding = std::max(0, holding - 1);
+                if (auto out = bot.step(in)) return out;
+                if (!bot.player.isRiding()) return Out::Landed; // stopped, not where it was wanted
+            }
+            return std::nullopt;
+        };
+        std::deque<Plan> open{{{}, EVERY}};
+        std::set<std::tuple<int, int, int, bool, bool>> seen;
+        float furthest = start.x;
+        while (!open.empty()) {
+            const Plan plan = open.front();
+            open.pop_front();
+            const auto out = replay(plan, plan.next);
+            furthest = dir > 0 ? std::max(furthest, bot.player.getPosition().x) : std::min(furthest, bot.player.getPosition().x);
+            if (out == Out::Reached) {
+                std::printf("%s: REACHED (riding, %lld steps)\n", name.c_str(), bot.steps);
+                for (const Press& p : plan.presses) std::printf("  jump after %.2fs, held %.2fs\n", p.at * DT, p.hold * DT);
+                std::fflush(stdout);
+                std::_Exit(0);
+            }
+            if (out || plan.next > longest) continue;
+            const Player& p = bot.player;
+            const auto state = std::make_tuple(plan.next, int(p.getPosition().y), int(std::floor(p.getVelocity().y / 15.f)), p.isGrounded(), p.hasAirJump());
+            if (!seen.insert(state).second) continue;
+            open.push_back({plan.presses, plan.next + EVERY});
+            if (p.isGrounded() || p.hasAirJump()) {
+                for (int hold : holds) {
+                    Plan jump = plan;
+                    jump.presses.push_back({plan.next, hold});
+                    jump.next = plan.next + EVERY;
+                    open.push_back(jump);
+                }
+            }
+        }
+        std::printf("%s: NOT REACHED (riding, got to column %d, %lld steps)\n", name.c_str(), int(furthest / Level::TILE_SIZE), bot.steps);
+        std::fflush(stdout);
+        std::_Exit(1);
+    }
+
     const std::set<std::string> ALL_ABILITIES = {"rope", "long_rope", "wall_climb", "air_throw", "double_jump"};
 
     void giveAbilities(Player& player, const std::set<std::string>& abilities)
     {
+        player.setBreathScale(abilities.count("diver") ? physics().divingAir : 1.f);
         player.setHasRope(abilities.count("rope") > 0);
         player.setRopeRange(abilities.count("long_rope") ? physics().longRopeRange : physics().ropeRange);
         player.setCanClimb(abilities.count("wall_climb") > 0);
@@ -511,6 +652,7 @@ int main(int argc, char** argv)
     Goal goal;
     std::set<std::string> abilities = ALL_ABILITIES;
     bool explore = false, openGates = false;
+    int riding = 0;
     for (int i = 2; i < argc; ++i) {
         const std::string a = argv[i];
         if (a == "--start" && i + 2 < argc) {
@@ -520,9 +662,18 @@ int main(int argc, char** argv)
             const std::string g = argv[++i];
             if (g == "pickup") goal.pickup = true;
             else if (g == "tug") goal.tug = true;
-            else if (g == "item") goal.item = true;
+            else if (g == "cart") goal.cart = true;
+            else if (g == "stop") goal.stop = true;
+            else if (g == "at" && i + 2 < argc) {
+                goal.at = sf::Vector2i(std::atoi(argv[i + 1]), std::atoi(argv[i + 2]));
+                i += 2;
+            }
             else if (g == "gem" && i + 1 < argc) goal.gem = std::atoi(argv[++i]);
-            else goal.side = g == "L" ? Level::Side::Left : g == "R" ? Level::Side::Right : g == "T" ? Level::Side::Top : Level::Side::Bottom;
+            else {
+                // "L", or "L:21" for the left door starting 21 up.
+                goal.side = g[0] == 'L' ? Level::Side::Left : g[0] == 'R' ? Level::Side::Right : g[0] == 'T' ? Level::Side::Top : Level::Side::Bottom;
+                if (g.size() > 2 && g[1] == ':') goal.door = std::atoi(g.c_str() + 2);
+            }
         } else if (a == "--abilities" && i + 1 < argc) {
             abilities.clear();
             std::stringstream list(argv[++i]);
@@ -533,6 +684,8 @@ int main(int argc, char** argv)
             explore = true;
         } else if (a == "--open") {
             openGates = true;
+        } else if (a == "--riding" && i + 1 < argc) {
+            riding = std::atoi(argv[++i]) < 0 ? -1 : 1;
         }
     }
 
@@ -567,7 +720,7 @@ int main(int argc, char** argv)
     // The moves to try from every spot.
     std::vector<Jump> jumps;
     for (float run : {-1.f, 0.f, 1.f}) {
-        for (float runTime : {0.f, 0.08f, 0.18f, 0.35f, 0.6f}) {
+        for (float runTime : {0.f, 0.04f, 0.08f, 0.12f, 0.18f, 0.25f, 0.35f, 0.45f, 0.6f}) {
             for (float hold : {0.f, 0.06f, 0.14f, 0.5f}) {
                 for (float steer : {-1.f, 0.f, 1.f}) {
                     if (hold == 0.f && (runTime == 0.f || steer != run)) continue;
@@ -589,7 +742,7 @@ int main(int argc, char** argv)
         for (int deg = 25; deg <= 155; deg += 10) {
             for (float push : {-1.f, 1.f}) {
                 for (bool reel : {false, true}) {
-                    for (float hold : {0.25f, 0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.8f, 2.2f}) {
+                    for (float hold : {0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.1f, 1.25f, 1.4f, 1.6f, 1.8f, 2.0f, 2.2f}) {
                         for (bool jumpOff : {false, true}) {
                             if (jumpOff && !ropeJumpKick) continue; // jumping only lets go, like letting go
                             for (float steer : {push, 0.f, -push}) {
@@ -655,9 +808,24 @@ int main(int argc, char** argv)
             }
         }
     }
+    // With no gravity, or under water: pushes (or strokes) every way, short and long.
+    bool water = false;
+    for (int x = int(b.left / Level::TILE_SIZE); x < int((b.left + b.width) / Level::TILE_SIZE) && !water; ++x) {
+        for (int y = int(b.top / Level::TILE_SIZE); y < int((b.top + b.height) / Level::TILE_SIZE) && !water; ++y) water = level->isWater(x, y);
+    }
+    std::vector<Drift> drifts;
+    if (level->isSpace() || water) {
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+                if (dx == 0 && dy == 0) continue;
+                for (float time : {0.12f, 0.25f, 0.4f, 0.6f, 0.9f, 1.3f, 1.8f}) drifts.push_back({sf::Vector2f(float(dx), float(dy)), time});
+            }
+        }
+        if (level->isSpace()) jumps.clear(); // nothing to jump off
+    }
     std::vector<Climb> climbing;
     for (float dir : {-1.f, 1.f}) {
-        if (!climbs) continue;
+        if (!climbs || level->isSpace()) continue;
         for (float time : {0.f, 0.4f, 0.8f, 1.2f, 1.7f}) {
             for (float steer : {-dir, 0.f, dir}) climbing.push_back({dir, time, true, steer});
             for (float steer : {-dir, 0.f}) climbing.push_back({dir, time, false, steer});
@@ -667,16 +835,23 @@ int main(int argc, char** argv)
         for (int leaps : {2, 4, 6, 8}) climbing.push_back({dir, 5.f, false, 0.f, leaps});
     }
 
+    if (riding) return ride(bot, start, riding, roomArg);
+
     // Best-first, furthest from the start first: where the goal is isn't known.
     struct Node
     {
         sf::Vector2f pos;
         int parent;
         std::string how;
+        float air = 1.f; // breath left there: a spot got to with more of it is worth trying again
     };
     std::vector<Node> nodes;
     std::map<std::pair<int, int>, int> seen;
-    auto key = [](sf::Vector2f p) { return std::make_pair(int(std::floor(p.x / 6.f)), int(p.y)); };
+    // Standing, the height is exact; floating, anywhere near is the same spot.
+    const bool space = level->isSpace();
+    auto key = [space](sf::Vector2f p) {
+        return space ? std::make_pair(int(std::floor(p.x / 5.f)), int(std::floor(p.y / 5.f))) : std::make_pair(int(std::floor(p.x / 6.f)), int(p.y));
+    };
     auto priority = [&](int i) { return std::abs(nodes[i].pos.x - start.x) + std::abs(nodes[i].pos.y - start.y); };
     std::priority_queue<std::pair<float, int>> open;
 
@@ -686,7 +861,7 @@ int main(int argc, char** argv)
         player.handleInput(none);
         player.update(DT);
     }
-    nodes.push_back({player.getPosition(), -1, "start"});
+    nodes.push_back({player.getPosition(), -1, "start", player.airLeft()});
     seen[key(nodes[0].pos)] = 0;
     open.push({priority(0), 0});
 
@@ -696,21 +871,29 @@ int main(int argc, char** argv)
         const int i = open.top().second;
         open.pop();
         const sf::Vector2f spot = nodes[i].pos;
+        bot.air = nodes[i].air;
         auto handle = [&](Result r, const std::string& how) {
             if (r.out == Out::Reached && !explore) {
                 found = i;
                 foundHow = how;
                 return true;
             }
-            if (r.out != Out::Landed || seen.count(key(r.pos))) return false;
+            if (r.out != Out::Landed) return false;
+            if (const auto known = seen.find(key(r.pos)); known != seen.end() && nodes[known->second].air >= r.air - 0.02f) return false;
             seen[key(r.pos)] = static_cast<int>(nodes.size());
-            nodes.push_back({r.pos, i, how});
+            nodes.push_back({r.pos, i, how, r.air});
             open.push({priority(static_cast<int>(nodes.size()) - 1), static_cast<int>(nodes.size()) - 1});
             return false;
         };
         bool done = false;
         for (const Jump& j : jumps) {
             if ((done = handle(bot.jump(spot, j), describe(j)))) break;
+        }
+        if (done) break;
+        for (const Drift& d : drifts) {
+            char how[80];
+            std::snprintf(how, sizeof how, "push %+.0f,%+.0f for %.2fs, drift", d.push.x, d.push.y, d.time);
+            if ((done = handle(bot.drift(spot, d), how))) break;
         }
         if (done) break;
         // No wall to grab on one side from here: nothing more to try that way.

@@ -12,7 +12,8 @@
 namespace
 {
     // The tiles in text: '%' metal, '#' rock, 'x' crystal, '^' spikes, '-' platform, '=' gate,
-    // 'o' slick, '~' ice, '&' crumbling, '_' cloud (see Level::TILE_ROCK and the rest).
+    // 'o' slick, '~' ice, '&' crumbling, '_' cloud, 'w' water, 'm' bounce mushroom, '?' hidden
+    // passage, 't' rails (see Level::TILE_ROCK and the rest).
 
     // Where things are in the sprite sheets made by tools/make_art.py.
     namespace sheet
@@ -39,6 +40,8 @@ namespace
         constexpr int ICE = 26;
         constexpr int CRUMBLE = 27;
         constexpr int CLOUD = 28;
+        constexpr int BOUNCE = 29;
+        constexpr int RAIL = 30;
 
         // assets/gfx/objects.png, 8x24 frames.
         constexpr int OBJECT_WIDTH = 8;
@@ -51,7 +54,7 @@ namespace
         constexpr int ITEM_SIZE = 10;
         constexpr int GEM = 1;
         // The frame of each ability's pickup.
-        const std::pair<const char*, int> ITEMS[] = {{"rope", 0}, {"long_rope", 2}, {"double_jump", 5}, {"wall_climb", 6}, {"air_throw", 7}};
+        const std::pair<const char*, int> ITEMS[] = {{"rope", 0}, {"long_rope", 2}, {"double_jump", 5}, {"wall_climb", 6}, {"air_throw", 7}, {"stopwatch", 8}};
         constexpr int LEVER_UP = 3, LEVER_DOWN = 4;
     }
 
@@ -196,12 +199,16 @@ std::shared_ptr<Level> Level::fromRows(const std::vector<std::string>& rows)
                 case '~': level->m_tileMap[x][y] = TILE_ICE; break;
                 case '&': level->m_tileMap[x][y] = TILE_CRUMBLE; break;
                 case '_': level->m_tileMap[x][y] = TILE_CLOUD; break;
+                case 'w': level->m_tileMap[x][y] = TILE_WATER; break;
+                case 'm': level->m_tileMap[x][y] = TILE_BOUNCE; break;
+                case '?': level->m_tileMap[x][y] = TILE_HIDDEN; break;
+                case 't': level->m_tileMap[x][y] = TILE_RAIL; break;
+                case 'K': level->addCart({x, y}); break;
+                case 'E': level->addCartStop({x, y}); break;
                 case 'Y': level->addIcicle({x, y}); break;
                 case 'U': level->addUpdraft({x, y}); break;
                 case 'Q': level->addLamp({x, y}); break;
                 case 'R': level->addRing({x, y}, {x + 6, y}, 4.f); break;
-                case 'I': level->addQuestItem("", {x, y}); break;
-                case 'F': level->addFinish("", {x, y}); break;
                 case 'L': level->addLever({x, y}); break;
                 case 'S': level->setStart({x, y}); break;
                 case 'C': level->addCheckpoint({x, y}); break;
@@ -243,9 +250,15 @@ void Level::addGem(sf::Vector2i tile)
     m_gems.push_back(sf::Vector2f(tile) * TILE_SIZE);
 }
 
-void Level::addNpc(const std::string& dialogue, const std::string& look, sf::Vector2i tile)
+void Level::addNpc(const Npc& npc, sf::Vector2i tile)
 {
-    m_npcs.push_back({dialogue, look, sf::Vector2f(tile) * TILE_SIZE});
+    m_npcs.push_back(npc);
+    m_npcs.back().position = sf::Vector2f(tile) * TILE_SIZE;
+}
+
+void Level::addNpc(const std::string& dialogue, const std::string& look, sf::Vector2i tile, bool sitting)
+{
+    addNpc(Npc{dialogue, look, {}, sitting, "", ""}, tile);
 }
 
 void Level::addBench(sf::Vector2i tile)
@@ -258,9 +271,9 @@ void Level::addLever(sf::Vector2i tile)
     m_levers.push_back(sf::Vector2f(tile) * TILE_SIZE);
 }
 
-void Level::addProp(const std::string& kind, sf::Vector2i tile)
+void Level::addProp(const std::string& kind, sf::Vector2i tile, const std::string& needs)
 {
-    m_props.push_back({kind, sf::Vector2f(tile) * TILE_SIZE});
+    m_props.push_back({kind, sf::Vector2f(tile) * TILE_SIZE, needs});
 }
 
 const std::vector<sf::Vector2f>& Level::levers() const
@@ -290,11 +303,12 @@ void Level::drawLevers(sf::RenderTarget& target, sf::Vector2f centr) const
     }
 }
 
-void Level::drawProps(sf::RenderTarget& target, sf::Vector2f centr, float time) const
+void Level::drawProps(sf::RenderTarget& target, sf::Vector2f centr, float time, const std::function<bool(const std::string&)>& holds) const
 {
     sf::Sprite sprite(props::texture());
     for (const Prop& prop : m_props) {
-        const PropInfo* info = props::find(prop.kind);
+        const bool on = prop.needs.empty() || holds(prop.needs);
+        const PropInfo* info = props::find(on ? prop.kind : prop.kind + "_off");
         if (!info) continue;
         // Animated ones not all in step.
         const int frame = info->frames > 1 ? static_cast<int>(time * info->fps + prop.position.x * 0.13f) % info->frames : 0;
@@ -346,6 +360,39 @@ void Level::computeBounds()
     m_bounds = {minX * TILE_SIZE, minY * TILE_SIZE, (maxX - minX + 1) * TILE_SIZE, (maxY - minY + 1) * TILE_SIZE};
 }
 
+void Level::drawRock(sf::Sprite& sprite, sf::RenderTarget& target, sf::Vector2f centr, int x, int y) const
+{
+    // Picked from the neighbours: grass on top, outlines on exposed sides, darker rock deep inside.
+    // Beyond the edges of the level counts as rock, for the looks: the room next door carries on
+    // there, so its outer walls get no outline or grass, and two rooms side by side join up. So
+    // do hidden passages: nothing about the rock round one gives it away.
+    const int left = static_cast<int>(m_bounds.left / TILE_SIZE), bottom = static_cast<int>(m_bounds.top / TILE_SIZE);
+    const int right = left + static_cast<int>(m_bounds.width / TILE_SIZE), top = bottom + static_cast<int>(m_bounds.height / TILE_SIZE);
+    auto looksSolid = [&](int tx, int ty) { return tx < left || tx >= right || ty < bottom || ty >= top || isSolid(tx, ty) || isHidden(tx, ty); };
+    const int size = static_cast<int>(TILE_SIZE);
+    auto drawTile = [&](int index, int tx, int ty) {
+        auto pos = viewCoordinates(sf::Vector2f(tx * TILE_SIZE, (ty + 1) * TILE_SIZE), centr);
+        sprite.setTextureRect(sf::IntRect((index % sheet::COLUMNS) * size, (index / sheet::COLUMNS) * size, size, size));
+        sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
+        target.draw(sprite);
+    };
+    const unsigned hash = tileHash(x, y);
+    const bool openTop = !looksSolid(x, y + 1), openBottom = !looksSolid(x, y - 1);
+    const bool openLeft = !looksSolid(x - 1, y), openRight = !looksSolid(x + 1, y);
+    drawTile((openTop || openBottom || openLeft || openRight) ? sheet::ROCK + static_cast<int>(hash % 3) : sheet::ROCK_DEEP, x, y);
+    if (openLeft) drawTile(sheet::EDGE_LEFT, x, y);
+    if (openRight) drawTile(sheet::EDGE_RIGHT, x, y);
+    if (openBottom) drawTile(sheet::EDGE_BOTTOM, x, y);
+    if (openTop) {
+        drawTile(sheet::GRASS + static_cast<int>((hash >> 4) % 2), x, y);
+        if (tileAt(x, y + 1) == 0) {
+            if (hash % 9 == 0) drawTile(sheet::FLOWER, x, y + 1);
+            else if (hash % 4 == 0) drawTile(sheet::TUFT, x, y + 1);
+        }
+    }
+    if (openBottom && tileAt(x, y - 1) == 0 && hash % 5 == 0) drawTile(sheet::DRIP, x, y - 1);
+}
+
 void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
 {
     // Only visit the tiles that can be on screen.
@@ -362,35 +409,13 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
         target.draw(sprite);
     };
 
-    // For the looks only, beyond the edges of the level counts as rock: the room next door carries
-    // on there, so its outer walls get no outline or grass, and two rooms side by side join up.
-    const int left = static_cast<int>(m_bounds.left / TILE_SIZE), bottom = static_cast<int>(m_bounds.top / TILE_SIZE);
-    const int right = left + static_cast<int>(m_bounds.width / TILE_SIZE), top = bottom + static_cast<int>(m_bounds.height / TILE_SIZE);
-    auto looksSolid = [&](int x, int y) { return x < left || x >= right || y < bottom || y >= top || isSolid(x, y); };
-
     for (int x = x0 - 1; x <= x1 + 1; ++x) {
         for (int y = y0 - 1; y <= y1 + 1; ++y) {
             const int tile = tileAt(x, y);
             if (tile == 0) continue;
-            const unsigned hash = tileHash(x, y);
 
             if (tile == TILE_ROCK) {
-                // Pick the look from the neighbours: grass on top, outlines on exposed sides,
-                // darker rock deep inside.
-                const bool openTop = !looksSolid(x, y + 1), openBottom = !looksSolid(x, y - 1);
-                const bool openLeft = !looksSolid(x - 1, y), openRight = !looksSolid(x + 1, y);
-                drawTile((openTop || openBottom || openLeft || openRight) ? sheet::ROCK + static_cast<int>(hash % 3) : sheet::ROCK_DEEP, x, y);
-                if (openLeft) drawTile(sheet::EDGE_LEFT, x, y);
-                if (openRight) drawTile(sheet::EDGE_RIGHT, x, y);
-                if (openBottom) drawTile(sheet::EDGE_BOTTOM, x, y);
-                if (openTop) {
-                    drawTile(sheet::GRASS + static_cast<int>((hash >> 4) % 2), x, y);
-                    if (tileAt(x, y + 1) == 0) {
-                        if (hash % 9 == 0) drawTile(sheet::FLOWER, x, y + 1);
-                        else if (hash % 4 == 0) drawTile(sheet::TUFT, x, y + 1);
-                    }
-                }
-                if (openBottom && tileAt(x, y - 1) == 0 && hash % 5 == 0) drawTile(sheet::DRIP, x, y - 1);
+                drawRock(sprite, target, centr, x, y);
             } else if (tile == TILE_METAL) {
                 drawTile(sheet::HOOK_BLOCK, x, y);
             } else if (isDangerous(x, y)) {
@@ -400,6 +425,10 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
                 drawTile(sheet::SLICK, x, y);
             } else if (tile == TILE_ICE) {
                 drawTile(sheet::ICE, x, y);
+            } else if (tile == TILE_BOUNCE) {
+                drawTile(sheet::BOUNCE, x, y);
+            } else if (tile == TILE_RAIL) {
+                drawTile(sheet::RAIL, x, y);
             } else if (tile == TILE_CRUMBLE || tile == TILE_CLOUD) {
                 // Shaking as it goes, gone for a while, then back.
                 const Crumbling* state = crumbling(x, y);
@@ -419,6 +448,24 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
                 const bool openRight = !isPlatform(x + 1, y) && !isSolid(x + 1, y);
                 drawTile(openLeft ? sheet::PLANK_LEFT : openRight ? sheet::PLANK_RIGHT : sheet::PLANK_MID, x, y);
             }
+        }
+    }
+}
+
+void Level::drawHidden(sf::RenderTarget& target, sf::Vector2f centr, sf::Vector2f player) const
+{
+    const sf::Vector2f halfScreen(config::GAME_WIDTH * 0.5f, config::GAME_HEIGHT * 0.5f);
+    auto [x0, y0] = tailNumbers(centr - halfScreen);
+    auto [x1, y1] = tailNumbers(centr + halfScreen);
+    sf::Sprite sprite(m_theme->tiles);
+    for (int x = x0 - 1; x <= x1 + 1; ++x) {
+        for (int y = y0 - 1; y <= y1 + 1; ++y) {
+            if (!isHidden(x, y)) continue;
+            // In one, it fades: most near you, so you can see your way through.
+            const float d = distance(player, {(x + 0.5f) * TILE_SIZE, (y + 0.5f) * TILE_SIZE});
+            const float near = std::clamp(1.f - (d - 16.f) / 40.f, 0.f, 1.f);
+            sprite.setColor(sf::Color(255, 255, 255, static_cast<sf::Uint8>(255.f * (1.f - m_reveal * (0.35f + 0.45f * near)))));
+            drawRock(sprite, target, centr, x, y);
         }
     }
 }
@@ -457,7 +504,7 @@ void Level::drawPickups(sf::RenderTarget& target, sf::Vector2f centr, float time
         sf::CircleShape halo(7.f);
         halo.setOrigin(7.f, 7.f);
         halo.setPosition(std::floor(pos.x) + 5.f, std::floor(pos.y) + 5.f);
-        halo.setFillColor(sf::Color(255, 220, 120, static_cast<sf::Uint8>(40.f + 40.f * glow)));
+        halo.setFillColor(sf::Color(255, 220, 120, static_cast<sf::Uint8>(22.f + 22.f * glow)));
         target.draw(halo);
         sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
         target.draw(sprite);
@@ -475,7 +522,7 @@ void Level::drawBenches(sf::RenderTarget& target, sf::Vector2f centr, std::optio
             sf::CircleShape halo(13.f);
             halo.setOrigin(13.f, 13.f);
             halo.setPosition(std::floor(pos.x) + 9.f, std::floor(pos.y) + 6.f);
-            halo.setFillColor(sf::Color(255, 210, 120, static_cast<sf::Uint8>(25.f + 25.f * glow)));
+            halo.setFillColor(sf::Color(255, 210, 120, static_cast<sf::Uint8>(15.f + 15.f * glow)));
             target.draw(halo);
         }
         sprite.setPosition(std::floor(pos.x), std::floor(pos.y));
@@ -512,6 +559,28 @@ bool Level::isSlick(int x, int y) const
     return tileAt(x, y) == TILE_SLICK;
 }
 
+bool Level::isBounce(int x, int y) const
+{
+    return tileAt(x, y) == TILE_BOUNCE;
+}
+
+bool Level::isHidden(int x, int y) const
+{
+    return tileAt(x, y) == TILE_HIDDEN;
+}
+
+bool Level::isRail(int x, int y) const
+{
+    return tileAt(x, y) == TILE_RAIL;
+}
+
+bool Level::isOnBounce(sf::Vector2f feet, float width) const
+{
+    const float row = feet.y / TILE_SIZE;
+    if (row != std::floor(row)) return false; // only exactly on a tile's top edge
+    return anyTileIn(feet - sf::Vector2f(0.f, 1.f), 1.f, width, [this](int x, int y) { return isBounce(x, y); });
+}
+
 bool Level::isHookBlock(int x, int y) const
 {
     return tileAt(x, y) == TILE_METAL;
@@ -524,7 +593,8 @@ bool Level::isSolid(int x, int y) const
         const Crumbling* state = crumbling(x, y);
         return !state || state->gone <= 0.f;
     }
-    return tile == TILE_ROCK || tile == TILE_METAL || tile == TILE_SLICK || tile == TILE_ICE || (tile == TILE_GATE && !m_gatesOpen);
+    return tile == TILE_ROCK || tile == TILE_METAL || tile == TILE_SLICK || tile == TILE_ICE || tile == TILE_BOUNCE ||
+           (tile == TILE_GATE && !m_gatesOpen);
 }
 
 bool Level::isDangerous(int x, int y) const
@@ -540,7 +610,7 @@ bool Level::isPlatform(int x, int y) const
         const Crumbling* state = crumbling(x, y);
         return !state || state->gone <= 0.f;
     }
-    return tile == TILE_PLATFORM;
+    return tile == TILE_PLATFORM || tile == TILE_RAIL;
 }
 
 bool Level::isOnPlatform(sf::Vector2f feet, float width) const

@@ -1,0 +1,13 @@
+# The Hidden Lake: dreamy and shimmering, a slow C major with a lydian sparkle over F.
+tempo 66
+lead 0.15 sine
+arp 0.07 up
+pad 0.16
+bass 0.16 x.......
+echo 0.5
+
+chords Fmaj7 G Fmaj7 G | Em7 Am Fmaj7 G | Fmaj7 G Em7 Am | Dm7 G Csus2 C
+melody A5 - - - C6 - E5 -   | D5 - - - B4 - - -   | A4 - C5 - E5 - G5 -  | B4 - - - D5 - - -
+melody G5 - - - E5 - D5 -   | C5 - - - . . E5 -   | A5 - G5 - E5 - C5 -  | D5 - - - - - . .
+melody C6 - - - B5 - A5 -   | G5 - - - D5 - - -   | E5 - G5 - B5 - - -   | A5 - - - - - . .
+melody F5 - - - A5 - C6 -   | B5 - - - G5 - D5 -  | D5 - - - E5 - - -    | C5 - - - - - . .

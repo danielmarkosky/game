@@ -1,6 +1,0 @@
-# One of Ash's notes: in the Greenhouse.
-
----
-Ash: Bramble beat me to Curtains. Twice. I'll get her next time.
-Ash: I won't get a next time, will I. The mountain only goes one way. - A.
-set read_note_garden

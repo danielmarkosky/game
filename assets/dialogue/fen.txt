@@ -1,0 +1,53 @@
+# Fen, sitting by the campfire at the end of the road. A traveller who reads the stars, and knows
+# what's wrong with them.
+
+---
+Fen: Sit, sit. The fire's warm and the night is long.
+Fen: You came up from the Hidden Lake. I can tell. You're still sparkling.
+? Sparkling?                          -> sparkle
+? Do you know how I got there?        -> how
+= sparkle
+Fen: The air's full of it tonight. Look. Little lights, drifting. Pretty, isn't it?
+Fen: It's the stars. They're coming loose. A bit more each night.
+-> lantern
+= how
+Fen: You fell. Everyone who wakes in that lake fell from somewhere.
+Fen: And tonight a lot of things are falling.
+-> lantern
+= lantern
+Fen: Up on the mountain there's a light called the Lantern. For as long as anyone remembers, it held the stars up there.
+Fen: A keeper tended it. An old woman, hard as rope. Then one night it went dark, and nobody's been up since.
+Fen: The old line runs up there, from the station over yonder. The cart won't run till the four beacons burn again.
+Fen: One out at the end of every way from this fire. East along the road. Down the sinkhole.
+Fen: Those two you can do now. The caves off the lookout need a longer rope than yours. The sky road needs hands that can hold rock.
+Fen: Rest first. The bench by the fire keeps your place.
+set met_fen
+
+--- met_fen !long_rope !wall_climb
+Fen: East along the road, the Hook Garden. Down the sinkhole, the Hollows. Either first.
+Fen: What you find at the end of one opens another.
+
+--- long_rope
+Fen: A long rope. Good. The Frost Caves, off the lookout, have a gap only that reaches across.
+Fen: And the waterfall in the lake hides more than it shows. I'd look there again, if I could reach as far as you.
+
+--- wall_climb
+Fen: Chalk on your hands. Then the sky road's yours: up the top of the lookout, there's a wall nothing else gets you up.
+
+--- dog
+Fen: And who's this, then? He won't leave your heel.
+You: Pip. It says so on his collar. And I think... I think he's mine.
+Fen: Then he's been looking for you. Dogs have good noses. Gems, too, I'd bet. Watch where he points.
+
+--- stopwatch
+Fen: Where did you find that? It's very old. And it's ticking.
+You: Behind the waterfall. Where the falls begin. It was just floating there.
+You: It's my Gran's. She used to time me, climbing. Again! Faster!
+Fen: The keeper's. Of course. Then you know whose granddaughter climbs my lookout every night.
+Fen: Time your runs with it. She'd want you to.
+
+--- long_rope wall_climb air_throw double_jump
+Fen: All four beacons are burning. I can see them from here.
+Fen: You were taking the line up when you fell. With a spark for the Lantern, I'd guess. The bridge gave way.
+Fen: The spark's still in you. That's why you sparkle.
+Fen: Go on up. Light it. Bring them home.

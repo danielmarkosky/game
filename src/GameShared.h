@@ -1,10 +1,11 @@
 #pragma once
 
-// What Game's own .cpp files share: Game.cpp (playing), GameMenus.cpp and GameDrawing.cpp.
-// Not for anything else.
+// What Game's own .cpp files share: Game.cpp (playing), GameRoutes.cpp (carts, the stopwatch,
+// Pip), GameStall.cpp (Mags's stall), GameMenus.cpp and GameDrawing.cpp. Not for anything else.
 
 #include "src/Config.h"
 #include "src/Hud.h"
+#include "src/Level.h"
 #include <SFML/Graphics.hpp>
 #include <algorithm>
 #include <cmath>
@@ -32,6 +33,15 @@ namespace game_detail
         sf::View view(area);
         view.setViewport({area.left / screen.x, area.top / screen.y, area.width / screen.x, area.height / screen.y});
         return view;
+    }
+
+    // How far down a waterfall or a shaft of light from the tile (x, y) goes: the bottom of the
+    // lowest empty tile, before the first rock (or water, for a waterfall), in tiles.
+    inline int fallFloor(const Level& room, int x, int y, bool stopAtWater)
+    {
+        int floor = y;
+        while (floor > y - 40 && !room.isSolid(x, floor - 1) && !(stopAtWater && room.isWater(x, floor - 1))) --floor;
+        return floor;
     }
 
     inline float easeInOut(float t)
