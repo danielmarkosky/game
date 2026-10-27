@@ -159,3 +159,28 @@ TEST(RopeTest, SlackChainRestsOnTheFloor) {
         EXPECT_GE(node.position.y, -0.01f);
     }
 }
+
+TEST(RopeTest, AnAnchorDraggedRoundTheCornerUnwrapsIt) {
+    // A block of rock; the rope from on top of it, over its right-hand corner and down the side.
+    auto level = Level::loadFromString(
+        "##########\n"
+        "#........#\n"
+        "#........#\n"
+        "#....##..#\n"
+        "#....##..#\n"
+        "#S.......#\n"
+        "##########\n");
+    const sf::Vector2f anchor(44.f, 32.5f);
+    Rope rope({70.f, 40.f}, anchor, level);
+    rope.wrap({70.f, 40.f}, {60.f, 10.f});
+    ASSERT_EQ(rope.pivots().size(), 2u);
+    const float free = rope.freeLength();
+    // Dragged along the top towards the corner: still round it, the part to you as long as it was.
+    rope.moveAnchor({50.f, 32.5f}, {60.f, 10.f});
+    EXPECT_EQ(rope.pivots().size(), 2u);
+    EXPECT_NEAR(rope.freeLength(), free, 0.01f);
+    EXPECT_NEAR(rope.length(), free + distance({50.f, 32.5f}, rope.pivots()[1]), 0.01f);
+    // Past the corner and over the edge: straight to you.
+    rope.moveAnchor({58.f, 30.f}, {60.f, 10.f});
+    EXPECT_EQ(rope.pivots().size(), 1u);
+}

@@ -43,6 +43,7 @@ import world.still  # noqa: E402,F401
 import world.drowned  # noqa: E402,F401
 import world.garden  # noqa: E402,F401
 import world.hollows  # noqa: E402,F401
+import world.quarry  # noqa: E402,F401
 import world.frost  # noqa: E402,F401
 import world.sky  # noqa: E402,F401
 import world.line  # noqa: E402,F401
@@ -52,8 +53,9 @@ import world.line  # noqa: E402,F401
 # ----------------------------------------------------------------------------------------------
 
 JOINS = [
-    # The Hidden Lake, out of the cave onto the Old Road, the Gully, and the Campfire.
-    ('lake', 'R', 0, 'old_road', 'L', 0),
+    # The Hidden Lake, out through the cave mouth onto the Old Road, the Gully, and the Campfire.
+    ('lake', 'R', 0, 'cave_mouth', 'L', 0),
+    ('cave_mouth', 'R', 0, 'old_road', 'L', 0),
     ('old_road', 'R', 0, 'gully', 'L', 0),
     ('gully', 'R', 0, 'camp', 'L', 0),
     # Behind the lake's waterfall, the wall that isn't there: on through it to the Still, and up the
@@ -64,24 +66,31 @@ JOINS = [
     # Down the crack in the lake bed, the Drowned Grotto: for the diving suit.
     ('lake', 'B', 0, 'drowned', 'T', 0),
     # From the Campfire, the four routes, and the last. The Hook Garden east along the road, the
-    # Hollows down the sinkhole: open from the start. The Frost Caves off the lookout on the left (for
-    # the long rope, from the garden) and the Sky Road up through its top (for the chalk bag, from
-    # the Hollows). Up the planks on the right, the Old Station: the cart up the Old Line, once all
-    # four are done. (The camp's left doors: 0 from the Gully, 1 up on the lookout; its right ones: 0
-    # the road, 1 the station.)
+    # Hollows down the sinkhole: open from the start. Up the cliff over the camp, the Cliff Path: off
+    # it on the left, the Snowy Pass to the Frost Caves (for the long rope, from the garden); at its
+    # top the Sky Road (for the chalk bag, from the Hollows); off it on the right the Old Station: the
+    # cart up the Old Line, once all four are done.
     ('camp', 'R', 0, 'hook_garden', 'L', 0),
     ('hook_garden', 'R', 0, 'mushroom_glade', 'L', 0),
     ('mushroom_glade', 'R', 0, 'ring_orchard', 'L', 0),
-    ('camp', 'B', 0, 'hollows', 'T', 0),
-    ('hollows', 'L', 0, 'dark_hollow', 'R', 0),
+    ('camp', 'B', 0, 'sinkhole', 'T', 0),
+    ('sinkhole', 'B', 0, 'hollows', 'T', 0),
+    ('hollows', 'L', 0, 'old_workings', 'R', 0),
+    ('old_workings', 'L', 0, 'dark_hollow', 'R', 0),
+    # Down the trapdoor in the Hollows' floor, the Quarry: the Rigging, the Kiln, the Cutting.
+    ('hollows', 'B', 0, 'rigging', 'T', 0),
+    ('rigging', 'L', 0, 'kiln', 'R', 0),
+    ('kiln', 'L', 0, 'cutting', 'R', 0),
     ('dark_hollow', 'L', 0, 'pips_den', 'R', 0),
-    ('camp', 'L', 1, 'frost_caves', 'R', 0),
+    ('cliff_path', 'L', 0, 'snowy_pass', 'R', 0),
+    ('snowy_pass', 'L', 0, 'frost_caves', 'R', 0),
     ('frost_caves', 'L', 0, 'icicle_hall', 'R', 0),
     ('icicle_hall', 'L', 0, 'frozen_falls', 'R', 0),
-    ('camp', 'T', 0, 'sky_road', 'B', 0),
+    ('camp', 'T', 0, 'cliff_path', 'B', 0),
+    ('cliff_path', 'T', 0, 'sky_road', 'B', 0),
     ('sky_road', 'R', 0, 'updraft_cliffs', 'L', 0),
     ('updraft_cliffs', 'T', 0, 'sky_edge', 'B', 0),
-    ('camp', 'R', 1, 'station', 'L', 0),
+    ('cliff_path', 'R', 0, 'station', 'L', 0),
     ('station', 'R', 0, 'old_line', 'L', 0),
     ('old_line', 'R', 0, 'broken_bridge', 'L', 0),
     ('broken_bridge', 'R', 0, 'summit', 'L', 0),

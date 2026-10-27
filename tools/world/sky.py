@@ -1,7 +1,34 @@
-"""The Sky Road, up through the top of the campfire's lookout: for when you have the chalk bag (from
-the Hollows). A wall to climb, clouds that won't hold you for long, updrafts in the wind, and at
-the Sky's Edge, the updraft feather."""
+"""Up from the camp: the Cliff Path, the way to everywhere above the clearing; and from its top, the
+Sky Road: for when you have the chalk bag (from the Hollows). A wall to climb, clouds that won't hold
+you for long, updrafts in the wind, and at the Sky's Edge, the updraft feather."""
 from world.build import region, room
+
+region('vale')
+
+# ----------------------------------------------------------------------------------------------
+# The Cliff Path: up through the boards over the camp's last shelf, onto the cliff above it, where
+# the trees thin out and the sky opens up. Shelves of rock up both sides of it, a jump apart, from
+# one to the other. Off one on the left, the path into the snow (the Snowy Pass, the Frost Caves);
+# off one on the right, the planks to the Old Station; at the top, out under the open sky (the Sky
+# Road). A gem up under the top, out over the drop.
+# ----------------------------------------------------------------------------------------------
+
+cliff = room('cliff_path', 'The Cliff Path', 'glade', 22, 33)
+cliff.fill(0, 21, 0, 1, '#')
+cliff.fill(18, 20, 0, 1, '.').fill(18, 20, 1, 1, '-')  # boards over the way up from the camp
+cliff.door('B', 18, 3)
+for top in (5, 11, 17, 23, 29):
+    cliff.fill(1, 13, top - 1, top - 1, '#')    # shelves on the left
+for top in (8, 14, 20, 26):
+    cliff.fill(9, 20, top - 1, top - 1, '#')    # and on the right
+cliff.door('L', 17).door('R', 8).door('T', 2)
+cliff.put(15, 2, 'S')
+cliff.put(19, 30, '*')
+
+cliff.props((3, 2, 'pine'), (8, 2, 'bellflowers'), (12, 2, 'flowers'), (3, 5, 'flowers'), (7, 5, 'pine'),
+            (18, 8, 'signpost'), (12, 8, 'bellflowers'), (2, 11, 'pine'), (9, 11, 'flowers'), (16, 14, 'cairn'),
+            (3, 17, 'signpost'), (10, 17, 'flowers'), (19, 20, 'pine'), (5, 23, 'cairn'), (14, 26, 'flags'),
+            (9, 29, 'flags'), (11, 31, 'hanging_lantern'))
 
 region('sky')
 

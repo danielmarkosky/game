@@ -63,7 +63,8 @@ public:
 private:
     enum class Screen { Title, Slots, ConfirmErase, Options, Controls, Playing, Paused, Complete, Map, Talking, Shop, Records };
 
-    // Moving from one room into the next: the camera pans across from the old one.
+    // Moving from one room into the next: the camera eases across from where it was in the old one,
+    // while you carry on moving.
     struct Transition
     {
         size_t from;                 // the room left
@@ -94,6 +95,15 @@ private:
     void finishGame();
     // The room other than the current one that a point (in the current room's coordinates) is in.
     std::optional<size_t> roomAt(sf::Vector2f point) const;
+    // A way out of this room into one that looks different: as you near it, the look of the room
+    // beyond comes in, `amount` of it, up to half and half in the doorway, where the room beyond, from
+    // its side, has this one's half in. So places run into each other instead of stopping at the edge.
+    struct NextDoor
+    {
+        size_t room;
+        float amount; // 0 to 0.5
+    };
+    std::optional<NextDoor> nextDoorLook() const;
     sf::Vector2f roomOrigin(size_t index) const; // world position of the room's (0, 0)
 
     // Abilities, story flags and gems
@@ -192,8 +202,10 @@ private:
     void drawAir(sf::Vector2f cam);   // what's in front: near motes, the dark and the lights
     void drawBeams();                 // light shafts (see props::LIGHT_SHAFT)
     void drawFront();                 // in front of the player: the water, and waterfalls (props::WATERFALL)
-    void drawTransition();
-    void drawBackground(const Theme& theme, float scrollX);
+    void drawBackground(sf::RenderTarget& target, const Theme& theme, float scrollX);
+    // Another room's scenery, over `area` of the screen (where that room is), fading in across the
+    // seam with the current room's instead of starting at a hard line.
+    void drawBackdrop(const Theme& theme, float scrollX, sf::FloatRect area);
     // Where a rope shot now would go (in the world): at the mouse, or along the stick.
     sf::Vector2f aimPoint() const;
     void drawAim();
@@ -218,6 +230,7 @@ private:
 
     std::shared_ptr<sf::RenderWindow> window;
     sf::RenderTexture canvas;
+    sf::RenderTexture backdrop; // another room's scenery, before it's faded in over the canvas
     InputManager input;
     Audio audio;
     Ambience ambience;

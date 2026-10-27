@@ -21,7 +21,8 @@ namespace game_detail
     inline constexpr float TITLE_TIME = 3.f;       // a room's name shows this long
     inline constexpr float MESSAGE_TIME = 4.f;
     inline constexpr float NOTICE_TIME = 3.f;
-    inline constexpr float TRANSITION_TIME = 0.5f; // panning from one room to the next
+    inline constexpr float TRANSITION_TIME = 0.6f; // the camera easing from one room into the next
+    inline constexpr float BLEND_REACH = 24.f * 8.f; // from this far off, a doorway's other side starts to show
     inline constexpr float FADE_TIME = 0.6f;       // fading in after travelling
     inline const char* const TITLE = "Tether";     // the game's name: the window's title and the title screen's
     inline const std::vector<sf::Color> CONFETTI = {hud::GOLD, sf::Color(255, 120, 160), sf::Color(120, 220, 255), sf::Color(160, 240, 120)};

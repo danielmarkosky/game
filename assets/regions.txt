@@ -13,3 +13,4 @@ region sky        | THE SKY
 region still      | THE STILL
 region drowned    | THE DROWNED GROTTO
 region line       | THE OLD LINE
+region quarry     | THE QUARRY

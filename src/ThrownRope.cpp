@@ -91,7 +91,7 @@ void ThrownRope::update(sf::Vector2f hand, float dt, bool flying)
 
     const size_t last = position.size() - 1;
     const size_t first = flying ? 1 : 0; // a flying hook goes where it's thrown
-    const float fall = physics().gravity * dt * dt;
+    const float fall = level->isSpace() ? 0.f : physics().gravity * dt * dt; // nothing falls in the Still
     const std::vector<sf::Vector2f> start = position;
     for (size_t ii = first; ii < last; ++ii) {
         sf::Vector2f speed = (position[ii] - previous[ii]) * DAMPING;

@@ -8,7 +8,7 @@ build/Release/levelbot), several at once. Takes a few minutes.
 
 Each route below is: the room, where to start ('S' for its Start, or "column row" counted from the
 top-left), the goal (L, R, T or B for a way out, "L:21" for the left door starting 21 up, "pickup",
-"gem N", "at COL ROW" for standing in that tile, "cart" or "stop"), the abilities the player has,
+"gem N", "at COL ROW" for standing in that tile, "cart", "stop" or "plate"), the abilities the player has,
 whether the bot should get there, and maybe more for the bot (RIDING: in a cart). "<room> --open"
 has the room's gates open. When you change a room, add or fix its routes here.
 """
@@ -29,6 +29,7 @@ RLC = 'rope,long_rope,wall_climb'
 RLA = 'rope,long_rope,air_throw'
 RLCA = 'rope,long_rope,wall_climb,air_throw'
 ALL = 'rope,long_rope,wall_climb,air_throw,double_jump'
+RT = 'rope,tie_off'  # the rope and the knot, from the end of the Quarry
 RIDING = ['--riding', '1']  # in a mine cart rolling right
 
 ROUTES = [
@@ -48,16 +49,21 @@ ROUTES = [
     ('drowned', '3 1', 'gem 0', R, False),
     ('drowned', '3 1', 'gem 0', R + ',diver', True),
     ('drowned', '42 14', 'T', R + ',diver', True),
-    # The Still: floating, nothing needed, all the way to the stopwatch and back.
-    ('still', 'S', 'L', 'none', True),
-    ('still', 'S', 'gem 0', 'none', True),
-    ('still', 'S', 'gem 1', 'none', True),
-    ('still', 'S', 'gem 2', 'none', True),
-    ('falls_source', 'S', 'pickup', 'none', True),
-    ('falls_source', 'S', 'gem 0', 'none', True),
-    ('falls_source', 'S', 'gem 1', 'none', True),
-    ('falls_source', '3 21', 'R', 'none', True),
-    ('still', '1 20', 'R', 'none', True),
+    # The Still: nothing moves you but the rope. Without it, only back out the way you came in; with
+    # it, all the way to the stopwatch and back, and the gems (numbered from the top: up in the
+    # corner, the pocket, under the column; on the pillar, between the wall and the roof).
+    ('still', 'S', 'R', 'none', True),
+    ('still', 'S', 'L', 'none', False),
+    ('still', 'S', 'L', R, True),
+    ('still', 'S', 'gem 0', R, True),
+    ('still', 'S', 'gem 1', R, True),
+    ('still', 'S', 'gem 2', R, True),
+    ('falls_source', 'S', 'pickup', 'none', False),
+    ('falls_source', 'S', 'pickup', R, True),
+    ('falls_source', 'S', 'gem 0', R, True),
+    ('falls_source', 'S', 'gem 1', R, True),
+    ('falls_source', '3 21', 'R', R, True),
+    ('still', '1 20', 'R', R, True),
     # The Hidden Spring: its gems (numbered from the top: the one over the pool, the stack's, for
     # when you have the feather, the island's).
     ('hidden_spring', 'S', 'gem 0', R, False),
@@ -75,14 +81,28 @@ ROUTES = [
     ('gully', 'S', 'R', R, True),
     ('gully', '61 11', 'L', R, True),
     ('gully', 'S', 'gem 0', R, True),
-    # The Campfire: the ways on, all open to anyone (it's what they need that's in their rooms).
-    ('camp', 'S', 'R:8', 'none', True),
+    # The Campfire: the ways on, all open to anyone (it's what they need that's in their rooms). East
+    # along the road; down through the boards over the sinkhole; up the cliff to the Cliff Path, and
+    # back down; the gem under the cliff's top.
+    ('camp', 'S', 'R', 'none', True),
     ('camp', 'S', 'B', 'none', True),
     ('camp', 'S', 'T', 'none', True),
-    ('camp', 'S', 'R:32', 'none', True),
-    ('camp', '45 31', 'L:31', 'none', True),
+    ('camp', '49 2', 'L', 'none', True),
     ('camp', 'S', 'gem 0', 'none', True),
-    ('camp', 'S', 'gem 1', 'none', True),
+    # The Cliff Path, up over the camp: off it to the Snowy Pass, the Old Station and the Sky Road, and
+    # back down, all with nothing, and its gem.
+    ('cliff_path', 'S', 'L', 'none', True),
+    ('cliff_path', 'S', 'R', 'none', True),
+    ('cliff_path', 'S', 'T', 'none', True),
+    ('cliff_path', '3 2', 'B', 'none', True),
+    ('cliff_path', 'S', 'gem 0', 'none', True),
+    # The Snowy Pass, both ways; the Sinkhole, down and back up; the Cave Mouth, both ways.
+    ('snowy_pass', 'S', 'L', 'none', True),
+    ('snowy_pass', '2 13', 'R', 'none', True),
+    ('sinkhole', 'S', 'B', 'none', True),
+    ('sinkhole', '5 21', 'T', 'none', True),
+    ('cave_mouth', 'S', 'R', 'none', True),
+    ('cave_mouth', '21 12', 'L', 'none', True),
     # The Hook Garden: two swings, mushrooms, rings, to the long rope. The ledge in the air: the long
     # rope. The hollow in the glade's roof: the feather, or the long rope.
     ('hook_garden', 'S', 'R', 'none', False),
@@ -100,6 +120,31 @@ ROUTES = [
     ('hollows', 'S', 'L', R, True),
     ('hollows', '2 25', 'T', R, False),
     ('hollows', '2 25', 'T', RC, True),
+    # The Old Workings: the gate, shut, until the stone's on the plate (dragged off the shelf from
+    # below, the rope over the edge); then over the pit and its braziers, both ways. The gem over
+    # the shelf: a jump from on top of the stone (or the long rope).
+    ('old_workings', 'S', 'L', R, False),
+    ('old_workings', 'S', 'plate', R, True),
+    ('old_workings --open', 'S', 'L', R, True),
+    ('old_workings --open', '2 25', 'R', R, True),
+    ('old_workings', 'S', 'gem 0', R, True),
+    # The Quarry, down the trapdoor by the foot of the Hollows' shaft: down the Rigging with anything,
+    # back up it only with the knot (the chalk bag and the glove don't do); the Kiln both ways,
+    # timing its flues; the Cutting's way back out, and its gem for the long rope. (The stone in the
+    # Cutting, the step up to the knot, is two moves the bot can't put together:
+    # tests/mechanics_tests.cpp plays it.)
+    ('hollows', 'S', 'B', 'none', True),
+    ('rigging', 'S', 'L', R, True),
+    ('rigging', 'S', 'T', R, False),
+    ('rigging', 'S', 'T', RLCA, False),
+    ('rigging', 'S', 'T', RT, True),
+    ('rigging', 'S', 'gem 0', RT, True),
+    ('kiln', 'S', 'L', R, True),
+    ('kiln', '2 19', 'R', R, True),
+    ('kiln', 'S', 'gem 0', R, True),
+    ('cutting', '3 14', 'R', R, True),
+    ('cutting', 'S', 'gem 0', R, False),
+    ('cutting', 'S', 'gem 0', RL, True),
     ('dark_hollow', 'S', 'L', R, True),
     ('dark_hollow', 'S', 'gem 0', R, False),
     ('dark_hollow', 'S', 'gem 0', RL, True),

@@ -1,8 +1,9 @@
 """The opening: where a new game starts. You come to floating in the Hidden Lake, under the waterfall
-you fell from, swim ashore and walk out of the cave. Odo, mending the old road outside, gives you a
-rope with a hook; the Gully teaches it; and the road comes to Fen's campfire, where the ways go on:
-east and down (open from the start), off the lookout on the left and up into the sky (for what's at
-the ends of those two), and up the planks to the Old Station (for all four). Each is a route of its
+you fell from, swim ashore and walk out through the cave mouth. Odo, mending the old road outside,
+gives you a rope with a hook; the Gully teaches it; and the road comes to Fen's campfire, where the
+ways go on: east and down (open from the start), and up the cliff to the Cliff Path (tools/world/
+sky.py), and off it into the snow and up into the sky (for what's at the ends of those two), and to
+the Old Station (for all four). Each is a route of its
 own, in its own file. Behind the lake's waterfall the rock isn't there: through it, the Still, and
 up inside it the Hidden Spring; down a crack in its bed, the Drowned Grotto."""
 from world.build import region, room, ground, roof
@@ -44,6 +45,23 @@ lake.door('B', 8, 2).fill(8, 9, 0, 0, 'w')
 lake.put(10, 7, 'S')                            # just above the water: you come to floating
 lake.put(31, 7, 'B')                            # a bench on the shore
 lake.put(40, 14, '*')                           # up under the overhang: for a rope that reaches
+
+# ----------------------------------------------------------------------------------------------
+# The Cave Mouth: out of the grotto. Its glowing plants and its roof overhead give out partway, the
+# roof stepping up and away, and beyond, grass, flowers, the night sky and the stars: the world.
+# (It's the outside's look, with the grotto's growing under the roof, and the grotto's own scenery
+# coming in towards the lake.)
+# ----------------------------------------------------------------------------------------------
+
+mouth = room('cave_mouth', 'The Cave Mouth', 'glade', 24, 30)
+ground(mouth, 6)
+mouth.fill(0, 10, 12, 29, '#').fill(11, 14, 14, 29, '#').fill(15, 17, 17, 29, '#')  # the roof, lifting away
+mouth.door('L', 7).door('R', 7)
+mouth.put(2, 7, 'S')
+
+mouth.props((3, 7, 'glowshroom'), (6, 7, 'bellflowers'), (9, 7, 'violet_crystals'), (2, 11, 'glow_roots'),
+            (7, 11, 'stalactites'), (12, 13, 'glow_roots'), (13, 7, 'glowshroom'), (16, 7, 'flowers'),
+            (19, 7, 'pine'), (22, 7, 'flowers'), (16, 16, 'vine'))
 
 # ----------------------------------------------------------------------------------------------
 # The Old Road, outside the cave mouth: Odo, mending the road where the bridge washed out. He gives
@@ -90,41 +108,35 @@ gully.put(3, 7, 'S')
 gully.put(41, 13, '*')                          # on the long swing
 
 # ----------------------------------------------------------------------------------------------
-# The Campfire: Fen, sitting by the fire, a tent behind, a bench, and Mags at her stall up the bank.
-# The ways on: east along the road (the Hook Garden: the long rope), down a sinkhole (the Hollows: the
-# chalk bag), up the old lookout, a scaffold of planks up the cliff on the left, a jump apart: off it
-# on the left (the Frost Caves, for the long rope: the throwing glove), on up through the top into the
-# sky (the Sky Road, for the chalk bag: the feather); and up planks on the right to the Old Station
-# (the cart up the Old Line, for all four: the end). What each needs is in its own rooms; the camp
-# lets you go anywhere.
+# The Campfire: a clearing at the foot of the cliffs, where the road from the gully comes down a
+# bank. Mags has her stall up on the bank; down in the clearing, Fen by the fire, a stewpot on the
+# embers, a tent, firewood, a bench under a string of lanterns, and the sinkhole, boarded over:
+# drop through the boards for the Hollows. The road goes on east under a shoulder of the cliff
+# (the Hook Garden); up the cliff, a wooden step onto its shoulder, a shelf, boards up its face, and
+# a crack up through the clifftop onto the Cliff Path (tools/world/sky.py): the Snowy Pass and the
+# Frost Caves off it on the left, the Old Station on the right, the sky at the top.
 # ----------------------------------------------------------------------------------------------
 
-camp = room('camp', 'The Campfire', 'glade', 48, 40)
+camp = room('camp', 'The Campfire', 'glade', 56, 33)
 ground(camp, 7)
 camp.fill(0, 10, 8, 11, '#').fill(11, 13, 8, 10, '#').fill(14, 16, 8, 9, '#').fill(17, 19, 8, 8, '#')  # down to the clearing
 camp.door('L', 12).door('R', 8)
-# The sinkhole: planks across it to climb back up by, and to land on coming up.
-camp.fill(41, 43, 0, 7, '.').fill(41, 43, 1, 1, '-').fill(41, 43, 4, 4, '-')
-camp.door('B', 41, 3)
-# The lookout, zig-zagging up the cliff. A rock ledge off it on the left, with the way to the Frost
-# Caves; at the top, the way up into the sky.
-for x0, x1, y in ((7, 11, 14), (2, 6, 17), (7, 11, 20), (4, 8, 23), (8, 12, 26), (4, 8, 29), (8, 12, 32), (3, 7, 35)):
-    camp.fill(x0, x1, y, y, '-')
-camp.fill(0, 3, 28, 30, '#')
-camp.door('L', 31)
-camp.door('T', 2)
-# Up the right side of the clearing, planks to the Old Station: the last route, the cart up the
-# mountain (tools/world/line.py).
-for x0, x1, y in ((34, 38, 10), (40, 44, 13), (34, 38, 16), (40, 44, 19), (34, 38, 22), (40, 44, 25), (34, 38, 28)):
-    camp.fill(x0, x1, y, y, '-')
-camp.fill(43, 47, 30, 31, '#')
-camp.door('R', 32)
+camp.fill(21, 23, 0, 7, '.').fill(21, 23, 7, 7, '-')  # the sinkhole, boarded over
+camp.fill(21, 23, 1, 1, '-').fill(21, 23, 4, 4, '-')   # and boards in it, to climb back up by
+camp.door('B', 21, 3)
+camp.fill(43, 45, 10, 10, '-')                  # a wooden step up onto the cliff
+camp.fill(46, 55, 12, 13, '#')                  # its shoulder, over the road east
+camp.fill(49, 55, 14, 16, '#')                  # a shelf up it
+camp.fill(52, 55, 17, 31, '#')                  # and the cliff itself
+for y in (19, 22, 25, 28):
+    camp.fill(48, 51, y, y, '-')                # boards up its face, each on a post
+camp.fill(40, 47, 30, 31, '#')                  # the clifftop, a crack up through it
+camp.door('T', 48, 3)
 camp.put(3, 12, 'S')
-camp.put(22, 8, 'B')
-camp.put(31, 8, 'N', dialogue='fen', look='fen', pose='sit')
-camp.put(13, 11, 'N', dialogue='mags', look='mags')   # Mags, at her stall
-camp.put(10, 33, '*')                           # up the lookout
-camp.put(42, 5, '*')                            # down the sinkhole
+camp.put(25, 8, 'B')
+camp.put(29, 8, 'N', dialogue='fen', look='fen', pose='sit')
+camp.put(8, 12, 'N', dialogue='mags', look='mags')    # Mags, at her stall
+camp.put(44, 26, '*')                           # out from the boards up the cliff
 
 # ----------------------------------------------------------------------------------------------
 # Scenery: magic in the air everywhere, glowing things growing, light falling from cracks.
@@ -148,7 +160,7 @@ gully.props((5, 7, 'signpost'), (7, 7, 'bellflowers'), (13, 2, 'glowshroom'),
            (58, 12, 'glowshroom'), (61, 12, 'flowers'),
            (8, 20, 'stalactites'), (19, 20, 'glow_roots'), (36, 20, 'stalactites'), (48, 20, 'glow_roots'),
            (56, 20, 'stalactites'))
-camp.props((1, 12, 'pine'), (5, 12, 'bellflowers'), (11, 11, 'stall'), (18, 9, 'glowshroom'),
-           (28, 8, 'fire'), (32, 8, 'log'), (37, 8, 'tent'), (39, 8, 'pack'), (34, 8, 'bedroll'),
-           (25, 8, 'lantern_post'), (45, 8, 'signpost'), (40, 8, 'rubble'), (20, 8, 'bellflowers'),
-           (9, 15, 'lantern_post'), (1, 31, 'signpost'), (2, 31, 'pine'), (5, 36, 'flags'))
+camp.props((1, 12, 'pine'), (5, 12, 'stall'), (10, 12, 'lantern_post'), (12, 11, 'flowers'), (15, 10, 'bellflowers'),
+           (19, 9, 'glowshroom'), (20, 8, 'woodpile'), (24, 8, 'lantern_string'), (28, 8, 'log'), (31, 8, 'fire'),
+           (33, 8, 'stewpot'), (35, 8, 'bedroll'), (38, 8, 'tent'), (41, 8, 'pack'), (47, 8, 'signpost'),
+           (53, 8, 'flowers'), (47, 14, 'pine'), (50, 17, 'bellflowers'), (49, 29, 'flags'), (44, 29, 'glow_roots'))

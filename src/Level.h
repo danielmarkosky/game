@@ -79,22 +79,57 @@ struct Icicle
     float timer = 0.f;
 };
 
+// A heavy stone block, two tiles square. It's solid, it falls, and the rope hooks into it. Reeled
+// in with your feet braced (standing, or holding on to a wall), the rope drags it towards wherever
+// the rope bends first, or towards you if it runs straight: so wrapped round a corner, the rope
+// pulls it another way than towards you, like over a pulley. Held like that, it doesn't fall.
+struct Stone
+{
+    sf::Vector2f home;     // bottom-left, where it was put: where it goes back to
+    sf::Vector2f position; // bottom-left, now: always whole pixels
+    sf::Vector2f remainder; // movement not made yet, less than a pixel
+    float fall = 0.f;      // px/s, falling
+    bool held = false;     // hanging on a rope that's held: it doesn't fall
+};
+
+// A weight plate, two tiles wide, set on the floor: a stone resting on it holds the room's gates
+// open. You're too light to.
+struct Plate
+{
+    sf::Vector2f position; // bottom-left of its left tile
+    bool down = false;
+};
+
+// Fire: it burns you, and the rope where the rope touches it. A brazier burns in its tile and up
+// into the one above; a flue is a column of fire from its tile up to the first rock. Either can
+// breathe: burning for half of `period` seconds, cold for the other half (`phase`, 0 to 1, is how
+// far through that it starts), flickering just before it lights again.
+struct Fire
+{
+    sf::Vector2f position; // bottom-left of its tile
+    float period = 0.f;    // 0: always burning
+    float phase = 0.f;
+    bool flue = false;
+    float top = 0.f;       // a flue's: the bottom of the first rock above it
+};
+
 // Something that happened in the room this step that can be heard: where, and what.
 struct LevelSound
 {
-    enum class Kind { Crack, Crumble, CloudFade, IcicleShake, IcicleShatter };
+    enum class Kind { Crack, Crumble, CloudFade, IcicleShake, IcicleShatter, StoneLanded, PlateDown, PlateUp, FireLit };
     Kind kind;
     sf::Vector2f position;
 };
 
 // What a rope thrown along a line meets first: rock it bites (or a hook block), slick stone it
-// bounces off, a moving ring it catches, or a lever or lamp it tugs and comes back from.
+// bounces off, a moving ring it catches, a stone block it bites (and can drag), a lever or lamp it
+// tugs and comes back from, or fire, which burns it through.
 struct RopeHit
 {
-    enum class Kind { Rock, Slick, Ring, Lever, Lamp };
+    enum class Kind { Rock, Slick, Ring, Lever, Lamp, Stone, Fire };
     Kind kind;
     sf::Vector2f point;
-    int index = -1;        // of the ring, lever or lamp
+    int index = -1;        // of the ring, stone, lever or lamp
     float distance = 0.f;
 };
 
@@ -140,6 +175,9 @@ public:
     void addCart(sf::Vector2i tile, int dir = 1, const std::string& needs = "");
     void addCartStop(sf::Vector2i tile); // the end of the line: a cart riding into it stops, and you get out
     void addTrial(const std::string& route, bool finish, sf::Vector2i tile);
+    void addStone(sf::Vector2i tile); // its bottom-left tile
+    void addPlate(sf::Vector2i tile); // its left tile, standing on the floor
+    void addFire(sf::Vector2i tile, float period = 0.f, float phase = 0.f, bool flue = false); // see Fire
     // The whole room: wind blowing (px/s each second, + to the right) on anything in the air;
     // dark, lit only by what glows in it; and with no gravity, everything floating.
     void setWind(float wind);
@@ -157,6 +195,22 @@ public:
     // What's happened since the last call that can be heard (see LevelSound).
     std::vector<LevelSound> takeSounds();
 
+    // Stone blocks (see Stone). Moving one moves it pixel by pixel as far as it'll go towards `by`,
+    // without going into rock, another stone or the player; it says how far it went.
+    static constexpr float STONE_SIZE = 2 * TILE_SIZE;
+    const std::vector<Stone>& stones() const;
+    sf::FloatRect stoneBox(size_t stone) const;
+    float moveStone(size_t stone, sf::Vector2f by, sf::FloatRect player);
+    void holdStone(size_t stone, bool held);
+    bool stoneResting(size_t stone) const; // on something: rock, a platform or another stone
+    const std::vector<Plate>& plates() const;
+    // Fire (see Fire): what burns, while it's burning.
+    const std::vector<Fire>& fires() const;
+    sf::FloatRect fireBox(const Fire& fire) const;
+    bool isBurning(const Fire& fire) const; // now
+    bool isAboutToBurn(const Fire& fire) const; // cold, but flickering: it lights in a moment
+    // Whether the line between two points goes through fire, and where.
+    std::optional<sf::Vector2f> burnsAlong(sf::Vector2f from, sf::Vector2f to) const;
     const std::vector<Ring>& rings() const;
     sf::Vector2f ringPosition(size_t ring) const; // now
     const std::vector<Lamp>& lamps() const;
@@ -244,10 +298,12 @@ public:
     const std::vector<Prop>& props() const;
     // Benches to sit on, two tiles wide, each the bottom-left of its left tile.
     const std::vector<sf::Vector2f>& benches() const;
-    // Gates ('=') are solid until a lever in the same room is pulled; then they all stay open.
+    // Gates ('=') are solid until a lever in the same room is pulled; then they all stay open. A
+    // stone on a weight plate holds them open too, only while it's there.
     const std::vector<sf::Vector2f>& levers() const;
     void setGatesOpen(bool open);
     bool gatesOpen() const;
+    bool gatesHeld() const; // by a weight plate
     static constexpr float BENCH_WIDTH = 2 * TILE_SIZE;
     // Which edge of the level `point` has gone past, if any.
     std::optional<Side> exitThrough(sf::Vector2f point) const;
@@ -262,6 +318,8 @@ public:
 private:
     void loadTextures();
     void computeBounds();
+    // Posts under planks, or ropes over them, where they aren't on rock: tiles x0..x1, y0..y1.
+    void drawPlankSupports(sf::RenderTarget& target, sf::Vector2f centr, int x0, int x1, int y0, int y1) const;
     // A rock tile (or a hidden passage's, which looks like one), picked from its neighbours.
     void drawRock(sf::Sprite& sprite, sf::RenderTarget& target, sf::Vector2f centr, int x, int y) const;
 
@@ -278,6 +336,12 @@ private:
     std::vector<Cart> m_carts;
     std::vector<sf::Vector2f> m_cartStops;
     std::vector<Trial> m_trials;
+    std::vector<Stone> m_stones;
+    std::vector<Plate> m_plates;
+    std::vector<Fire> m_fires;
+    bool m_gatesHeld = false; // a weight plate down
+    bool stoneFits(sf::FloatRect box, size_t stone, sf::FloatRect player) const;
+    void updateStones(float dt, sf::FloatRect player);
 
     // What moves or changes (see update).
     struct Crumbling

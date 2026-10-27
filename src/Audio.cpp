@@ -59,6 +59,10 @@ namespace
             case Audio::Sfx::Crash: return tone(Wave::Noise, 900.f, 80.f, 0.6f, 0.001f, 0.45f, 0.4f);     // into the wall
             case Audio::Sfx::Watch: return tone(Wave::Square, 1760.f, 1760.f, 0.08f, 0.001f, 0.04f, 0.14f); // a beep
             case Audio::Sfx::Record: return tone(Wave::Triangle, 784.f, 784.f, 0.7f, 0.003f, 0.35f, 0.3f, 0.f, {0, 4, 7, 12, 16});
+            case Audio::Sfx::Scrape: return tone(Wave::Noise, 220.f, 160.f, 0.22f, 0.04f, 0.12f, 0.14f);   // stone dragged over stone
+            case Audio::Sfx::Thud: return tone(Wave::Noise, 140.f, 50.f, 0.3f, 0.001f, 0.25f, 0.4f);      // and dropped
+            case Audio::Sfx::PlateClick: return tone(Wave::Square, 220.f, 110.f, 0.12f, 0.001f, 0.08f, 0.2f, 0.f, {0, 7}); // a plate going down
+            case Audio::Sfx::Burn: return tone(Wave::Noise, 3000.f, 700.f, 0.4f, 0.005f, 0.3f, 0.22f);     // the rope burning through
             case Audio::Sfx::Count: break;
         }
         return {};

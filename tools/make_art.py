@@ -1488,6 +1488,23 @@ SIGNAL_BASE = ['.....WwlwWlwW.......',
                'sSsSsSsSsSsSsSsSsS..',
                'SsSsSsSsSsSsSsSsSsS.']
 
+def lantern_string(width=36, height=16):
+    """Two poles and a cord sagging between them, little lanterns hanging off it."""
+    g = [['.'] * width for _ in range(height)]
+    for y in range(height):
+        g[y][0] = g[y][width - 1] = 'W'
+    g[height - 1][1] = g[height - 1][width - 2] = 'W'
+    mid = (width - 1) / 2
+    for x in range(1, width - 1):
+        sag = 1 + round(4 * (1 - ((x - mid) / mid) ** 2))
+        g[sag][x] = 'k'
+        if x % 6 == 3:
+            g[sag + 1][x], g[sag + 2][x] = 'y', 'f'
+            g[sag + 2][x - 1] = g[sag + 2][x + 1] = 'y'
+            g[sag + 3][x] = 'o'
+    return [''.join(row) for row in g]
+
+
 PROPS = [
     # name, frames, fps, hangs, light (r, g, b, radius)
     ('cold_fire', [['....KK..K.....',
@@ -1711,13 +1728,63 @@ PROPS = [
     ('vent', [['.ZzZzZzZzZzZzZ.',
                'ZzKzKzKzKzKzKzZ',
                'ZZZZZZZZZZZZZZZ']], 0, False, (255, 140, 60, 20)),
-    ('ring', [['.zzz.',
-               'z...z',
-               'Z...Z',
-               '.ZZZ.']], 0, False, None),
+    ('ring', [['...zzz...',
+               '.zzZZZzz.',
+               '.zZ...Zz.',
+               'zZ.....Zz',
+               'zZ.....ZZ',
+               'zZ.....ZZ',
+               '.ZZ...ZZ.',
+               '.ZZZZZZZ.',
+               '...ZZZ...']], 0, False, None),
     ('lamp', [['..Z..', '.ZZZ.', 'ZsSsZ', 'ZSsSZ', 'ZsSsZ', '.ZZZ.']], 0, True, None),
     ('lamp_lit', [['..Z..', '.ZZZ.', 'ZyfyZ', 'ZfyfZ', 'ZyfyZ', '.ZZZ.']], 0, True, (255, 200, 110, 60)),
     ('icicle', [['iIi', 'iIi', 'iI.', '.I.', '.I.', '.i.']], 0, True, None),
+    # For the camp: firewood stacked by the tent, a stewpot on its embers, and a string of lanterns
+    # between two poles.
+    ('woodpile', [['....wlw.wlw....',
+                   '...WwlwWwlwW...',
+                   '..wlwWwlwWwlw..',
+                   '.WwlwWwlwWwlwW.',
+                   'wlwWwlwWwlwWwlw',
+                   'WwlwWwlwWwlwWwl']], 0, False, None),
+    ('stewpot', [['...m...m...',
+                  '....m.m....',
+                  '..KkkkkkK..',
+                  '.KaSSSSSaK.',
+                  '.KaSsSsSaK.',
+                  '..KaaaaaK..',
+                  '.oryoyroyo.',
+                  'sSoSrSoSrSs'],
+                 ['....m...m..',
+                  '...m...m...',
+                  '..KkkkkkK..',
+                  '.KaSSSSSaK.',
+                  '.KaSsSsSaK.',
+                  '..KaaaaaK..',
+                  '.royoryoyr.',
+                  'sSrSoSrSoSs']], 3, False, (255, 150, 70, 22)),
+    ('lantern_string', [lantern_string()], 0, False, (255, 210, 130, 40)),
+    # A stone block, two tiles square, with an iron ring in it for the rope; and the weight plate a
+    # stone holds down, up and down.
+    ('stone', [['sssssssssssssS',
+                'saaaaaaaaaaaaS',
+                'saSaaaaaaaaaaS',
+                'saaaaaakkaaaaS',
+                'saaaaaZzzZaaaS',
+                'saaaaZaaaaZaaS',
+                'saaaaZaaaaZaaS',
+                'saaaaaZZZZaaaS',
+                'saaaaaaaaaaaaS',
+                'saaaaaaaaaaSaS',
+                'saaaaaaaaaaaaS',
+                'saaSaaaaaaaaaS',
+                'saaaaaaaaaaaaS',
+                'SSSSSSSSSSSSSS']], 0, False, None),
+    ('plate', [['.zzzzzzzzzzzz.',
+                'zZZZZZZZZZZZZz',
+                'ZZZZZZZZZZZZZZ']], 0, False, None),
+    ('plate_down', [['1222222222221']], 0, False, (90, 230, 200, 26)),
     ('stall', [['rrrrrrrrrrrrrrrrrrrrrr',
                 'rffrffrffrffrffrffrffr',
                 'rrrrrrrrrrrrrrrrrrrrrr',
@@ -2069,9 +2136,9 @@ def make_ice():
 
 
 # Sky: pale stone islands among the clouds, high above everything, bright and windy.
-SKY_ROCK = {'0': rgb('#5a6478'), '1': rgb('#7a849a'), '2': rgb('#98a2b8'), '3': rgb('#bcc4d6'),
-            'g': rgb('#5aa060'), 'G': rgb('#86c86a'), 'h': rgb('#b8ec8c'), 'H': rgb('#e8ffc8'),
-            'f': rgb('#ffffff'), 'p': rgb('#f0d060'), 'w': rgb('#8a6a4a')}
+SKY_ROCK = {'0': rgb('#262c48'), '1': rgb('#3a4264'), '2': rgb('#4e5880'), '3': rgb('#6c76a0'),  # moonlit
+            'g': rgb('#2a5a4c'), 'G': rgb('#3e7c5c'), 'h': rgb('#6ab884'), 'H': rgb('#b4ecc4'),
+            'f': rgb('#e8eeff'), 'p': rgb('#f0d060'), 'w': rgb('#5a4a42')}
 cloud_moss = ['HhHHhHHh',
               'hGhhGhhG',
               'GgGG3GgG',
@@ -2107,28 +2174,37 @@ sky_wisp = ['........',
 
 
 def make_sky():
+    # Up above the camp, the same night: the moon nearer, the stars thick, the aurora below, and
+    # clouds and islands silvered by the moonlight. No daylight anywhere tonight.
     make_tiles('sky', tile_sheet(SKY_ROCK, (cloud_moss, cloud_moss_b), (sky_tuft, sky_wisp, roots)))
-    c = sky('#5a9ae0', '#d8ecff')
-    glow(c, 270, 26, 10, '#fffbe0', rings=4)
+    c = sky('#060a24', '#24346a')
+    stars(c, count=190, seed=51, color='#ffffff', below=150)
+    stars(c, count=40, seed=52, color='#9ab8ff', below=170)
+    for x in range(W):  # the aurora, low now: you're above it
+        top = int(128 + 8 * periodic_noise(x, 1.1, ((1, 1.0), (2, 0.6), (5, 0.2))))
+        for dy in range(24):
+            fade = 1 - dy / 24
+            c.mix(x, top + dy, rgb('#5af0b0' if dy < 12 else '#a070ff', int(22 * fade * (0.6 + 0.4 * math.sin(x * 0.09 + dy * 0.2)))))
+    glow(c, 262, 30, 10, '#f4f0d8', rings=5)
     for x, y, size in ((40, 30, 12), (120, 52, 16), (210, 20, 9), (290, 70, 14), (70, 96, 10), (180, 110, 13)):
-        cloud(c, x, y, size, '#ffffff', '#dce8f6')
+        cloud(c, x, y, size, '#8c9cc8', '#56689a')
     c.save('themes/sky/sky.png')
     c = Canvas(W, H)
     rng = random.Random(21)
-    for _ in range(9):  # far islands, hanging in the haze
+    for _ in range(9):  # far islands, hanging in the dark
         cx, cy, w = rng.randrange(W), rng.randrange(60, 130), rng.randrange(14, 34)
         for y in range(10):
             half = w * (1 - y / 10) * 0.5 + 2
             for x in range(int(cx - half), int(cx + half) + 1):
-                c.put(x % W, cy + y, rgb('#a8bcd8'))
+                c.put(x % W, cy + y, rgb('#2c3862'))
         for x in range(cx - w // 2, cx + w // 2 + 1):
-            c.put(x % W, cy - 1, rgb('#b8d8b8'))
+            c.put(x % W, cy - 1, rgb('#3e6a64'))
     c.save('themes/sky/far.png')
     c = Canvas(W, H)
-    for x in range(W):  # a bank of cloud below
+    for x in range(W):  # a bank of cloud below, lit from above
         top = int(H - 30 - 10 * periodic_noise(x, 8.1))
         for y in range(top, H):
-            c.put(x, y, rgb('#f0f6ff' if y < top + 3 else '#e2ecf8'))
+            c.put(x, y, rgb('#7a8abc' if y < top + 3 else '#3c4a7c'))
     c.save('themes/sky/near.png')
 
 

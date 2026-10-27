@@ -52,11 +52,12 @@ people to talk to, and a dog. See [The world](#the-world).
 | Towards a wall, in the air (with the chalk bag) | Grab it. W / S climb, jump leaps off |
 | W / S (on the rope) | Reel in / let out |
 | A / D, S, Space (in water) | Swim, dive, leap out at the surface. Under water you hold your breath: the blue bar over your head. Come up before it runs out |
-| Arrows / WASD (where nothing falls) | Push yourself any way; let go and you drift to a stop |
+| Arrows / WASD (where nothing falls) | Only touching rock: clamber along it. Out in the open nothing moves you but the rope: hook something and W pulls you along the rope; held, it swings you round, and let go, you drift on |
 | Space (in a mine cart) | Jump the cart. That's all: it goes where the rails go |
 | S (on a bounce mushroom) | Stand on it instead of bouncing |
 | S (on a platform) | Drop through it |
 | W / Up / E | Talk to someone, sit on a bench, pull a lever: a bubble shows when you're close enough |
+| E (with the knot) | Hooked and standing (or holding a wall): tie the rope off where you are. Again: untie it |
 | Up / Down, Enter / Space or the mouse (talking) | Choose what to say, next line. Esc stops |
 | M / Tab | The map (also in the pause menu). Arrows or drag to move it, Z or the mouse wheel to zoom. On a bench: travel |
 | R | Retry: back to the last checkpoint (counts as a death) |
@@ -92,9 +93,16 @@ The buttons can be changed in CONTROLS too. The pad that was pressed last is the
 - **The updraft feather**: one more jump in the air, until you land or catch the rope.
 - **Gran's stopwatch**: times runs of a route, from its green post to its chequered flag, and keeps
   your best (RECORDS, in the pause menu).
+- **The knot**, at the end of the Quarry: hooked in rock, and standing or holding on
+  to a wall, E ties the rope off where you are, and it stays strung from the hook round its corners
+  to the knot: a line to hang from. Fall or jump onto it and you grab it (holding up, reach up for
+  it); along it hand over hand; where it's steep you slide down it like a zipline, or climb it
+  holding up it; jump to let go. E again unties it and it comes back to your hand. It burns in
+  fire, and comes down if what it's hooked in crumbles.
 
 The rope comes from Odo; the long rope and the chalk bag are at the ends of the two routes open from
-the start, the glove and the feather at the ends of the two they open, and the stopwatch behind the
+the start, the glove and the feather at the ends of the two they open, the knot at the bottom of the
+Quarry under the Hollows, and the stopwatch behind the
 waterfall. A test room has them all.
 
 **Outfits.** Mags keeps a stall by the campfire: clothes, for the gems you've found. The diving suit
@@ -111,27 +119,43 @@ The numbers are all in [assets/physics.txt](assets/physics.txt).
 ## The world
 
 Rooms join up like in Celeste: walk out through a gap in a room's wall (or drop down a hole in its
-floor) and the camera pans over into the room on the other side. You can always go back the way you
+floor) and the camera eases over into the room on the other side, without stopping you. Places run
+into each other: between two that look different there's a room that's some of each (the Cave
+Mouth, the Sinkhole, the Cliff Path, the Snowy Pass), and nearing a way into somewhere that looks different, its scenery and its dark come
+in, half and half in the doorway, and the room you've left goes on showing a while past it. And
+it's all the one night: the sky over the camp is the sky the Sky Road climbs into. You can always go back the way you
 came.
 
-You come to floating in **the Hidden Lake**, swim ashore and walk out of the cave onto **the Old
-Road**, where Odo gives you the rope; past **the Gully**, his practice ground, the road ends at **the
-Campfire**: Fen by the fire, Mags at her stall, a bench, and five ways on.
+You come to floating in **the Hidden Lake**, swim ashore and walk out through **the Cave Mouth**
+onto **the Old Road**, where Odo gives you the rope; past **the Gully**, his practice ground, the road
+ends at **the Campfire**, a clearing at the foot of the cliffs: Fen by the fire, a stewpot on the
+embers, Mags at her stall, a bench under a string of lanterns. The road goes on east; the sinkhole
+is boarded over (drop through, down **the Sinkhole** to the Hollows); and up the cliff, **the Cliff
+Path**, where the other ways go off.
 
 - **The Hook Garden**, east: swings over spikes, bounce mushrooms, hook rings that carry you. At its
   end, the long rope. Open from the start.
-- **The Hollows**, down the sinkhole: crumbling stone, a hollow so dark you light lamps with the rope
+- **The Hollows**, down the sinkhole: the old workings, where a block of stone has to be dragged onto
+  a weight plate to open the gate (the rope pulls it where the rope bends, so lower yourself off the
+  shelf it's on and reel it in from below), and a brazier the rope mustn't swing into; a hollow so dark you light lamps with the rope
   to see, and the den at the bottom: the chalk bag, and Pip. Open from the start.
-- **The Frost Caves**, off the lookout: a chasm only the long rope crosses, icicles over ice, a
+- **The Frost Caves**, off the Cliff Path and through **the Snowy Pass**: a chasm only the long rope crosses, icicles over ice, a
   frozen waterfall to swing up. At its end, the throwing glove.
-- **The Sky Road**, up through the top of the lookout: a wall only the chalk bag climbs, clouds that
+- **The Sky Road**, at the top of the Cliff Path: a wall only the chalk bag climbs, clouds that
   fade under you, updrafts in the wind. At its end, the feather.
-- **The Old Line**, up the planks to the station: once all four beacons burn, the cart takes you up
+- **The Old Line**, off the Cliff Path to the station: once all four beacons burn, the cart takes you up
   the mountain, over the broken bridge (a jump and a second jump), to the Lantern: up to it with
   everything you've got, and past it, the end of the game.
 
+Under the Hollows, through a trapdoor of planks by the foot of the shaft, **the Quarry**: a long drop
+down the Rigging, a shaft with nothing to climb or swing from; the Kiln, where flues of fire breathe
+on and off and you swing past them while they're cold; and the Cutting, where a block of stone
+dragged through a cold flue is the step up to the riggers' knot. The way back up the Rigging is
+climbing lines tied off with it (or the bench).
+
 And secrets. Behind the lake's waterfall the rock isn't there: through it, **the Still**, where
-there's no gravity at all, only black and stars, and the stopwatch; up inside it, a climb for the
+there's no gravity at all, only black and stars, and the stopwatch: nothing moves you there but the
+rope, and the walls are crystal (come back with the rope); up inside it, a climb for the
 long rope to **the Hidden Spring**. Down a crack in the lake bed, a tunnel longer than any breath
 lasts, to **the Drowned Grotto** (the diving suit). And along every route, gems that wait for an
 ability you'll only have later, and rock here and there that isn't there either.
@@ -208,8 +232,10 @@ gravity, the jump, how hard you can push a swing, how far a fling carries) is in
 playing: no compiling. `./build/Release/game assets/levels/playground.txt` is a room for trying it
 out: steps 1 to 4 tiles high, gaps 3 to 7 wide, a pit to swing across, a long flat floor to see how
 far a fling carries, a slick wall to get over and a tall one to climb. A test room starts with every
-ability, and the keys **1 to 6** switch them off and on: the rope, the long rope, the chalk bag, the
-throwing hand, the feather and the stopwatch.
+ability, and the keys **1 to 7** switch them off and on: the rope, the long rope, the chalk bag, the
+throwing hand, the feather, the stopwatch and the knot. `./build/Release/game assets/levels/tie_off.txt`
+is a room for trying the knot: a pit to string a line across, a wall to climb a line up, and a
+zipline down to a pillar over spikes.
 
 **Checking the world can be played.** `python3 tools/check_world.py` sends the level bot
 ([tools/levelbot.cpp](tools/levelbot.cpp), built with the game) through every room both ways, through

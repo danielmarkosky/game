@@ -22,6 +22,7 @@ public:
         Bench, Travel, MenuMove, MenuPick, Talk, Door, Throw, Hooked, Grab,
         Crack, Crumble, CloudPuff, IcicleShake, Shatter, LampLit,
         Splash, Stroke, Bubble, Gasp, Bounce, Bark, Buy, CartStart, Crash, Watch, Record,
+        Scrape, Thud, PlateClick, Burn,
         Count // not a sound
     };
     // Sounds that go on, louder or quieter: the wind, the heat of an updraft, a waterfall, a cart

@@ -190,7 +190,7 @@ void Game::onMenuChoice(MenuChoice choice)
         case MAP: openMap(); break;
         case RECORDS: openScreen(Screen::Records); break;
         case RETRY:
-            if (deathTimer <= 0.f && !transition) killPlayer();
+            if (deathTimer <= 0.f) killPlayer();
             openScreen(Screen::Playing);
             break;
         case MAIN_MENU:

@@ -64,13 +64,26 @@ struct Physics
     // Bounce mushrooms: landing on one throws you up this fast (holding down, you stand on it).
     float bounceSpeed = 330.f;
 
+    // The rope tied off (with the knot): a line to hang from.
+    float lineHandSpeed = 45.f;      // along it hand over hand, where it isn't steep
+    float lineSteep = 0.45f;         // steeper than this (how much of it is up and down), you slide down it...
+    float lineZipSpeed = 200.f;      // ...up to this fast
+    float lineClimbSpeed = 30.f;     // or climb up it this fast
+    float lineJumpSpeed = 230.f;     // jumping off it: enough to get onto a ledge from a line hooked at its lip
+
+    // Stone blocks: hooked, and reeled in with your feet braced, the rope drags one this fast.
+    float stoneDragSpeed = 40.f;
+
     // Riding a mine cart along the rails: it rolls on at this speed, and jump jumps it.
     float cartSpeed = 110.f;
 
-    // Floating where there's no gravity (the Still): the arrows push you any way.
-    float floatAcceleration = 200.f;
-    float floatSpeed = 70.f;         // the fastest pushing gets you
-    float floatDrag = 1.2f;          // how much of your speed you lose each second, pushing nowhere
+    // Floating where there's no gravity (the Still). Out in the open nothing you do moves you: you
+    // drift on the way you were going. Only the rope gets you anywhere.
+    float floatDrag = 0.1f;          // how much of your speed you lose each second, drifting
+    float floatCrawl = 30.f;         // holding on to rock, the arrows move you along it (never off it), this fast
+    float throwRecoil = 16.f;        // throwing the rope pushes you the other way, this fast
+    float spaceReelPull = 320.f;     // reeling in on the rope pulls you along it, px/s each second...
+    float spaceReelSpeed = 130.f;    // ...up to this fast
 
     // "run_speed 70" lines; # starts a comment. Unknown names and broken numbers are skipped and
     // described in `problems`, if given.

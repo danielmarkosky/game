@@ -77,7 +77,7 @@ Each room has two layers, 8 px to a tile:
 | `platform` | One-way platform: jump up through it, stand on top, hold down to drop through |
 | `spikes` | Metal spikes, kill on touch |
 | `crystal` | Crystal spikes, same as spikes but pink. The rope goes through them to whatever's behind |
-| `gate` | Solid, until a lever in the same room is pulled: then every gate in the room opens for good |
+| `gate` | Solid, until a lever in the same room is pulled: then every gate in the room opens for good. Or while a stone holds down a weight plate (`Plate`) in the room |
 | `slick` | Slick, wind-polished stone: solid, but the rope slides off it. For places that mustn't be swung across |
 | `ice` | Solid, and the rope bites it, but you slide on it (slow to start, slower to stop) and hands can't hold it |
 | `crumble` | Cracked stone: it gives way half a second after you stand on it, and comes back a moment later. A rope hooked in it comes loose |
@@ -92,7 +92,7 @@ Each room has two layers, 8 px to a tile:
 | `Start` | Where the game starts, in the first room, and where `--room` starts a room (required, exactly one) |
 | `Checkpoint` | A flag. Put it in the empty tile right above the ground |
 | `Goal` | Touching it finishes the game (optional) |
-| `Pickup` | Gives an ability: its `ability` field says which: `rope` (the rope and hook), `long_rope`, `wall_climb` (the chalk bag), `air_throw` (the throwing hand) or `double_jump` (the updraft feather). Abilities come from these, or from a conversation (`give ability rope`) |
+| `Pickup` | Gives an ability: its `ability` field says which: `rope` (the rope and hook), `long_rope`, `wall_climb` (the chalk bag), `air_throw` (the throwing hand), `double_jump` (the updraft feather) or `tie_off` (the knot). Abilities come from these, or from a conversation (`give ability rope`) |
 | `Gem` | A gem, to collect. It can float in the air: touching it is enough |
 | `Lever` | Pulling it (W next to it, or a rope thrown at it) opens the room's gates, and the save remembers |
 | `Lamp` | A lantern hanging from the top of its tile, unlit: a rope thrown at it lights it, for good. For dark rooms |
@@ -104,12 +104,18 @@ Each room has two layers, 8 px to a tile:
 | `Cart` | A mine cart on rails: walking into it gets you in, and it rolls off `dir`-wards (`1` right, `-1` left) at `cart_speed` until it reaches a `CartStop`. All you can do in it is jump (and jump again, with the feather); running into a wall wrecks it. `needs`: what has to hold before it moves, by commas (the Old Line's: all four abilities). Dying while riding puts you back in it where it came into the room |
 | `CartStop` | The end of the line: a cart riding into it stops, and you get out |
 | `Trial` | A post for timing runs with the stopwatch: `route` is which route (one of assets/regions.txt), `mark` `start` or `finish`. Passing a start post starts the clock; that route's finish stops it, and the best time is kept (RECORDS, in the pause menu). Only seen once you have the stopwatch |
+| `Stone` | A block of stone, two tiles square (its tile is the bottom-left one): solid, it falls, and the rope hooks into it. Hooked, with your feet on the ground (or hands on a wall), reeling in drags it along at `stone_drag_speed` towards wherever the rope bends first, or towards you if it runs straight: so wrapped round a corner, the rope pulls it another way than towards you, like over a pulley. Held like that, it doesn't fall. It's back where it was when you die or come back into the room |
+| `Plate` | A weight plate, two tiles wide (its tile is the left one), standing on the floor: a `Stone` resting on it holds the room's gates open, while it's there. You're too light to |
+| `Fire` | Fire, burning in its tile and up into the one above: it burns you, and burns the rope through wherever the rope touches it, thrown, hooked, hanging slack or tied off (the end beyond is lost and the rest comes back). `flue` `1` makes it a column of fire from its tile up to the first rock. `period`: it breathes, burning for half that many seconds and cold for the other half, and flickers for half a second before it lights again; `phase` (0 to 1) is how far through that it starts, so flues can take turns |
 | `Prop` | Scenery: its `kind` is a prop in [`assets/gfx/props.txt`](../gfx/props.txt) (a cold fire, a tent, bookshelves, braziers, a signal fire, a beacon...). With `needs`, it's drawn as `<kind>_off` until that fact holds (the beacons: unlit until you've their route's ability). It stands on the bottom of its tile, or hangs from its top (banners, vines, chains, lanterns, icicles). Some glow, some flicker. `light_shaft` is a shaft of light falling from its tile to the ground below, and `waterfall` water pouring from its tile (and the one to its right) down to the first water or rock below, in front of the player, with spray and its own sound. Nothing to touch: it's only looks |
 
 Each room also has two fields: its `title`, shown the first time you go in, and its `theme`:
 `cave`, `garden`, `snow`, `ember`, `daylight`, `ruins`, `ice`, `sky`, `grotto`, `glade`, `still` or `mine` (the folders in `assets/gfx/themes/`).
 And some settings: `wind`, `dark`, and `space`: `1` for no gravity at all, everything floating
-(the Still): the arrows push you any way, and you drift to a stop. A theme only
+(the Still): nothing you do moves you out in the open, you drift on the way you were going; touching
+rock you hold on to it and can clamber along it, never off it. Only the rope moves you: reeled in,
+it pulls you along itself, and held, it swings you round where it's hooked. The rope hangs no
+slack there either. A theme only
 changes the looks, never how a tile behaves. Grass, edges and decorations are picked automatically
 from the neighbouring tiles, and spikes point away from the rock they're next to (rock below: up,
 rock above: down, rock on a side: sideways). Only that pointy half of the tile hurts.

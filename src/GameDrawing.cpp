@@ -21,8 +21,6 @@ void Game::renderCanvas()
     canvas.clear();
     if (!inGame()) {
         drawWorld(titleCamera(), false);
-    } else if (transition) {
-        drawTransition();
     } else {
         sf::Vector2f cam = drawCamera();
         if (shake > 0.f && settings.screenShake && screen == Screen::Playing) {
@@ -34,7 +32,7 @@ void Game::renderCanvas()
     }
 
     if (screen == Screen::Playing) {
-        if (!transition && deathTimer <= 0.f) drawAim();
+        if (deathTimer <= 0.f) drawAim();
         drawHud();
     } else {
         if (screen == Screen::Paused) drawHud();
@@ -182,12 +180,18 @@ void Game::drawRooms(sf::Vector2f cam)
 
     // Each room has its own scenery behind it, so going into another theme the new scenery comes
     // into view with the room while the parallax carries on across the seam.
-    drawBackground(level->theme(), scroll);
+    drawBackground(canvas, level->theme(), scroll);
+    // Near a doorway into somewhere that looks different, its scenery coming in over this one's.
+    if (const auto next = inGame() ? nextDoorLook() : std::nullopt) {
+        backdrop.clear(sf::Color::Transparent);
+        drawBackground(backdrop, rooms[next->room]->theme(), scroll);
+        backdrop.display();
+        sf::Sprite beyond(backdrop.getTexture());
+        beyond.setColor(sf::Color(255, 255, 255, static_cast<sf::Uint8>(255.f * next->amount)));
+        canvas.draw(beyond);
+    }
     for (const Visible& v : visible) {
-        if (&rooms[v.index]->theme() == &level->theme()) continue;
-        canvas.setView(clipView(v.area));
-        drawBackground(rooms[v.index]->theme(), scroll);
-        canvas.setView(canvas.getDefaultView());
+        if (&rooms[v.index]->theme() != &level->theme()) drawBackdrop(rooms[v.index]->theme(), scroll, v.area);
     }
     ambience.drawFar(canvas);
     lights.clear();
@@ -271,6 +275,17 @@ void Game::drawRooms(sf::Vector2f cam)
             if (lamp.lit) lights.push_back({viewCoordinates(middle, v.cam), 56.f * (1.f + 0.04f * std::sin(clockTime * 9.f + middle.x)), sf::Color(255, 200, 120, 140)});
             else lights.push_back({viewCoordinates(middle, v.cam), 7.f, sf::Color(120, 120, 150, 120)}); // a glint, to find it by
         }
+        for (const Fire& fire : room.fires()) {
+            if (!room.isBurning(fire)) continue;
+            const float flicker = 1.f + 0.08f * std::sin(clockTime * 13.f + fire.position.x);
+            const float height = fire.flue ? fire.top - fire.position.y : 8.f;
+            for (float up = 6.f; up <= height; up += 24.f) {
+                lights.push_back({viewCoordinates(fire.position + sf::Vector2f(4.f, up), v.cam), 44.f * flicker, sf::Color(255, 150, 70, 130)});
+            }
+        }
+        for (const Plate& plate : room.plates()) {
+            if (plate.down) lights.push_back({viewCoordinates(plate.position + sf::Vector2f(8.f, 1.f), v.cam), 20.f, sf::Color(90, 230, 200, 110)});
+        }
         for (const Pickup& pickup : room.pickups()) {
             if (!hasAbility(pickup.ability)) lights.push_back({viewCoordinates(pickup.position + sf::Vector2f(4.f, 6.f), v.cam), 24.f, sf::Color(170, 140, 60, 120)});
         }
@@ -288,20 +303,48 @@ void Game::drawRooms(sf::Vector2f cam)
     }
 }
 
-void Game::drawTransition()
+void Game::drawBackdrop(const Theme& theme, float scrollX, sf::FloatRect area)
 {
-    // The camera pans from where it was to where it'll be in the new room.
-    const Transition& t = *transition;
-    const float p = easeInOut(t.time / TRANSITION_TIME);
-    const sf::Vector2f to = drawCamera();
-    const sf::Vector2f cam(std::round(t.fromCamera.x + (to.x - t.fromCamera.x) * p), std::round(t.fromCamera.y + (to.y - t.fromCamera.y) * p));
-    drawRooms(cam);
-    player->draw(canvas, cam);
-    drawFront();
-    drawAir(cam);
+    backdrop.clear(sf::Color::Transparent);
+    drawBackground(backdrop, theme, scrollX);
+    backdrop.display();
+    // The area, grown past each edge that's a seam (not the edge of the screen) by half the width
+    // of the fade, which goes from nothing there to all of it as far inside.
+    constexpr float FADE = 28.f;
+    const float W = config::GAME_WIDTH, H = config::GAME_HEIGHT;
+    const auto edges = [&](float from, float to, float size, float* at, float* alpha) {
+        const bool before = from > 0.5f, after = to < size - 0.5f;
+        if (before) from = std::max(0.f, from - FADE * 0.5f);
+        if (after) to = std::min(size, to + FADE * 0.5f);
+        const float middle = (from + to) * 0.5f;
+        at[0] = from;
+        at[1] = before ? std::min(from + FADE, middle) : from;
+        at[2] = after ? std::max(to - FADE, middle) : to;
+        at[3] = to;
+        alpha[0] = before ? 0.f : 1.f;
+        alpha[1] = alpha[2] = 1.f;
+        alpha[3] = after ? 0.f : 1.f;
+    };
+    float xs[4], ax[4], ys[4], ay[4];
+    edges(area.left, area.left + area.width, W, xs, ax);
+    edges(area.top, area.top + area.height, H, ys, ay);
+    sf::VertexArray quads(sf::Quads);
+    const auto corner = [&](int i, int j) {
+        const sf::Vector2f at(xs[i], ys[j]);
+        quads.append(sf::Vertex(at, sf::Color(255, 255, 255, static_cast<sf::Uint8>(255.f * ax[i] * ay[j])), at));
+    };
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            corner(i, j);
+            corner(i + 1, j);
+            corner(i + 1, j + 1);
+            corner(i, j + 1);
+        }
+    }
+    canvas.draw(quads, &backdrop.getTexture());
 }
 
-void Game::drawBackground(const Theme& theme, float scrollX)
+void Game::drawBackground(sf::RenderTarget& target, const Theme& theme, float scrollX)
 {
     // The sky, then two layers of scenery, each scrolling slower than the level the further back
     // it is, for depth.
@@ -310,7 +353,7 @@ void Game::drawBackground(const Theme& theme, float scrollX)
         sf::Sprite sprite(theme.layers[i]);
         int offset = static_cast<int>(std::round(scrollX * parallax[i]));
         sprite.setTextureRect(sf::IntRect(offset, 0, config::GAME_WIDTH, config::GAME_HEIGHT));
-        canvas.draw(sprite);
+        target.draw(sprite);
     }
 }
 
@@ -335,6 +378,10 @@ void Game::drawAim()
             // Something it tugs: a lever, a lamp.
             sf::Vector2f p = viewCoordinates(hit->point, drawCamera());
             hud::fillRect(canvas, {std::floor(p.x) - 1.f, std::floor(p.y) - 1.f, 2.f, 2.f}, hud::GOLD);
+        } else if (auto fire = player->aimHit(aim); fire && fire->kind == RopeHit::Kind::Fire) {
+            // In the way: it'd burn through there.
+            sf::Vector2f p = viewCoordinates(fire->point, drawCamera());
+            hud::fillRect(canvas, {std::floor(p.x) - 1.f, std::floor(p.y) - 1.f, 2.f, 2.f}, sf::Color(255, 150, 60, 200));
         } else if (auto bounce = player->ropeBounce(aim)) {
             // Rock in range, but no pick yet: a dim red dot where the rope would bounce off.
             sf::Vector2f p = viewCoordinates(*bounce, drawCamera());
@@ -407,6 +454,11 @@ void Game::drawHud()
         const std::string move = input.usingPad() ? "STICK" : hint(controls::Action::Left) + " / " + hint(controls::Action::Right);
         hud::drawCentred(canvas, move + (player->isSwimming() ? " - SWIM" : " - GET UP"), HALF_W, 168.f, hud::withAlpha(hud::GREY, 200));
     }
+    // The knot: what the key does now.
+    if (screen == Screen::Playing && !sitting && (player->canTie() || (player->isTied() && player->isGrounded()))) {
+        hud::drawCentred(canvas, hint(controls::Action::Interact) + (player->isTied() ? " - UNTIE" : " - TIE IT OFF"), HALF_W, 168.f,
+                         hud::withAlpha(hud::GREY, 200));
+    }
     if (sitting && screen == Screen::Playing) {
         const std::string getUp = "MOVE - GET UP";
         const std::string text = travelDestinations().size() > 1 ? hint(controls::Action::Map) + " - TRAVEL    " + getUp : getUp;
@@ -439,10 +491,13 @@ void Game::drawHud()
     }
 
     if (titleTimer > 0.f && messageTimer <= 0.f && screen == Screen::Playing) {
-        // Fade in quickly, hold, fade out over the last second.
-        float alpha = std::min({1.f, (TITLE_TIME - titleTimer) * 4.f, titleTimer});
-        auto a = static_cast<sf::Uint8>(255.f * alpha);
-        hud::drawCentred(canvas, hud::upper(levels[levelIndex].title), HALF_W, 40.f, hud::withAlpha(hud::WHITE, a), 2.f);
+        // A new place's name, quietly: fading in, a line drawing out under it, fading away.
+        const float shown = TITLE_TIME - titleTimer;
+        const float alpha = std::min({1.f, shown * 1.5f, titleTimer * 0.8f});
+        const std::string name = hud::upper(levels[levelIndex].title);
+        hud::drawCentred(canvas, name, HALF_W, 24.f, hud::withAlpha(hud::WHITE, static_cast<sf::Uint8>(220.f * alpha)));
+        const float width = std::floor((hud::textWidth(name) + 20.f) * std::min(1.f, shown * 1.2f));
+        hud::fillRect(canvas, {std::floor(HALF_W - width * 0.5f), 34.f, width, 1.f}, hud::withAlpha(hud::GREY, static_cast<sf::Uint8>(150.f * alpha)));
     }
     if (messageTimer > 0.f && screen == Screen::Playing) {
         float alpha = std::min({1.f, (MESSAGE_TIME - messageTimer) * 4.f, messageTimer});

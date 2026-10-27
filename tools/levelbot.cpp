@@ -12,16 +12,18 @@
 //   --goal       which way out counts (default: any; "L:21" only the left door starting 21 up), or
 //                touching a pickup, or gem N, or "tug": the
 //                rope tugging a lever or a lamp, or "cart": getting into a mine cart, or "stop":
-//                riding one to the end of the line, or "at COL ROW": standing in that tile
-//   --abilities  the ones the player has (default: all). "none" for none. "diver" is wearing the
-//                diving suit: breath lasting longer
+//                riding one to the end of the line, "plate": a stone dragged onto a weight
+//                plate, or "at COL ROW": standing in that tile
+//   --abilities  the ones the player has (default: all but the knot). "none" for none. "diver" is
+//                wearing the diving suit: breath lasting longer; "tie_off" the knot
 //   --explore    don't stop at the goal: list every spot that can be stood on
 //   --open       with the room's gates open, as if its lever had been pulled
 //   --riding     starting in a mine cart rolling that way: all there is to try is when to jump
 //   --measure    how far the moves reach with the physics in assets/physics.txt, for designing rooms
 //
-// In a room with no gravity (a `space` room) the spots are where you drift to a stop, not where
-// you stand, and the moves are pushes every way as well as the rope.
+// In a room with no gravity (a `space` room) the spots are where you come to rest holding on to
+// rock, not where you stand, and the moves are the rope thrown every way (reeled in on, or held,
+// for a while, then let go of) and clambering along the rock.
 //
 // Prints the route it found and exits with 0, or prints a map of where it got to and exits with 1.
 #include "src/Config.h"
@@ -30,6 +32,7 @@
 #include "src/Player.h"
 #include "src/World.h"
 #include "src/utils.h"
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -64,8 +67,9 @@ namespace
         bool tug = false;  // the rope tugging a lever or a lamp
         bool cart = false; // getting into a mine cart
         bool stop = false; // riding one to the end of the line
+        bool plate = false; // a stone on a weight plate
         std::optional<sf::Vector2i> at; // standing in this tile (column, and row from the top)
-        bool any() const { return pickup || gem >= 0 || tug || cart || stop || at; } // something other than a way out
+        bool any() const { return pickup || gem >= 0 || tug || cart || stop || plate || at; } // something other than a way out
     };
 
     // A run, then maybe a jump, held for a while, steering in the air, maybe jumping again.
@@ -74,6 +78,7 @@ namespace
         float run, runTime, hold, steer;
         bool drop;        // hold down first, to drop through a platform
         float airJumpAt;  // < 0: no second jump
+        float wait = 0.f; // standing first: in a room with fires that come and go, for one to go out
     };
 
     // Maybe a jump first, then the rope thrown at an angle, swung on for a while once it catches,
@@ -92,6 +97,7 @@ namespace
         float wait = 0.f;   // standing first: in a room with moving rings, for one to come round
         int ring = -1;      // thrown straight at this ring, wherever it is by then, not at `angle`
         std::optional<sf::Vector2f> at = std::nullopt; // or straight at this point: a lever or a lamp
+        float outFirst = 0.f; // once it catches, let out for this long first (lowering yourself on it)
     };
 
     // Up against a wall (with the chalk bag): run and jump at it holding towards it until it's
@@ -112,6 +118,18 @@ namespace
         float time;
     };
 
+    // With the knot: the rope thrown at an angle, tied off where you stand once it catches, then
+    // onto the line (a jump that way, holding up), along it towards the hook or away for a while
+    // (holding up too, which climbs it where it's steep), and a jump off it, steering.
+    struct Tie
+    {
+        float angle;
+        float onto;    // the way to jump onto it: -1 or 1
+        float along;   // then the way to go along it: 1 towards the hook, -1 away
+        float time;
+        float steer;   // jumping off it
+    };
+
     constexpr float THROW_WAIT = 1.5f; // the longest a throw is waited on to catch
 
     class Bot
@@ -127,6 +145,9 @@ namespace
         Result jump(sf::Vector2f spot, const Jump& j)
         {
             start(spot);
+            for (int i = 0; i < int(j.wait / DT); ++i) {
+                if (auto o = step({})) return {*o, player.getPosition()};
+            }
             PlayerInput in;
             in.moveX = j.run;
             if (j.drop) in.moveY = -1.f;
@@ -204,7 +225,12 @@ namespace
             if (!player.getRope()) return {Out::Missed, {}};
             rope.ropePressed = false;
             rope.moveX = s.push;
+            rope.moveY = -1.f;
+            for (int i = 0; i < int(s.outFirst / DT); ++i) {
+                if (auto o = step(rope)) return {*o, player.getPosition()};
+            }
             rope.moveY = s.reel ? 1.f : 0.f;
+            if (s.outFirst > 0.f) rope.moveX = 0.f; // lowered down: standing still to reel it in
             for (int i = 0; i < int(s.hold / DT); ++i) {
                 if (auto o = step(rope)) return {*o, player.getPosition()};
             }
@@ -242,6 +268,48 @@ namespace
                 }
             }
             return settle(s.steer, true);
+        }
+
+        Result tie(sf::Vector2f spot, const Tie& t)
+        {
+            start(spot);
+            PlayerInput rope;
+            rope.ropePressed = rope.ropeHeld = true;
+            rope.aim = player.centre() + sf::Vector2f(std::cos(t.angle), std::sin(t.angle)) * 200.f;
+            if (!player.canShootRope() || !player.ropeTarget(rope.aim)) return {Out::Missed, {}};
+            for (int i = 0; i < int(THROW_WAIT / DT) && !player.getRope(); ++i) {
+                if (auto o = step(rope)) return {*o, player.getPosition()};
+                rope.ropePressed = false;
+            }
+            if (!player.getRope() || !player.canTie()) return {Out::Missed, {}};
+            rope.tiePressed = true;
+            if (auto o = step(rope)) return {*o, player.getPosition()};
+            if (!player.isTied()) return {Out::Missed, {}};
+            const sf::Vector2f hook = player.tiedLine().front(), knot = player.tiedLine().back();
+            PlayerInput onto;
+            onto.moveX = t.onto;
+            onto.moveY = 1.f;
+            onto.jumpPressed = onto.jumpHeld = true;
+            for (int i = 0; i < int(1.2f / DT) && !player.isHanging(); ++i) {
+                if (auto o = step(onto)) return {*o, player.getPosition()};
+                onto.jumpPressed = false;
+                if (i > 2 && player.isGrounded()) return {Out::Missed, {}};
+            }
+            if (!player.isHanging()) return {Out::Missed, {}};
+            PlayerInput along;
+            along.moveX = (hook.x > knot.x ? 1.f : -1.f) * t.along;
+            along.moveY = t.along;
+            for (int i = 0; i < int(t.time / DT) && player.isHanging(); ++i) {
+                if (auto o = step(along)) return {*o, player.getPosition()};
+            }
+            PlayerInput off;
+            off.moveX = t.steer;
+            off.jumpPressed = off.jumpHeld = true;
+            for (int i = 0; i < int(0.3f / DT); ++i) {
+                if (auto o = step(off)) return {*o, player.getPosition()};
+                off.jumpPressed = false;
+            }
+            return settle(t.steer, true);
         }
 
         Result drift(sf::Vector2f spot, const Drift& d)
@@ -337,6 +405,7 @@ namespace
                 const int row = rows - 1 - int((player.getPosition().y - b.top) / Level::TILE_SIZE);
                 if (column == goal.at->x && row == goal.at->y) return Out::Reached;
             }
+            if (goal.plate && level->gatesHeld()) return Out::Reached;
             bool tugged = false;
             for (const PlayerEvent& e : player.takeEvents()) {
                 tugged |= e.type == PlayerEvent::Type::LeverTugged || e.type == PlayerEvent::Type::LampTugged;
@@ -368,7 +437,8 @@ namespace
                 // Drifting, or afloat under the water (up against a roof, or rising): wherever it
                 // comes to rest, holding its breath meanwhile.
                 PlayerInput none;
-                for (int i = 0; i < int(5.f / DT); ++i) {
+                const float wait = player.isFloating() ? 9.f : 5.f; // drifting on, nothing slows you
+                for (int i = 0; i < int(wait / DT); ++i) {
                     if (auto o = step(none)) return {*o, player.getPosition()};
                     if (i > 3 && !player.getRope() && magnitude(player.getVelocity()) < 3.f) return {Out::Landed, player.getPosition(), player.airLeft()};
                     if (player.isGrounded() && !player.isUnderwater()) break; // out of it, onto something
@@ -399,6 +469,7 @@ namespace
         char b[160];
         std::snprintf(b, sizeof b, "%s run=%+.0f for %.2fs, jump %.2fs steering %+.0f%s", j.drop ? "drop" : "jump", j.run, j.runTime, j.hold, j.steer,
                       j.airJumpAt >= 0.f ? (", jump again after " + std::to_string(j.airJumpAt).substr(0, 4) + "s").c_str() : "");
+        if (j.wait > 0.f) return "after " + std::to_string(j.wait).substr(0, 3) + "s, " + b;
         return b;
     }
 
@@ -423,6 +494,11 @@ namespace
                       s.angle * 57.2958f, s.push, s.reel ? " reeling in" : "", s.hold, s.jumpOff ? "jump off" : "let go", s.steer,
                       s.airJump ? ", jump again" : "");
         std::string text = b;
+        if (s.wait > 0.f) text = "after " + std::to_string(s.wait).substr(0, 3) + "s, " + text;
+        if (s.outFirst > 0.f) {
+            std::snprintf(b, sizeof b, ", letting it out for %.1fs first", s.outFirst);
+            text += b;
+        }
         if (s.again >= 0.f) {
             std::snprintf(b, sizeof b, ", then the rope again in the air at %.0f deg for %.2fs", s.again * 57.2958f, s.holdAgain);
             text += b;
@@ -511,6 +587,7 @@ namespace
         player.setCanClimb(abilities.count("wall_climb") > 0);
         player.setCanThrowInAir(abilities.count("air_throw") > 0);
         player.setCanDoubleJump(abilities.count("double_jump") > 0);
+        player.setCanTie(abilities.count("tie_off") > 0);
     }
 
     // An empty room `width` tiles wide with a floor, the start near its left, and `ceiling` empty
@@ -664,6 +741,7 @@ int main(int argc, char** argv)
             else if (g == "tug") goal.tug = true;
             else if (g == "cart") goal.cart = true;
             else if (g == "stop") goal.stop = true;
+            else if (g == "plate") goal.plate = true;
             else if (g == "at" && i + 2 < argc) {
                 goal.at = sf::Vector2i(std::atoi(argv[i + 1]), std::atoi(argv[i + 2]));
                 i += 2;
@@ -738,7 +816,9 @@ int main(int argc, char** argv)
     for (float steer : {-1.f, 0.f, 1.f}) jumps.push_back({0.f, 0.1f, 0.f, steer, true, -1.f});
     std::vector<Swing> swings;
     for (bool jumpFirst : {false, true}) {
-        if (!rope || (jumpFirst && !airThrow)) continue; // thrown standing only, until the throwing hand
+        // With no gravity: every way round, and nothing but how long it's reeled in on or held.
+        if (!rope || level->isSpace()) continue;
+        if (jumpFirst && !airThrow) continue; // thrown standing only, until the throwing hand
         for (int deg = 25; deg <= 155; deg += 10) {
             for (float push : {-1.f, 1.f}) {
                 for (bool reel : {false, true}) {
@@ -768,6 +848,29 @@ int main(int argc, char** argv)
         }
     }
 
+    if (rope && level->isSpace()) {
+        for (int deg = 0; deg < 360; deg += 10) {
+            for (bool reel : {false, true}) {
+                for (float hold : {0.1f, 0.2f, 0.3f, 0.4f, 0.5f, 0.6f, 0.7f, 0.8f, 0.9f, 1.0f, 1.2f, 1.4f, 1.7f, 2.0f, 2.5f, 3.f}) {
+                    swings.push_back({false, deg / 57.2958f, 1.f, reel, hold, false, 0.f, false});
+                }
+            }
+        }
+    }
+    // With stones about: hooking one, lowering yourself on it off a ledge first, then reeling it in.
+    if (rope && !level->stones().empty()) {
+        for (int deg = 0; deg < 360; deg += 10) {
+            for (float push : {-1.f, 1.f}) {
+                for (float out : {0.3f, 0.6f, 1.0f, 1.5f}) {
+                    for (float hold : {0.5f, 1.0f, 2.0f, 3.0f}) {
+                        Swing lower{false, deg / 57.2958f, push, true, hold, false, 0.f, false};
+                        lower.outFirst = out;
+                        swings.push_back(lower);
+                    }
+                }
+            }
+        }
+    }
     // When it's a tug that's wanted: straight at each lever and lamp.
     if (goal.tug) {
         std::vector<sf::Vector2f> targets;
@@ -796,8 +899,20 @@ int main(int argc, char** argv)
             }
         }
     }
-    // With rings going round, the same swing a moment later is another swing.
-    if (!level->rings().empty()) {
+    // With rings going round, or fires that come and go, the same swing (or run, or jump) a moment
+    // later is another.
+    const bool breathing = std::any_of(level->fires().begin(), level->fires().end(), [](const Fire& f) { return f.period > 0.f; });
+    if (breathing) {
+        const size_t count = jumps.size();
+        for (float wait : {0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f}) {
+            for (size_t i = 0; i < count; ++i) {
+                Jump later = jumps[i];
+                later.wait = wait;
+                jumps.push_back(later);
+            }
+        }
+    }
+    if (!level->rings().empty() || breathing) {
         const size_t count = swings.size();
         for (float wait : {0.5f, 1.0f, 1.5f, 2.0f}) {
             for (size_t i = 0; i < count; ++i) {
@@ -818,10 +933,28 @@ int main(int argc, char** argv)
         for (int dx = -1; dx <= 1; ++dx) {
             for (int dy = -1; dy <= 1; ++dy) {
                 if (dx == 0 && dy == 0) continue;
+                // Floating, clambering along the rock, slowly.
+                if (level->isSpace()) {
+                    for (float time : {0.3f, 0.6f, 1.f, 1.6f, 2.5f, 4.f}) drifts.push_back({sf::Vector2f(float(dx), float(dy)), time});
+                    continue;
+                }
                 for (float time : {0.12f, 0.25f, 0.4f, 0.6f, 0.9f, 1.3f, 1.8f}) drifts.push_back({sf::Vector2f(float(dx), float(dy)), time});
             }
         }
         if (level->isSpace()) jumps.clear(); // nothing to jump off
+    }
+    // With the knot: tied off every way but steeply down, and onto the line, along it and off.
+    std::vector<Tie> ties;
+    if (rope && abilities.count("tie_off")) {
+        for (int deg = -60; deg <= 240; deg += 10) {
+            for (float onto : {-1.f, 1.f}) {
+                for (float along : {1.f, -1.f}) {
+                    for (float time : {0.6f, 1.5f, 3.f}) {
+                        for (float steer : {-1.f, 1.f}) ties.push_back({deg / 57.2958f, onto, along, time, steer});
+                    }
+                }
+            }
+        }
     }
     std::vector<Climb> climbing;
     for (float dir : {-1.f, 1.f}) {
@@ -890,9 +1023,25 @@ int main(int argc, char** argv)
             if ((done = handle(bot.jump(spot, j), describe(j)))) break;
         }
         if (done) break;
+        std::set<int> tieMisses; // once a tie misses at an angle, it will however it goes on
+        for (const Tie& t : ties) {
+            const int deg = int(std::round(t.angle * 57.2958f));
+            if (tieMisses.count(deg)) continue;
+            const Result r = bot.tie(spot, t);
+            if (r.out == Out::Missed) {
+                if (!bot.player.isTied()) tieMisses.insert(deg);
+                continue;
+            }
+            char how[160];
+            std::snprintf(how, sizeof how, "rope at %d deg, tie it off, onto the line %+.0f, along it %s for %.1fs, jump off steering %+.0f", deg, t.onto,
+                          t.along > 0.f ? "towards the hook" : "away from it", t.time, t.steer);
+            if ((done = handle(r, how))) break;
+        }
+        if (done) break;
         for (const Drift& d : drifts) {
             char how[80];
             std::snprintf(how, sizeof how, "push %+.0f,%+.0f for %.2fs, drift", d.push.x, d.push.y, d.time);
+            if (level->isSpace()) std::snprintf(how, sizeof how, "clamber along the rock %+.0f,%+.0f for %.1fs", d.push.x, d.push.y, d.time);
             if ((done = handle(bot.drift(spot, d), how))) break;
         }
         if (done) break;

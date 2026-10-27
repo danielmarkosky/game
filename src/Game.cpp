@@ -46,6 +46,7 @@ namespace
         {"air_throw", "THROWING GLOVE", "THROW THE ROPE IN MID-AIR TOO"},
         {"double_jump", "UPDRAFT FEATHER", "JUMP AGAIN IN THE AIR"},
         {"stopwatch", "GRAN'S STOPWATCH", "TIME YOUR RUNS: FROM A GREEN POST TO THE FLAG"},
+        {"tie_off", "THE KNOT", "HOOKED AND STANDING, TIE THE ROPE OFF: A LINE TO HANG FROM"},
     };
 }
 
@@ -65,6 +66,7 @@ Game::Game(std::vector<LevelInfo> levelList, Options options)
     const bool heard = !headless || options.sounds;
     audio.setVolumes(heard ? settings.musicVolume : 0, heard ? settings.soundVolume : 0);
     canvas.create(config::GAME_WIDTH, config::GAME_HEIGHT);
+    backdrop.create(config::GAME_WIDTH, config::GAME_HEIGHT);
     canvas.setSmooth(false);
     for (const auto& info : levels) {
         info.level->setTheme(Theme::get(info.theme));
@@ -159,6 +161,15 @@ void Game::enterRoom(size_t index, Level::Side side)
 
     // Until the player lands somewhere in the new room, dying puts them back where they came in.
     checkpoint = player->getPosition();
+    if (level->isSpace()) {
+        // Floating in, that may be out in the open, where nothing would ever move you again without
+        // the rope: back on the rock under the doorway instead.
+        for (sf::Vector2f under = checkpoint; under.y > checkpoint.y - 4.f * Level::TILE_SIZE; under.y -= 1.f) {
+            if (level->isEmptySpace(under - sf::Vector2f(0.f, 1.f), Player::HEIGHT, Player::WIDTH)) continue;
+            checkpoint = under;
+            break;
+        }
+    }
     needsSpawnPoint = true;
     updateCamera(0.f, true);
     // The title only shows the first time in, and only coming into another place: a place can be
@@ -169,7 +180,9 @@ void Game::enterRoom(size_t index, Level::Side side)
     }
     progress.explored.insert(levelKey(index));
     // The first time with no gravity: how it works.
-    if (level->isSpace() && progress.flags.insert("seen_space").second) showMessage("NOTHING FALLS HERE", "THE ARROWS PUSH YOU ANY WAY");
+    if (level->isSpace() && progress.flags.insert("seen_space").second) {
+        showMessage("NOTHING FALLS HERE", "ONLY THE ROPE MOVES YOU: HOOK ON, " + hint(controls::Action::Up) + " PULLS");
+    }
     saveProgress();
 }
 
@@ -210,6 +223,34 @@ std::optional<size_t> Game::roomAt(sf::Vector2f point) const
     return room;
 }
 
+std::optional<Game::NextDoor> Game::nextDoorLook() const
+{
+    const sf::Vector2f you = player->centre();
+    // The gaps in the room's outside walls, and what's on the other side of each.
+    const float T = Level::TILE_SIZE;
+    const sf::FloatRect b = level->bounds();
+    const int x0 = static_cast<int>(b.left / T), x1 = static_cast<int>((b.left + b.width) / T) - 1;
+    const int y0 = static_cast<int>(b.top / T), y1 = static_cast<int>((b.top + b.height) / T) - 1;
+    std::optional<NextDoor> nearest;
+    const auto consider = [&](int x, int y, sf::Vector2f out) {
+        if (level->isSolid(x, y)) return;
+        const sf::Vector2f door((x + 0.5f) * T, (y + 0.5f) * T);
+        const auto other = roomAt(door + out * T);
+        if (!other || levels[*other].theme == levels[levelIndex].theme) return;
+        const float amount = 0.5f * std::clamp(1.f - distance(you, door) / BLEND_REACH, 0.f, 1.f);
+        if (amount > 0.f && (!nearest || amount > nearest->amount)) nearest = NextDoor{*other, amount};
+    };
+    for (int x = x0; x <= x1; ++x) {
+        consider(x, y0, {0.f, -1.f});
+        consider(x, y1, {0.f, 1.f});
+    }
+    for (int y = y0; y <= y1; ++y) {
+        consider(x0, y, {-1.f, 0.f});
+        consider(x1, y, {1.f, 0.f});
+    }
+    return nearest;
+}
+
 sf::Vector2f Game::roomOrigin(size_t index) const
 {
     return sf::Vector2f(levels[index].position) * Level::TILE_SIZE;
@@ -236,6 +277,7 @@ void Game::applyAbilities()
     player->setCanClimb(hasAbility("wall_climb"));
     player->setCanThrowInAir(hasAbility("air_throw"));
     player->setCanDoubleJump(hasAbility("double_jump"));
+    player->setCanTie(hasAbility("tie_off"));
 }
 
 bool Game::touchesSlick(sf::Vector2f point) const
@@ -612,6 +654,11 @@ void Game::frame(float frameTime, std::optional<PlayerInput> scripted)
     // The air: what drifts in it moves along with the camera, at its own depth.
     ambience.setTheme(levels[levelIndex].theme);
     ambience.setDark(level->isDark());
+    // Near a way into somewhere that looks different, its light (and its dark) comes in too.
+    if (inGame()) {
+        const auto next = nextDoorLook();
+        ambience.setBlend(next ? levels[next->room].theme : "", next ? next->amount : 0.f);
+    }
     const sf::Vector2f cameraWorld = drawCamera() + roomOrigin(levelIndex);
     const sf::Vector2f moved = cameraWorld - lastCamera;
     lastCamera = cameraWorld;
@@ -648,7 +695,7 @@ void Game::frame(float frameTime, std::optional<PlayerInput> scripted)
     // Menus leave the player alone, so a rope held when pausing is still held after.
     if (screen == Screen::Playing) {
         PlayerInput in;
-        if (!transition && deathTimer <= 0.f && !ignoreInputThisFrame) {
+        if (deathTimer <= 0.f && !ignoreInputThisFrame) {
             in = scripted ? *scripted : playerInput();
             if (ignorePressesThisFrame) in.jumpPressed = in.ropePressed = false;
             // On a bench (or coming to), moving gets you up; anything else leaves you sitting.
@@ -776,7 +823,7 @@ void Game::handlePress(const InputManager::Press& press)
         else if (interact && npcInReach()) startTalk(*npcInReach());
         else if (interact && !sitting && benchInReach()) sitDown(*benchInReach());
         else if (interact && leverInReach()) pullLever();
-        else if (has(A::Restart) && !transition && deathTimer <= 0.f) killPlayer(); // back to the checkpoint
+        else if (has(A::Restart) && deathTimer <= 0.f) killPlayer(); // back to the checkpoint
         else if (testing && press.key >= sf::Keyboard::Num1 && press.key <= sf::Keyboard::Num9) toggleAbility(size_t(press.key - sf::Keyboard::Num1));
         return;
     }
@@ -822,6 +869,7 @@ PlayerInput Game::playerInput()
     // The rope's key works like the mouse button, for trackpads that can't hold a click.
     in.ropePressed = input.wasMouseClicked() || input.wasPressed(A::Rope);
     in.ropeHeld = input.isMousePressed() || input.isHeld(A::Rope);
+    in.tiePressed = input.wasPressed(A::Interact);
     in.aim = aimPoint();
     return in;
 }
@@ -916,10 +964,10 @@ void Game::step(float dt)
     runShown = std::max(0.f, runShown - dt);
     particles.update(dt);
 
+    // Coming into a room, the camera eases over; you carry on all the while.
     if (transition) {
         transition->time += dt;
         if (transition->time >= TRANSITION_TIME) transition.reset();
-        return;
     }
 
     if (deathTimer > 0.f) {
@@ -992,6 +1040,16 @@ void Game::step(float dt)
         checkpointRiding = player->ridingDir();
         needsSpawnPoint = false;
     }
+    // Standing on a weight plate: it doesn't budge. The first time, say why.
+    if (player->isGrounded() && !progress.flags.count("seen_plate")) {
+        for (const Plate& plate : level->plates()) {
+            const sf::Vector2f feet = player->getPosition();
+            if (!plate.down && feet.y == plate.position.y && feet.x + Player::WIDTH > plate.position.x && feet.x < plate.position.x + 2.f * Level::TILE_SIZE) {
+                progress.flags.insert("seen_plate");
+                showMessage("IT DOESN'T BUDGE", "YOU'RE TOO LIGHT FOR IT");
+            }
+        }
+    }
     updateCart();
     updateTrial();
     updateDog(dt);
@@ -1051,6 +1109,18 @@ void Game::playLevelSounds()
                 particles.spawn(sound.position, {.count = 10, .speed = 50.f, .life = 0.4f, .gravity = 250.f,
                                                  .colors = {sf::Color(220, 240, 255), sf::Color(160, 200, 240)}});
                 break;
+            case LevelSound::Kind::StoneLanded:
+                audio.play(Audio::Sfx::Thud, pitch, volume);
+                shake = std::max(shake, SHAKE_TIME * 0.4f);
+                particles.spawn(sound.position, {.count = 10, .speed = 30.f, .spread = 1.2f, .direction = 1.5708f, .life = 0.5f, .gravity = 150.f,
+                                                 .colors = {sf::Color(120, 110, 105), sf::Color(90, 85, 80)}});
+                break;
+            case LevelSound::Kind::PlateDown:
+                audio.play(Audio::Sfx::PlateClick, 1.f, volume);
+                audio.play(Audio::Sfx::Door, 1.f, volume); // the gates opening
+                break;
+            case LevelSound::Kind::PlateUp: audio.play(Audio::Sfx::PlateClick, 0.7f, volume); break;
+            case LevelSound::Kind::FireLit: audio.play(Audio::Sfx::Burn, 0.6f, volume * 0.7f); break;
         }
     }
 }
@@ -1126,6 +1196,14 @@ void Game::showEffects(const std::vector<PlayerEvent>& events)
             case PlayerEvent::Type::RopeAttached:
                 audio.play(Audio::Sfx::Hooked);
                 particles.spawn(e.position, {.count = 8, .speed = 50.f, .life = 0.25f, .gravity = 100.f, .colors = sparks});
+                // The first stone hooked: how it's moved.
+                for (size_t stone = 0; stone < level->stones().size(); ++stone) {
+                    const sf::FloatRect box = level->stoneBox(stone);
+                    const sf::FloatRect near(box.left - 1.f, box.top - 1.f, box.width + 2.f, box.height + 2.f);
+                    if (near.contains(e.position) && progress.flags.insert("seen_stone").second) {
+                        showMessage("A HEAVY STONE", "FEET ON THE GROUND, " + hint(controls::Action::Up) + ": IT COMES WHERE THE ROPE BENDS");
+                    }
+                }
                 break;
             case PlayerEvent::Type::RopeWrapped:
                 particles.spawn(e.position, {.count = 4, .speed = 30.f, .life = 0.2f, .gravity = 100.f, .colors = sparks});
@@ -1176,6 +1254,22 @@ void Game::showEffects(const std::vector<PlayerEvent>& events)
                 particles.spawn(e.position, {.count = 2, .speed = 10.f, .life = 0.6f, .gravity = 0.f,
                                              .colors = {sf::Color(200, 210, 255, 160), sf::Color(255, 255, 255, 120)}});
                 break;
+            case PlayerEvent::Type::RopeBurnt:
+                audio.play(Audio::Sfx::Burn);
+                if (progress.flags.insert("seen_fire").second) showMessage("IT BURNT THROUGH", "KEEP THE ROPE OUT OF THE FIRE");
+                particles.spawn(e.position, {.count = 12, .speed = 35.f, .spread = 1.4f, .direction = 1.5708f, .life = 0.6f, .gravity = -40.f,
+                                             .colors = {sf::Color(255, 200, 90), sf::Color(255, 120, 50), sf::Color(90, 80, 80, 200)}});
+                break;
+            case PlayerEvent::Type::Tied:
+                audio.play(Audio::Sfx::Hooked, 0.7f);
+                particles.spawn(e.position, {.count = 6, .speed = 25.f, .life = 0.3f, .gravity = 100.f, .colors = dust});
+                break;
+            case PlayerEvent::Type::Untied: audio.play(Audio::Sfx::Throw, 0.8f); break;
+            case PlayerEvent::Type::GrabbedLine: audio.play(Audio::Sfx::Grab, 1.2f); break;
+            case PlayerEvent::Type::StoneDragged:
+                audio.play(Audio::Sfx::Scrape, 0.9f + 0.2f * static_cast<float>(std::rand() % 100) / 100.f);
+                particles.spawn(e.position, {.count = 2, .speed = 15.f, .life = 0.4f, .gravity = 100.f, .colors = dust});
+                break;
             case PlayerEvent::Type::RopeBounced:
                 audio.play(Audio::Sfx::RopeClink);
                 particles.spawn(e.position, {.count = 5, .speed = 40.f, .life = 0.25f, .gravity = 200.f, .colors = dust});
@@ -1220,8 +1314,14 @@ sf::Vector2f Game::clampToLevel(sf::Vector2f cam) const
 
 sf::Vector2f Game::drawCamera() const
 {
+    // Just come into a room: easing from where it was in the last one to where it follows you now.
+    sf::Vector2f cam = camera;
+    if (transition) {
+        const float p = easeInOut(std::min(1.f, transition->time / TRANSITION_TIME));
+        cam = transition->fromCamera + (camera - transition->fromCamera) * p;
+    }
     // Rounded so tiles and player move in whole pixels together and nothing shimmers.
-    return {std::round(camera.x), std::round(camera.y)};
+    return {std::round(cam.x), std::round(cam.y)};
 }
 
 sf::Vector2f Game::titleCamera() const

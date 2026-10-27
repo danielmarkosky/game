@@ -1,4 +1,4 @@
-"""The Frost Caves, off the old lookout above the campfire: for when you have the long rope (from
+"""The Frost Caves, through the Snowy Pass off the Cliff Path above the campfire: for when you have the long rope (from
 the Hook Garden). Ice underfoot, icicles overhead, crystal spikes below; at the top of the Frozen
 Falls, the throwing glove."""
 from world.build import region, room, ground, roof, pit
@@ -12,6 +12,23 @@ region('frost')
 # A gem on top of a slick pillar by the way in, too high for one jump (the feather's).
 # ----------------------------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------------------------------
+# The Snowy Pass: off the Cliff Path into the cold. The grass gives out under snow; pines, a cairn,
+# a drift or two to hop; and at the far end the rock closes in overhead, icicles under it: the
+# mouth of the Frost Caves.
+# ----------------------------------------------------------------------------------------------
+
+snowy = room('snowy_pass', 'The Snowy Pass', 'snow', 32, 18)
+ground(snowy, 3)
+snowy.fill(18, 20, 4, 4, '#').fill(19, 20, 5, 5, '#')  # a drift-covered rock
+snowy.fill(0, 9, 11, 17, '#').fill(10, 12, 13, 17, '#')  # the cave mouth's rock, overhead
+snowy.door('L', 4).door('R', 4)
+snowy.put(29, 4, 'S')
+
+snowy.props((27, 4, 'signpost'), (24, 4, 'pine'), (15, 4, 'cairn'), (12, 4, 'pine'), (6, 4, 'crystals'),
+            (3, 4, 'stalagmite'), (2, 10, 'icicles'), (7, 10, 'icicles'), (11, 12, 'icicles'), (30, 4, 'pine'))
+
+# ----------------------------------------------------------------------------------------------
 frost = room('frost_caves', 'The Frost Caves', 'ice', 48, 28)
 ground(frost, 5)
 pit(frost, 16, 29, bottom=1, top=5)

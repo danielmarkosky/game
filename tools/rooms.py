@@ -35,7 +35,7 @@ CHAR_OF = {value: char for value, char, _, _ in TILES}
 VALUE_OF = {char: value for value, char, _, _ in TILES}
 
 THEMES = ['cave', 'garden', 'snow', 'ember', 'daylight', 'ruins', 'ice', 'sky', 'grotto', 'glade', 'still', 'mine']
-ABILITIES = ['rope', 'long_rope', 'wall_climb', 'air_throw', 'double_jump', 'stopwatch']
+ABILITIES = ['rope', 'long_rope', 'wall_climb', 'air_throw', 'double_jump', 'stopwatch', 'tie_off']
 
 # Entities: identifier, text character, colour, at most one per room, fields.
 ENTITIES = [
@@ -55,6 +55,9 @@ ENTITIES = [
     ('Cart', 'K', '#8A7A6A', False, [('dir', 'String'), ('needs', 'String')]),
     ('CartStop', 'E', '#6A5A4A', False, []),
     ('Trial', 'T', '#7EF08E', False, [('route', 'String'), ('mark', 'String')]),
+    ('Stone', 'O', '#968C96', False, []),
+    ('Plate', 'V', '#78C8AA', False, []),
+    ('Fire', 'F', '#FF8C3C', False, [('period', 'String'), ('phase', 'String'), ('flue', 'String')]),
 ]
 ENTITY_OF_CHAR = {char: ident for ident, char, *_ in ENTITIES}
 CHAR_OF_ENTITY = {ident: char for ident, char, *_ in ENTITIES}

@@ -20,7 +20,11 @@ namespace
     constexpr float ICICLE_MAX_SPEED = 420.f;
     constexpr float ICICLE_BACK = 2.5f;    // grown back after this
     constexpr float ICICLE_SIGHT = 14.f;   // tiles: how far below it notices you
-    constexpr float RING_RADIUS = 4.f;     // what the rope has to pass through to catch it
+    constexpr float RING_RADIUS = 6.f;     // what the rope has to pass through to catch it
+    constexpr float STONE_GRAVITY = 900.f;
+    constexpr float STONE_MAX_SPEED = 400.f;
+    constexpr float STONE_THUD = 120.f;    // landing faster than this is heard
+    constexpr float FIRE_WARNING = 0.5f;   // a breathing fire flickers this long before it lights
     constexpr float PI = 3.14159265f;
 
     long long tileKey(int x, int y)
@@ -93,6 +97,181 @@ void Level::addCartStop(sf::Vector2i tile)
 void Level::addTrial(const std::string& route, bool finish, sf::Vector2i tile)
 {
     m_trials.push_back({route, finish, sf::Vector2f(tile) * TILE_SIZE});
+}
+
+void Level::addStone(sf::Vector2i tile)
+{
+    const sf::Vector2f at = sf::Vector2f(tile) * TILE_SIZE;
+    m_stones.push_back({at, at, {}});
+}
+
+void Level::addPlate(sf::Vector2i tile)
+{
+    m_plates.push_back({sf::Vector2f(tile) * TILE_SIZE});
+}
+
+void Level::addFire(sf::Vector2i tile, float period, float phase, bool flue)
+{
+    Fire fire{sf::Vector2f(tile) * TILE_SIZE, std::max(0.f, period), phase, flue, 0.f};
+    if (flue) {
+        int top = tile.y + 1;
+        while (top < tile.y + 60 && !isSolid(tile.x, top)) ++top;
+        fire.top = static_cast<float>(top) * TILE_SIZE;
+    }
+    m_fires.push_back(fire);
+}
+
+const std::vector<Stone>& Level::stones() const { return m_stones; }
+const std::vector<Plate>& Level::plates() const { return m_plates; }
+const std::vector<Fire>& Level::fires() const { return m_fires; }
+
+namespace
+{
+    // How far through its breath a fire is, 0 to 1: burning for the first half, cold for the second.
+    float breath(const Fire& fire, float time)
+    {
+        if (fire.period <= 0.f) return 0.f;
+        const float t = std::fmod(time / fire.period + fire.phase, 1.f);
+        return t < 0.f ? t + 1.f : t;
+    }
+}
+
+bool Level::isBurning(const Fire& fire) const
+{
+    return fire.period <= 0.f || breath(fire, m_time) < 0.5f;
+}
+
+bool Level::isAboutToBurn(const Fire& fire) const
+{
+    return !isBurning(fire) && (1.f - breath(fire, m_time)) * fire.period < FIRE_WARNING;
+}
+
+sf::FloatRect Level::stoneBox(size_t stone) const
+{
+    return {m_stones[stone].position.x, m_stones[stone].position.y, STONE_SIZE, STONE_SIZE};
+}
+
+sf::FloatRect Level::fireBox(const Fire& fire) const
+{
+    // The flames: a little narrower than the tile, and up into the one above, or a flue's all the
+    // way up.
+    const float height = fire.flue ? fire.top - fire.position.y : TILE_SIZE * 1.5f;
+    return {fire.position.x + 1.f, fire.position.y, TILE_SIZE - 2.f, height};
+}
+
+std::optional<sf::Vector2f> Level::burnsAlong(sf::Vector2f from, sf::Vector2f to) const
+{
+    if (m_fires.empty()) return std::nullopt;
+    const float length = distance(from, to);
+    const int steps = std::max(1, static_cast<int>(std::ceil(length)));
+    for (int ii = 0; ii <= steps; ++ii) {
+        const sf::Vector2f p = from + (to - from) * (static_cast<float>(ii) / static_cast<float>(steps));
+        for (const Fire& fire : m_fires) {
+            if (isBurning(fire) && inside(fireBox(fire), p)) return p;
+        }
+    }
+    return std::nullopt;
+}
+
+bool Level::stoneFits(sf::FloatRect box, size_t stone, sf::FloatRect player) const
+{
+    if (box.intersects(player)) return false;
+    for (size_t ii = 0; ii < m_stones.size(); ++ii) {
+        if (ii != stone && box.intersects(stoneBox(ii))) return false;
+    }
+    for (int x = static_cast<int>(std::floor(box.left / TILE_SIZE)); x * TILE_SIZE < box.left + box.width; ++x) {
+        for (int y = static_cast<int>(std::floor(box.top / TILE_SIZE)); y * TILE_SIZE < box.top + box.height; ++y) {
+            if (isSolid(x, y)) return false;
+        }
+    }
+    return true;
+}
+
+bool Level::stoneResting(size_t stone) const
+{
+    const sf::FloatRect box = stoneBox(stone);
+    if (!stoneFits({box.left, box.top - 1.f, box.width, box.height}, stone, {})) return true;
+    // On a platform's top edge.
+    return isOnPlatform({box.left, box.top}, box.width);
+}
+
+float Level::moveStone(size_t stone, sf::Vector2f by, sf::FloatRect player)
+{
+    // Pixel by pixel, like the player, so it always ends up exactly touching what stops it. What's
+    // less than a pixel waits for next time, and counts as moved.
+    Stone& s = m_stones[stone];
+    const sf::Vector2f start = s.position + s.remainder;
+    s.remainder += by;
+    for (int axis = 0; axis < 2; ++axis) {
+        float& remainder = axis == 0 ? s.remainder.x : s.remainder.y;
+        int move = static_cast<int>(std::round(remainder));
+        remainder -= static_cast<float>(move);
+        const int step = move > 0 ? 1 : -1;
+        for (; move != 0; move -= step) {
+            const sf::Vector2f next = s.position + (axis == 0 ? sf::Vector2f(static_cast<float>(step), 0.f) : sf::Vector2f(0.f, static_cast<float>(step)));
+            const bool onPlatform = axis == 1 && step < 0 && isOnPlatform(s.position, STONE_SIZE);
+            if (onPlatform || !stoneFits({next.x, next.y, STONE_SIZE, STONE_SIZE}, stone, player)) {
+                remainder = 0.f;
+                break;
+            }
+            s.position = next;
+        }
+    }
+    return distance(start, s.position + s.remainder);
+}
+
+void Level::holdStone(size_t stone, bool held)
+{
+    if (stone < m_stones.size()) m_stones[stone].held = held;
+}
+
+void Level::updateStones(float dt, sf::FloatRect player)
+{
+    for (size_t ii = 0; ii < m_stones.size(); ++ii) {
+        Stone& stone = m_stones[ii];
+        const sf::Vector2f bottom = stone.position + sf::Vector2f(STONE_SIZE * 0.5f, 0.f);
+        if (stone.held || m_space || stoneResting(ii)) { // where nothing falls, nor does a stone
+            if (stone.fall > STONE_THUD) m_sounds.push_back({LevelSound::Kind::StoneLanded, bottom});
+            stone.fall = 0.f;
+            continue;
+        }
+        stone.fall = std::min(stone.fall + STONE_GRAVITY * dt, STONE_MAX_SPEED);
+        const float wanted = stone.fall * dt;
+        if (moveStone(ii, {0.f, -wanted}, player) < wanted - 0.01f) {
+            if (stone.fall > STONE_THUD) m_sounds.push_back({LevelSound::Kind::StoneLanded, bottom});
+            stone.fall = 0.f;
+        }
+        // Lost down a pit: it's back where it was.
+        if (stone.position.y < m_bounds.top - 4.f * TILE_SIZE) {
+            stone.position = stone.home;
+            stone.remainder = {};
+            stone.fall = 0.f;
+        }
+    }
+    // A stone resting on a plate holds it down, and the gates open. They don't shut on you.
+    bool held = false;
+    for (Plate& plate : m_plates) {
+        bool down = false;
+        for (size_t ii = 0; ii < m_stones.size() && !down; ++ii) {
+            const Stone& stone = m_stones[ii];
+            down = std::abs(stone.position.y - plate.position.y) < 0.5f && stone.position.x < plate.position.x + 2.f * TILE_SIZE &&
+                   stone.position.x + STONE_SIZE > plate.position.x;
+        }
+        if (down != plate.down) {
+            const sf::Vector2f middle = plate.position + sf::Vector2f(TILE_SIZE, 0.f);
+            m_sounds.push_back({down ? LevelSound::Kind::PlateDown : LevelSound::Kind::PlateUp, middle});
+        }
+        plate.down = down;
+        held |= down;
+    }
+    if (m_gatesHeld && !held) {
+        for (int x = static_cast<int>(std::floor(player.left / TILE_SIZE)); x * TILE_SIZE < player.left + player.width && !held; ++x) {
+            for (int y = static_cast<int>(std::floor(player.top / TILE_SIZE)); y * TILE_SIZE < player.top + player.height && !held; ++y) {
+                held = tileAt(x, y) == TILE_GATE;
+            }
+        }
+    }
+    m_gatesHeld = held;
 }
 
 void Level::setWind(float wind) { m_wind = wind; }
@@ -268,6 +447,14 @@ bool Level::isOnIce(sf::Vector2f feet, float width) const
 void Level::update(float dt, sf::FloatRect player)
 {
     m_time += dt;
+    updateStones(dt, player);
+    // Breathing fires lighting again: heard.
+    for (const Fire& fire : m_fires) {
+        if (fire.period <= 0.f || dt <= 0.f) continue;
+        if (breath(fire, m_time) < breath(fire, m_time - dt)) {
+            m_sounds.push_back({LevelSound::Kind::FireLit, fire.position + sf::Vector2f(TILE_SIZE * 0.5f, TILE_SIZE)});
+        }
+    }
 
     // In a hidden passage, it fades away round you; out of it, it closes up again.
     bool inPassage = false;
@@ -374,6 +561,17 @@ void Level::reset()
         icicle.tip = icicle.home;
         icicle.speed = icicle.timer = 0.f;
     }
+    for (Stone& stone : m_stones) {
+        stone.position = stone.home;
+        stone.remainder = {};
+        stone.fall = 0.f;
+        stone.held = false;
+    }
+    for (Plate& plate : m_plates) plate.down = false;
+    m_gatesHeld = false;
+    // A stone put on a plate to start with holds it from the start.
+    if (!m_plates.empty()) updateStones(0.f, {});
+    m_sounds.clear();
 }
 
 std::optional<RopeHit> Level::ropeHit(sf::Vector2f from, sf::Vector2f to, float range) const
@@ -396,6 +594,12 @@ std::optional<RopeHit> Level::ropeHit(sf::Vector2f from, sf::Vector2f to, float 
         for (size_t ii = 0; ii < m_lamps.size(); ++ii) {
             const sf::Vector2f at = m_lamps[ii].position;
             if (inside({at.x + 1.f, at.y, TILE_SIZE - 2.f, TILE_SIZE}, p)) return RopeHit{RopeHit::Kind::Lamp, p, static_cast<int>(ii), d};
+        }
+        for (size_t ii = 0; ii < m_stones.size(); ++ii) {
+            if (inside(stoneBox(ii), p)) return RopeHit{RopeHit::Kind::Stone, lastEmpty, static_cast<int>(ii), d};
+        }
+        for (const Fire& fire : m_fires) {
+            if (isBurning(fire) && inside(fireBox(fire), p)) return RopeHit{RopeHit::Kind::Fire, p, -1, d};
         }
         const auto [tx, ty] = tailNumbers(p);
         // Slick stone and soft mushroom caps: nothing to bite.
@@ -428,17 +632,75 @@ void Level::drawMoving(sf::RenderTarget& target, sf::Vector2f centr, float time)
         }
         drawProp(target, "vent", viewCoordinates({area.left + TILE_SIZE, area.top + 2.f}, centr));
     }
-    // Rings on their tracks.
+    // Rings on their tracks: a rail two pixels thick, a bolt at each end.
     for (size_t ii = 0; ii < m_rings.size(); ++ii) {
         const sf::Vector2f a = viewCoordinates(m_rings[ii].from, centr), b = viewCoordinates(m_rings[ii].to, centr);
-        const sf::Color track(70, 70, 90);
-        const sf::Vertex line[] = {{{std::floor(a.x) + 0.5f, std::floor(a.y) + 0.5f}, track}, {{std::floor(b.x) + 0.5f, std::floor(b.y) + 0.5f}, track}};
-        target.draw(line, 2, sf::Lines);
+        const sf::Color track(70, 72, 96), shine(110, 116, 140);
+        for (const auto& [offset, colour] : {std::pair{0.f, track}, std::pair{1.f, shine}}) {
+            const sf::Vertex line[] = {{{std::floor(a.x) + 0.5f, std::floor(a.y) + 0.5f + offset}, colour},
+                                       {{std::floor(b.x) + 0.5f, std::floor(b.y) + 0.5f + offset}, colour}};
+            target.draw(line, 2, sf::Lines);
+        }
+        for (const sf::Vector2f end : {a, b}) {
+            sf::RectangleShape bolt({3.f, 3.f});
+            bolt.setPosition(std::floor(end.x) - 1.f, std::floor(end.y) - 1.f);
+            bolt.setFillColor(sf::Color(50, 52, 70));
+            target.draw(bolt);
+        }
         drawProp(target, "ring", viewCoordinates(ringPosition(ii), centr));
     }
     // Lamps, lit or not.
     for (const Lamp& lamp : m_lamps) {
         drawProp(target, lamp.lit ? "lamp_lit" : "lamp", viewCoordinates(lamp.position + sf::Vector2f(TILE_SIZE * 0.5f, TILE_SIZE * 0.5f), centr));
+    }
+    // Fire, flickering: a brazier, or a flue's column of it, a grate at its foot. Breathing ones go
+    // cold, and sputter just before they light again.
+    for (const Fire& fire : m_fires) {
+        const sf::Vector2f foot = fire.position + sf::Vector2f(TILE_SIZE * 0.5f, 0.f);
+        const bool burning = isBurning(fire), sputtering = isAboutToBurn(fire);
+        if (!fire.flue) {
+            if (burning) drawStanding(target, "fire", viewCoordinates(foot, centr), time + fire.position.x * 0.13f);
+            else drawStanding(target, sputtering && std::fmod(time * 12.f, 1.f) < 0.5f ? "fire" : "cold_fire", viewCoordinates(foot, centr));
+            continue;
+        }
+        drawProp(target, "vent", viewCoordinates(foot + sf::Vector2f(0.f, 2.f), centr));
+        const float height = fire.top - fire.position.y;
+        const sf::Vector2f corner = viewCoordinates({fire.position.x, fire.top}, centr);
+        if (burning) {
+            // A roaring column: a glow over all of it, and tongues of flame racing up it.
+            sf::RectangleShape glow({TILE_SIZE - 2.f, height});
+            glow.setPosition(std::floor(corner.x) + 1.f, std::floor(corner.y));
+            glow.setFillColor(sf::Color(255, 120, 40, 110));
+            target.draw(glow);
+            const int tongues = std::max(6, static_cast<int>(height / 5.f));
+            for (int i = 0; i < tongues; ++i) {
+                const float rise = std::fmod(time * (90.f + (i % 4) * 20.f) + i * 31.f, height);
+                const float x = fire.position.x + 1.f + std::fmod(i * 3.7f + std::sin(time * 9.f + i) * 1.5f + 6.f, TILE_SIZE - 3.f);
+                const sf::Vector2f p = viewCoordinates({x, fire.position.y + rise}, centr);
+                sf::RectangleShape tongue({2.f, 4.f});
+                tongue.setPosition(std::floor(p.x), std::floor(p.y));
+                const float hot = 1.f - rise / height;
+                tongue.setFillColor(sf::Color(255, static_cast<sf::Uint8>(140 + 100 * hot), static_cast<sf::Uint8>(60 + 120 * hot), 220));
+                target.draw(tongue);
+            }
+        } else if (sputtering) {
+            // About to go up: licks of flame at the grate.
+            for (int i = 0; i < 3; ++i) {
+                const float up = std::abs(std::sin(time * 17.f + i * 2.1f)) * 7.f;
+                const sf::Vector2f p = viewCoordinates({fire.position.x + 2.f + i * 2.f, fire.position.y + 2.f + up}, centr);
+                sf::RectangleShape lick({1.f, 3.f});
+                lick.setPosition(std::floor(p.x), std::floor(p.y));
+                lick.setFillColor(sf::Color(255, 190, 90, 200));
+                target.draw(lick);
+            }
+        }
+    }
+    // Weight plates, down or not, and the stones.
+    for (const Plate& plate : m_plates) {
+        drawStanding(target, plate.down ? "plate_down" : "plate", viewCoordinates(plate.position + sf::Vector2f(TILE_SIZE, 0.f), centr));
+    }
+    for (size_t ii = 0; ii < m_stones.size(); ++ii) {
+        drawStanding(target, "stone", viewCoordinates(m_stones[ii].position + sf::Vector2f(STONE_SIZE * 0.5f, 0.f), centr));
     }
     // Icicles, shaking before they fall.
     for (const Icicle& icicle : m_icicles) {

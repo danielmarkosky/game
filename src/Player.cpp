@@ -34,15 +34,20 @@ namespace
 
     const sf::Color ROPE_COLOUR(200, 190, 170);
     const sf::Color HOOK_COLOUR(255, 90, 90);
+    const sf::Color KNOT_COLOUR(150, 130, 105);
+    // Hands this close to the tied line take hold of it.
+    constexpr float LINE_GRAB = 3.f;
 
     // Grabbing a wall in the air only once a jump has slowed to this, so jumping up beside a wall
     // doesn't stop dead on it.
     constexpr float GRAB_BELOW_SPEED = 100.f;
     // Leaping off a wall uses this much of the strength for holding on.
     constexpr float WALL_JUMP_STAMINA = 0.5f;
+    // Floating, holding on to rock stops you this quickly: this much of your speed each second.
+    constexpr float GRIP = 12.f;
 }
 
-Player::Player(std::shared_ptr<const Level> lvl)
+Player::Player(std::shared_ptr<Level> lvl)
     : level(std::move(lvl)), ropeRange(physics().ropeRange)
 {
     respawn(level->getStartPos());
@@ -54,6 +59,7 @@ void Player::handleInput(const PlayerInput& in)
     input = in;
     if (in.jumpPressed) jumpBufferTimer = physics().jumpBufferTime;
     if (in.ropePressed) ropeShotQueued = true;
+    if (in.tiePressed) tieQueued = true;
     if (!in.ropeHeld) {
         ropeShotQueued = false;
         if (rope) {
@@ -106,6 +112,30 @@ void Player::update(float dt)
     dropThroughTimer = std::max(0.f, dropThroughTimer - dt);
     ropeJumpTimer = std::max(0.f, ropeJumpTimer - dt);
     regrabTimer = std::max(0.f, regrabTimer - dt);
+
+    // The knot: tying the rope off, or untying it. Tied, where it's hooked can crumble away, and
+    // fire burns it through, like the rope in your hand.
+    if (tieQueued) {
+        tieQueued = false;
+        if (!line.empty()) untie();
+        else if (canTie()) tieOff();
+    }
+    if (!line.empty() && !rockAt(line.front())) {
+        untie();
+    } else {
+        for (size_t ii = 0; ii + 1 < line.size(); ++ii) {
+            if (!level->burnsAlong(line[ii], line[ii + 1])) continue;
+            untie(true);
+            break;
+        }
+    }
+    // Hanging from the line: that's all there is to do.
+    if (lineSegment >= 0) {
+        updateHanging(dt);
+        animTime += dt;
+        squash += (sf::Vector2f(1.f, 1.f) - squash) * (1.f - std::exp(-14.f * dt));
+        return;
+    }
     if (grounded && !rope && !riding && input.moveY < 0.f && level->isOnPlatform(position, WIDTH)) {
         dropThroughTimer = DROP_THROUGH_TIME;
     }
@@ -120,17 +150,31 @@ void Player::update(float dt)
 
     // --- Horizontal ---
     if (floating) {
-        // Pushed about by the arrows, any way, drifting to a stop with nothing held. On the rope,
-        // up and down reel it in and out instead.
-        const sf::Vector2f push(inputX, rope ? 0.f : input.moveY);
-        for (auto [speed, along] : {std::pair{&velocity.x, push.x}, std::pair{&velocity.y, push.y}}) {
-            if (along != 0.f) *speed = approach(*speed, along * p.floatSpeed, p.floatAcceleration * dt);
-            else *speed -= *speed * std::min(1.f, p.floatDrag * dt);
-        }
-        strokeTimer -= dt;
-        if (push != sf::Vector2f() && strokeTimer <= 0.f) {
-            strokeTimer = 0.5f;
-            events.push_back({PlayerEvent::Type::Pushed, exactCentre() - push * 4.f});
+        // Out in the open nothing you do moves you: you drift on, hardly slowing. Touching rock you
+        // hold on to it, and the arrows move you along it hand over hand, but never off it (on the
+        // rope, only left and right: up and down reel). Anything more is the rope's doing (below).
+        velocity -= velocity * std::min(1.f, p.floatDrag * dt);
+        const bool reeling = rope && input.moveY > 0.f;
+        if (holdingOn() && !reeling) {
+            const sf::Vector2f want(inputX, rope ? 0.f : input.moveY);
+            bool crawling = false;
+            for (int axis = 0; axis < 2; ++axis) {
+                const float along = axis == 0 ? want.x : want.y;
+                float& speed = axis == 0 ? velocity.x : velocity.y;
+                const sf::Vector2f step = axis == 0 ? sf::Vector2f(sign(along), 0.f) : sf::Vector2f(0.f, sign(along));
+                // That way keeps a hand on the rock (or is into it, which stops you anyway).
+                if (along != 0.f && (!fits(position + step) || touchingRockAt(position + step))) {
+                    speed = along * p.floatCrawl;
+                    crawling = true;
+                } else {
+                    speed -= speed * std::min(1.f, GRIP * dt);
+                }
+            }
+            strokeTimer -= dt;
+            if (crawling && strokeTimer <= 0.f) {
+                strokeTimer = 0.4f;
+                events.push_back({PlayerEvent::Type::Pushed, exactCentre()});
+            }
         }
     } else if (riding) {
         velocity.x = static_cast<float>(riding) * p.cartSpeed;
@@ -277,12 +321,62 @@ void Player::update(float dt)
     // --- Rope ---
     if (rope) {
         // On a ring, it goes where the ring goes. In rock that's crumbled away, it's let go.
-        if (ringAnchor) rope->moveAnchor(level->ringPosition(*ringAnchor));
+        if (ringAnchor) rope->moveAnchor(level->ringPosition(*ringAnchor), exactCentre());
+        else if (stoneAnchor) rope->moveAnchor(level->stones()[*stoneAnchor].position + stoneHook, exactCentre());
         else if (!anchorHeld()) letGoOfRope();
     }
+    if (rope && floating) {
+        // Nothing to hang from: reeling in pulls you along the rope towards where it bends (or is
+        // hooked), and held, it's never longer than it needs to be, so it swings you round on it.
+        // Letting it out gives it slack.
+        const sf::Vector2f toPivot = rope->pivot() - exactCentre();
+        const float away = magnitude(toPivot);
+        if (input.moveY > 0.f && away > Rope::MIN_LENGTH + 1.f) {
+            const sf::Vector2f dir = toPivot / away;
+            const float along = dot(velocity, dir);
+            if (along < p.spaceReelSpeed) velocity += dir * std::min(p.spaceReelPull * dt, p.spaceReelSpeed - along);
+        }
+        if (input.moveY < 0.f) rope->setLength(rope->length() + p.reelSpeed * dt);
+        else if (away < rope->freeLength()) rope->setLength(rope->length() - (rope->freeLength() - away));
+    } else if (rope) {
+        // Hooked in a stone, with your feet braced, the rope holds it up; reeling in drags it towards
+        // where the rope bends first (or you). Only once it won't come does reeling pull you instead.
+        bool dragged = false;
+        const bool braced = grounded || clinging;
+        if (stoneAnchor) {
+            // It hangs on the rope only where the rope goes up over something from it: straight to
+            // you, nothing's holding it up.
+            const bool overhead = rope->pivots().size() > 1 && rope->pivots()[1].y > rope->anchor().y;
+            level->holdStone(*stoneAnchor, braced && overhead);
+            if (braced && input.moveY > 0.f) {
+                const sf::Vector2f from = rope->anchor();
+                const sf::Vector2f to = rope->pivots().size() > 1 ? rope->pivots()[1] : exactCentre();
+                const sf::Vector2f pull = to - from;
+                const float apart = magnitude(pull);
+                // Resting on something, it slides along it (off the edge, if it gets there), unless the
+                // rope pulls it up more than sideways; hanging, it goes straight where it's pulled.
+                sf::Vector2f way = apart > 0.f ? pull / apart : sf::Vector2f();
+                if (level->stoneResting(*stoneAnchor) && pull.y < std::abs(pull.x)) way = {std::abs(pull.x) > 1.f ? sign(pull.x) : 0.f, 0.f};
+                if (apart > 2.f && way != sf::Vector2f()) {
+                    const float moved = level->moveStone(*stoneAnchor, way * p.stoneDragSpeed * dt, hitbox());
+                    if (moved > 0.01f) {
+                        dragged = true;
+                        rope->moveAnchor(level->stones()[*stoneAnchor].position + stoneHook, exactCentre());
+                        // Reeled in as it comes: never slack.
+                        const float slack = rope->freeLength() - distance(exactCentre(), rope->pivot());
+                        if (slack > 0.f) rope->setLength(rope->length() - slack);
+                        dragSound -= dt;
+                        if (dragSound <= 0.f) {
+                            dragSound = 0.25f;
+                            events.push_back({PlayerEvent::Type::StoneDragged, level->stones()[*stoneAnchor].position + sf::Vector2f(Level::STONE_SIZE * 0.5f, 0.f)});
+                        }
+                    }
+                }
+            }
+        }
+        if (!dragged && input.moveY != 0.f) rope->setLength(rope->length() - input.moveY * p.reelSpeed * dt);
+    }
     if (rope) {
-        if (input.moveY != 0.f) rope->setLength(rope->length() - input.moveY * p.reelSpeed * dt);
-
         float speed = magnitude(velocity);
         if (swinging && speed > p.maxSwingSpeed) velocity *= p.maxSwingSpeed / speed;
         velocity = rope->constrainVelocity(exactCentre(), velocity);
@@ -318,6 +412,11 @@ void Player::update(float dt)
         moveX(correction.x);
         moveY(correction.y);
         rope->update(centre(), dt);
+        burnRope();
+    }
+    // Falling (or reaching up) past the tied line: hands on it.
+    if (!line.empty() && !rope && !clinging && !riding && regrabTimer <= 0.f && (velocity.y <= 0.f || input.moveY > 0.f) && !isGrounded()) {
+        grabLine();
     }
     if (loose) loose->update(exactCentre(), dt, hook == Hook::Out);
 }
@@ -346,8 +445,9 @@ void Player::updateThrow(float dt, bool grounded)
             else if (windUp <= 0.f) throwRope();
             break;
         case Hook::Out: {
-            // After a ring, wherever it's got to.
+            // After a ring, or a stone, wherever it's got to.
             if (hookKind == RopeHit::Kind::Ring) hookTarget = level->ringPosition(static_cast<size_t>(hookIndex));
+            if (hookKind == RopeHit::Kind::Stone) hookTarget = level->stones()[static_cast<size_t>(hookIndex)].position + stoneHook;
             const sf::Vector2f to = hookTarget - hookHead;
             const float left = magnitude(to), step = p.throwSpeed * dt;
             if (left > step) {
@@ -361,6 +461,7 @@ void Player::updateThrow(float dt, bool grounded)
             if (hookCatches && distance(exactCentre(), hookTarget) <= ropeRange + 4.f) {
                 rope.emplace(exactCentre(), hookTarget, level);
                 if (hookKind == RopeHit::Kind::Ring) ringAnchor = static_cast<size_t>(hookIndex);
+                if (hookKind == RopeHit::Kind::Stone) stoneAnchor = static_cast<size_t>(hookIndex);
                 loose.reset();
                 hook = Hook::InHand;
                 airJumped = false;
@@ -371,6 +472,10 @@ void Player::updateThrow(float dt, bool grounded)
                 const auto type = hookKind == RopeHit::Kind::Lever ? PlayerEvent::Type::LeverTugged : PlayerEvent::Type::LampTugged;
                 events.push_back({type, hookTarget, 0.f, hookIndex});
                 hook = Hook::Back;
+            } else if (hookBurns) {
+                // Into the fire: the end of it burns off, and the rest comes back.
+                events.push_back({PlayerEvent::Type::RopeBurnt, hookTarget});
+                hook = Hook::Back;
             } else {
                 if (hookBounces) {
                     loose->bounce(exactCentre() - hookTarget);
@@ -380,6 +485,8 @@ void Player::updateThrow(float dt, bool grounded)
             }
             break;
         }
+        case Hook::Tied:
+            break; // strung up: see tieOff
         case Hook::Back:
             // Pulled in hand over hand, the way it lies.
             loose->reelIn(p.ropeReturnSpeed * dt);
@@ -399,7 +506,7 @@ void Player::throwRope()
     direction = length > 0.f ? direction / length : sf::Vector2f(facingLeft ? -1.f : 1.f, 0.f);
     hookHead = from;
     loose.emplace(from, level);
-    hookCatches = hookBounces = false;
+    hookCatches = hookBounces = hookBurns = false;
     hookKind = RopeHit::Kind::Rock;
     hookIndex = -1;
     if (const auto hit = level->ropeHit(from, from + direction, reach())) {
@@ -408,8 +515,11 @@ void Player::throwRope()
         hookIndex = hit->index;
         if (hit->kind == RopeHit::Kind::Ring) {
             hookCatches = true;
-        } else if (hit->kind == RopeHit::Kind::Rock && hit->distance >= Rope::MIN_LENGTH) {
+        } else if (hit->kind == RopeHit::Kind::Fire) {
+            hookBurns = true;
+        } else if ((hit->kind == RopeHit::Kind::Rock || hit->kind == RopeHit::Kind::Stone) && hit->distance >= Rope::MIN_LENGTH) {
             hookCatches = true;
+            if (hit->kind == RopeHit::Kind::Stone) stoneHook = hit->point - level->stones()[static_cast<size_t>(hit->index)].position;
         } else if (hit->kind == RopeHit::Kind::Rock || hit->kind == RopeHit::Kind::Slick) {
             // Slick stone, or rock too close to hook on: it bounces off it, not through it.
             hookBounces = true;
@@ -418,6 +528,8 @@ void Player::throwRope()
         hookTarget = from + direction * reach();
     }
     hook = Hook::Out;
+    // With nothing under your feet, throwing it pushes you back the other way.
+    if (isFloating()) velocity -= direction * physics().throwRecoil;
     events.push_back({PlayerEvent::Type::RopeThrown, from});
 }
 
@@ -426,20 +538,220 @@ void Player::letGoOfRope()
     loose.emplace(rope->path(), level);
     hook = Hook::Back;
     rope.reset();
+    releaseAnchors();
+}
+
+void Player::releaseAnchors()
+{
+    if (stoneAnchor && *stoneAnchor < level->stones().size()) level->holdStone(*stoneAnchor, false);
+    stoneAnchor.reset();
     ringAnchor.reset();
+}
+
+void Player::burnRope()
+{
+    // From the hook round the corners to your hand: the first place it's in the fire.
+    const std::vector<sf::Vector2f> path = rope->path();
+    for (size_t ii = 0; ii + 1 < path.size(); ++ii) {
+        const auto at = level->burnsAlong(path[ii], path[ii + 1]);
+        if (!at) continue;
+        std::vector<sf::Vector2f> left{*at};
+        left.insert(left.end(), path.begin() + static_cast<long>(ii) + 1, path.end());
+        events.push_back({PlayerEvent::Type::RopeBurnt, *at});
+        loose.emplace(left, level);
+        hook = Hook::Back;
+        rope.reset();
+        releaseAnchors();
+        return;
+    }
 }
 
 bool Player::anchorHeld() const
 {
-    // The rock the anchor's in: right next to it.
-    const sf::Vector2f anchor = rope->anchor();
+    if (stoneAnchor) return true; // it's in the stone, wherever that goes
+    return rockAt(rope->anchor());
+}
+
+bool Player::rockAt(sf::Vector2f point) const
+{
     for (float dx : {-0.5f, 0.5f}) {
         for (float dy : {-0.5f, 0.5f}) {
-            const auto [x, y] = tailNumbers(anchor + sf::Vector2f(dx, dy));
+            const auto [x, y] = tailNumbers(point + sf::Vector2f(dx, dy));
             if (level->isSolid(x, y)) return true;
         }
     }
     return false;
+}
+
+void Player::setCanTie(bool can)
+{
+    canTieRope = can;
+    if (!can && !line.empty()) untie();
+}
+
+bool Player::canTie() const
+{
+    return canTieRope && rope && !ringAnchor && !stoneAnchor && !riding && (isGrounded() || clinging || holdingOn());
+}
+
+bool Player::isTied() const
+{
+    return !line.empty();
+}
+
+bool Player::isHanging() const
+{
+    return lineSegment >= 0;
+}
+
+const std::vector<sf::Vector2f>& Player::tiedLine() const
+{
+    return line;
+}
+
+sf::Vector2f Player::hands() const
+{
+    return position + remainder + sf::Vector2f(WIDTH * 0.5f, HEIGHT - 1.f);
+}
+
+void Player::tieOff()
+{
+    // From the hook round the corners, to a knot where you are: at your feet, or on the wall at
+    // your hands.
+    line = rope->pivots();
+    if (clinging) line.push_back(position + sf::Vector2f(clinging > 0 ? WIDTH + 0.5f : -0.5f, HEIGHT - 2.f));
+    else line.push_back(position + sf::Vector2f(WIDTH * 0.5f, 0.5f));
+    rope.reset();
+    hook = Hook::Tied;
+    events.push_back({PlayerEvent::Type::Tied, line.back()});
+}
+
+void Player::untie(bool burnt)
+{
+    // It comes back the way it lies: from the hook along the line, and from the knot to your hand.
+    std::vector<sf::Vector2f> path = line;
+    if (burnt) {
+        for (size_t ii = 0; ii + 1 < line.size(); ++ii) {
+            const auto at = level->burnsAlong(line[ii], line[ii + 1]);
+            if (!at) continue;
+            path.assign(line.begin() + static_cast<long>(ii) + 1, line.end());
+            path.insert(path.begin(), *at);
+            events.push_back({PlayerEvent::Type::RopeBurnt, *at});
+            break;
+        }
+    }
+    path.push_back(exactCentre());
+    if (lineSegment >= 0) letGoOfLine();
+    line.clear();
+    loose.emplace(path, level);
+    hook = Hook::Back;
+    events.push_back({PlayerEvent::Type::Untied, path.back()});
+}
+
+void Player::grabLine()
+{
+    // The nearest point of it to your hands, if it's within a few pixels.
+    const sf::Vector2f at = hands();
+    float nearest = LINE_GRAB;
+    for (size_t ii = 0; ii + 1 < line.size(); ++ii) {
+        const float length = distance(line[ii], line[ii + 1]);
+        if (length < 0.5f) continue;
+        const sf::Vector2f dir = (line[ii + 1] - line[ii]) / length;
+        const float along = std::clamp(dot(at - line[ii], dir), 0.f, length);
+        const float off = distance(line[ii] + dir * along, at);
+        if (off > nearest) continue;
+        nearest = off;
+        lineSegment = static_cast<int>(ii);
+        lineAlong = along;
+        lineSpeed = dot(velocity, dir); // carrying on along it the way you were going
+    }
+    if (lineSegment < 0) return;
+    jumping = false;
+    airJumped = false;
+    events.push_back({PlayerEvent::Type::GrabbedLine, at});
+}
+
+void Player::letGoOfLine()
+{
+    lineSegment = -1;
+    regrabTimer = REGRAB_TIME;
+}
+
+void Player::updateHanging(float dt)
+{
+    const Physics& p = physics();
+    if (jumpBufferTimer > 0.f) {
+        // Jumping lets go: up off it, carrying on the way you were going along it.
+        jumpBufferTimer = 0.f;
+        letGoOfLine();
+        velocity.y = std::max(velocity.y, p.lineJumpSpeed);
+        jumping = true;
+        squash = {0.8f, 1.25f};
+        events.push_back({PlayerEvent::Type::Jumped, position + sf::Vector2f(WIDTH * 0.5f, HEIGHT)});
+        return;
+    }
+    sf::Vector2f a, dir;
+    float length = 0.f;
+    const auto segment = [&] {
+        a = line[static_cast<size_t>(lineSegment)];
+        const sf::Vector2f b = line[static_cast<size_t>(lineSegment) + 1];
+        length = std::max(0.001f, distance(a, b));
+        dir = (b - a) / length;
+    };
+    segment();
+    // Where it's steep you slide down it, fast, unless you're climbing up it, slowly; where it's
+    // not, you hold on, and the arrows take you along it hand over hand.
+    const float down = dir.y < 0.f ? 1.f : -1.f; // + along it is downhill, or -
+    const float along = input.moveX * dir.x + input.moveY * dir.y;
+    const float way = std::abs(along) > 0.3f ? sign(along) : 0.f;
+    if (std::abs(dir.y) > p.lineSteep && way != -down) {
+        lineSpeed = std::clamp(lineSpeed - p.gravity * dir.y * dt, -p.lineZipSpeed, p.lineZipSpeed);
+    } else if (std::abs(dir.y) > p.lineSteep) {
+        lineSpeed = approach(lineSpeed, way * p.lineClimbSpeed, 400.f * dt);
+    } else if (way != 0.f && std::abs(lineSpeed) <= p.lineHandSpeed) {
+        lineSpeed = approach(lineSpeed, way * p.lineHandSpeed, 300.f * dt);
+    } else {
+        lineSpeed = approach(lineSpeed, 0.f, (std::abs(lineSpeed) > p.lineHandSpeed ? 120.f : 600.f) * dt);
+    }
+
+    // Along it, round the corners it's wrapped on, to its ends.
+    lineAlong += lineSpeed * dt;
+    while (lineAlong > length) {
+        if (static_cast<size_t>(lineSegment) + 2 >= line.size()) {
+            lineAlong = length;
+            lineSpeed = 0.f;
+            break;
+        }
+        lineAlong -= length;
+        ++lineSegment;
+        segment();
+    }
+    while (lineAlong < 0.f) {
+        if (lineSegment == 0) {
+            lineAlong = 0.f;
+            lineSpeed = 0.f;
+            break;
+        }
+        --lineSegment;
+        segment();
+        lineAlong += length;
+    }
+    // Hanging under your hands, moved there like anything else, so rock stops you. Stopped, your
+    // hands stay on the line where they got to; pulled right off it, you let go.
+    const sf::Vector2f onLine = a + dir * lineAlong;
+    const sf::Vector2f to = onLine - hands();
+    moveX(to.x);
+    moveY(to.y);
+    if (distance(hands(), onLine) > 0.5f) {
+        lineSpeed = 0.f;
+        lineAlong = std::clamp(dot(hands() - a, dir), 0.f, length);
+        if (distance(hands(), a + dir * lineAlong) > 2.f * LINE_GRAB) {
+            letGoOfLine();
+            return;
+        }
+    }
+    velocity = dir * lineSpeed;
+    if (std::abs(lineSpeed) > 1.f) facingLeft = velocity.x < 0.f;
 }
 
 bool Player::wallToGrab(int side) const
@@ -580,6 +892,24 @@ bool Player::fits(sf::Vector2f pos) const
 void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
 {
     if (rope) rope->draw(target, centr);
+    if (!line.empty()) {
+        // Tied off: strung straight from the hook round the corners to the knot.
+        sf::VertexArray strung(sf::LineStrip);
+        for (const sf::Vector2f& point : line) {
+            const sf::Vector2f at = viewCoordinates(point, centr);
+            strung.append({{std::floor(at.x) + 0.5f, std::floor(at.y) + 0.5f}, ROPE_COLOUR});
+        }
+        target.draw(strung);
+        const sf::Vector2f hookAt = viewCoordinates(line.front(), centr), knotAt = viewCoordinates(line.back(), centr);
+        sf::RectangleShape mark({2.f, 2.f});
+        mark.setPosition(std::floor(hookAt.x) - 1.f, std::floor(hookAt.y) - 1.f);
+        mark.setFillColor(HOOK_COLOUR);
+        target.draw(mark);
+        mark.setSize({3.f, 2.f});
+        mark.setPosition(std::floor(knotAt.x) - 1.f, std::floor(knotAt.y) - 1.f);
+        mark.setFillColor(KNOT_COLOUR);
+        target.draw(mark);
+    }
     // The rope flying out or coming back: a straight line to the hook, from your hand.
     const auto dot = [&](sf::Vector2f world, sf::Color colour) {
         const sf::Vector2f at = viewCoordinates(world, centr);
@@ -612,8 +942,10 @@ void Player::draw(sf::RenderTarget& target, sf::Vector2f centr) const
         lyingInWater = true;
     } else if (riding) {
         frame = frames::IDLE; // standing in the cart, holding on
+    } else if (lineSegment >= 0) {
+        frame = frames::SWING; // hands up, on the line
     } else if (isFloating() && !rope) {
-        frame = frames::FALL; // hair and arms adrift
+        frame = holdingOn() ? frames::CLIMB : frames::FALL; // a hand on the rock, or hair and arms adrift
     } else if (swimming && !rope) {
         frame = std::abs(velocity.x) > 5.f ? frames::RUN + static_cast<int>(animTime * 7.f) % 4 : frames::IDLE + static_cast<int>(animTime * 2.f) % 2;
     } else if (clinging) {
@@ -692,12 +1024,14 @@ void Player::setLook(size_t lookIndex)
     look = std::min(lookIndex, LOOKS.size() - 1);
 }
 
-void Player::enterLevel(std::shared_ptr<const Level> lvl, sf::Vector2f shift, bool fromBelow)
+void Player::enterLevel(std::shared_ptr<Level> lvl, sf::Vector2f shift, bool fromBelow)
 {
+    releaseAnchors();
+    line.clear(); // it's not long enough to reach from one room into the next: back in your hand
+    lineSegment = -1;
     level = std::move(lvl);
     position += shift;
     rope.reset();
-    ringAnchor.reset();
     loose.reset();
     hook = Hook::InHand;
     clinging = 0;
@@ -713,8 +1047,11 @@ void Player::respawn(sf::Vector2f pos)
     position = {std::round(pos.x), std::round(pos.y)};
     remainder = {0.f, 0.f};
     velocity = {0.f, 0.f};
+    releaseAnchors();
+    line.clear();
+    lineSegment = -1;
+    tieQueued = false;
     rope.reset();
-    ringAnchor.reset();
     loose.reset();
     hook = Hook::InHand;
     clinging = 0;
@@ -800,6 +1137,19 @@ bool Player::isFloating() const
     return level->isSpace();
 }
 
+bool Player::holdingOn() const
+{
+    return isFloating() && touchingRockAt(position);
+}
+
+bool Player::touchingRockAt(sf::Vector2f pos) const
+{
+    for (sf::Vector2f side : {sf::Vector2f(-1.f, 0.f), sf::Vector2f(1.f, 0.f), sf::Vector2f(0.f, -1.f), sf::Vector2f(0.f, 1.f)}) {
+        if (!fits(pos + side)) return true;
+    }
+    return false;
+}
+
 void Player::startRiding(int dir)
 {
     riding = dir < 0 ? -1 : 1;
@@ -862,7 +1212,8 @@ std::optional<sf::Vector2f> Player::ropeTarget(sf::Vector2f aim) const
 {
     const auto hit = aimHit(aim);
     if (!hit) return std::nullopt;
-    if (hit->kind == RopeHit::Kind::Ring || (hit->kind == RopeHit::Kind::Rock && hit->distance >= Rope::MIN_LENGTH)) return hit->point;
+    const bool bites = hit->kind == RopeHit::Kind::Rock || hit->kind == RopeHit::Kind::Stone;
+    if (hit->kind == RopeHit::Kind::Ring || (bites && hit->distance >= Rope::MIN_LENGTH)) return hit->point;
     return std::nullopt;
 }
 
@@ -893,7 +1244,8 @@ std::optional<sf::Vector2f> Player::ropeBounce(sf::Vector2f aim) const
 {
     const auto hit = aimHit(aim);
     if (!hit) return std::nullopt;
-    if (hit->kind == RopeHit::Kind::Slick || (hit->kind == RopeHit::Kind::Rock && hit->distance < Rope::MIN_LENGTH)) return hit->point;
+    const bool bites = hit->kind == RopeHit::Kind::Rock || hit->kind == RopeHit::Kind::Stone;
+    if (hit->kind == RopeHit::Kind::Slick || (bites && hit->distance < Rope::MIN_LENGTH)) return hit->point;
     return std::nullopt;
 }
 
@@ -906,8 +1258,10 @@ void Player::setHasRope(bool has)
 {
     hasRope = has;
     if (!has) {
+        releaseAnchors();
+        line.clear();
+        lineSegment = -1;
         rope.reset();
-        ringAnchor.reset();
         loose.reset();
         hook = Hook::InHand;
     }

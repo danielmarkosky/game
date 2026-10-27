@@ -18,6 +18,7 @@ struct PlayerInput
     bool jumpHeld = false;
     bool ropePressed = false;  // went down this frame
     bool ropeHeld = false;
+    bool tiePressed = false;   // went down this frame: ties the rope off where you are, or unties it
     sf::Vector2f aim;          // world position the rope is shot towards
 };
 
@@ -25,7 +26,8 @@ struct PlayerInput
 struct PlayerEvent
 {
     enum class Type { Jumped, AirJumped, WallJumped, Landed, Stepped, Grabbed, RopeThrown, RopeAttached, RopeWrapped, RopeBounced,
-                      LeverTugged, LampTugged, Splashed, Stroked, Bubbled, Gasped, Bounced, Pushed };
+                      LeverTugged, LampTugged, Splashed, Stroked, Bubbled, Gasped, Bounced, Pushed, RopeBurnt, StoneDragged,
+                      Tied, Untied, GrabbedLine };
     Type type;
     sf::Vector2f position;
     float strength = 0.f; // Landed, Splashed: how fast the player was falling (Splashed: or leaping out)
@@ -35,7 +37,7 @@ struct PlayerEvent
 class Player
 {
 public:
-    explicit Player(std::shared_ptr<const Level> lvl);
+    explicit Player(std::shared_ptr<Level> lvl);
 
     // Every look in assets/gfx/player.png, in the order of its rows (made by tools/make_art.py):
     // the heroine, who you are, then the people (and the dog) you meet, then the heroine in the
@@ -68,7 +70,7 @@ public:
     // Carries on into the next room, moved by `shift` into its coordinates, keeping the speed but
     // letting go of the rope. Going up into a room through its floor gives a lift, like in
     // Celeste, so a jump through the gap makes it onto the ledge above.
-    void enterLevel(std::shared_ptr<const Level> lvl, sf::Vector2f shift, bool fromBelow);
+    void enterLevel(std::shared_ptr<Level> lvl, sf::Vector2f shift, bool fromBelow);
 
     sf::Vector2f centre() const;
     // Bottom-left corner of the hitbox. Always whole pixels.
@@ -85,8 +87,10 @@ public:
     float airLeft() const;
     bool isOutOfAir() const;
     bool isTouchingDanger() const;
-    // Where the room has no gravity (Level::isSpace): floating, pushed about by the arrows.
+    // Where the room has no gravity (Level::isSpace): floating, drifting on the way you were going.
+    // Only the rope moves you; touching rock you hold on to it, and can clamber along it.
     bool isFloating() const;
+    bool holdingOn() const; // floating, touching rock
     // In a mine cart: it rolls on `dir`-wards (1 right, -1 left) at physics().cartSpeed until it's
     // stopped, and all you can do is jump. The rope stays in your hand. Hitting a wall wrecks it.
     void startRiding(int dir);
@@ -120,6 +124,15 @@ public:
     void setRopeRange(float range);
     // With the updraft feather: one more jump in the air, until landing or catching the rope.
     void setCanDoubleJump(bool can);
+    // With the knot: hooked in rock, and standing (or holding on to a wall), the rope can be tied off
+    // where you are. Then it stays strung there, from the hook round the corners to the knot: a
+    // line to hang from. Grab it in the air; along it hand over hand; where it's steep, you slide
+    // down it; jump to let go. Untied (the same key again), it comes back to your hand.
+    void setCanTie(bool can);
+    bool canTie() const;     // it could be tied off now
+    bool isTied() const;
+    bool isHanging() const;  // from the tied line
+    const std::vector<sf::Vector2f>& tiedLine() const; // from the hook to the knot; empty if it isn't tied
     bool hasAirJump() const; // it could double jump now
     // Where a rope thrown towards `aim` would hit something and bounce off: slick stone, or rock too
     // close to catch on.
@@ -163,6 +176,7 @@ private:
     void moveX(float amount);
     void moveY(float amount);
     bool fits(sf::Vector2f pos) const;
+    bool touchingRockAt(sf::Vector2f pos) const; // a box there would be right up against something solid
     sf::Vector2f exactCentre() const;
     // The rope, when it isn't hooked.
     void updateThrow(float dt, bool grounded);
@@ -177,7 +191,7 @@ private:
     sf::Vector2f remainder;  // sub-pixel movement not applied yet
     sf::Vector2f velocity;
 
-    std::shared_ptr<const Level> level;
+    std::shared_ptr<Level> level; // not const: the rope drags stones about in it
     std::optional<Rope> rope;
     sf::Texture texture;
 
@@ -190,7 +204,7 @@ private:
 
     // The rope when it isn't hooked: in your hand, being swung round to throw, flying out to where
     // it'll catch or bounce off, or being reeled back in. Out and Back, `loose` is where it lies.
-    enum class Hook { InHand, WindingUp, Out, Back };
+    enum class Hook { InHand, WindingUp, Out, Back, Tied };
     Hook hook = Hook::InHand;
     std::optional<ThrownRope> loose;
     float windUp = 0.f;           // time left swinging it round
@@ -198,9 +212,30 @@ private:
     sf::Vector2f hookTarget;      // where it's flying to
     bool hookCatches = false;     // and whether it'll stick there
     bool hookBounces = false;     // or hit something it won't stick to
+    bool hookBurns = false;       // or fire
     RopeHit::Kind hookKind = RopeHit::Kind::Rock;
     int hookIndex = -1;           // the ring, lever or lamp it's flying to
     std::optional<size_t> ringAnchor; // hooked on a moving ring
+    std::optional<size_t> stoneAnchor; // or in a stone block
+    sf::Vector2f stoneHook;            // where in it, from its bottom-left
+    float dragSound = 0.f;             // until the next scrape, dragging one
+    void releaseAnchors();             // not on a ring or in a stone any more
+    // The rope going through fire burns through there: the end beyond it is lost.
+    void burnRope();
+    // The knot (see setCanTie).
+    bool canTieRope = false;
+    bool tieQueued = false;
+    std::vector<sf::Vector2f> line; // tied off: from the hook, round the corners, to the knot
+    int lineSegment = -1;           // hanging from line[lineSegment] to line[lineSegment + 1]; -1 not
+    float lineAlong = 0.f;          // how far along that your hands are, px
+    float lineSpeed = 0.f;          // and moving, px/s, + towards the knot
+    void tieOff();
+    void untie(bool burnt = false); // it comes back to your hand; burnt, only from where it burnt through
+    void grabLine();                // in the air, your hands at it: hold on
+    void updateHanging(float dt);
+    void letGoOfLine();
+    sf::Vector2f hands() const;     // where you hold on, hanging: over your head
+    bool rockAt(sf::Vector2f point) const; // rock right next to a point (what a hook's stuck in)
     bool hasRope = true;
     bool throwsInAir = true;
 

@@ -74,7 +74,7 @@ namespace entities
         static const std::vector<Kind> kinds = {
             {'S', "Start"}, {'C', "Checkpoint"}, {'G', "Goal"}, {'P', "Pickup"}, {'*', "Gem"}, {'N', "Npc"}, {'B', "Bench"},
             {'L', "Lever"}, {'D', "Prop"}, {'Y', "Icicle"}, {'U', "Updraft"}, {'R', "Ring"}, {'Q', "Lamp"}, {'K', "Cart"},
-            {'E', "CartStop"}, {'T', "Trial"},
+            {'E', "CartStop"}, {'T', "Trial"}, {'O', "Stone"}, {'V', "Plate"}, {'F', "Fire"},
         };
         return kinds;
     }
@@ -105,6 +105,13 @@ namespace entities
         else if (kind == "Cart") level.addCart(tile, f("dir", "1") == "-1" ? -1 : 1, f("needs"));
         else if (kind == "CartStop") level.addCartStop(tile);
         else if (kind == "Trial") level.addTrial(f("route"), f("mark") == "finish", tile);
+        else if (kind == "Stone") level.addStone(tile);
+        else if (kind == "Plate") level.addPlate(tile);
+        else if (kind == "Fire") {
+            // `period`: seconds burning and cold, "" always burning; `phase` 0 to 1; `flue` "1" for a
+            // column of fire up to the first rock.
+            level.addFire(tile, std::strtof(f("period", "0").c_str(), nullptr), std::strtof(f("phase", "0").c_str(), nullptr), f("flue") == "1");
+        }
         else if (kind == "Ring") {
             // `to`: where its track ends, in tiles right and up from it, "6,0"; `period`: seconds there and back.
             int dx = 6, dy = 0;

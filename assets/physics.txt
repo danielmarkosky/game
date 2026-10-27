@@ -64,10 +64,28 @@ diving_air 4                # the diving suit (from Mags's stall): breath lasts 
 # --- Bounce mushrooms ---
 bounce_speed 330            # landing on one throws you up this fast: 68 px, 8.5 tiles. Hold down to stand on it
 
+# --- The rope tied off (the knot) ---
+# Hooked, and standing (or holding a wall), E ties it off where you are: it stays strung, a line to
+# hang from. Grab it in the air; E again unties it, and it comes back.
+line_hand_speed 45          # along it hand over hand, where it isn't steep
+line_steep 0.45             # steeper than this (0 flat, 1 straight up), you slide down it...
+line_zip_speed 200          # ...up to this fast
+line_climb_speed 30         # or climb up it (holding up it) this fast
+line_jump_speed 230         # jumping off it: enough to get onto a ledge from a line hooked at its lip
+
+# --- Stone blocks ---
+stone_drag_speed 40         # hooked, and reeled in standing (or holding a wall), the rope drags one this fast
+
 # --- Mine carts ---
 cart_speed 110              # riding one, it rolls along the rails this fast. Jump jumps the cart
 
 # --- Floating, where there's no gravity (the Still) ---
-float_acceleration 200      # the arrows push you any way, this hard...
-float_speed 70              # ...up to this fast
-float_drag 1.2              # and pushing nowhere you lose this much of your speed a second: drifting to a stop
+# Out in the open nothing you do moves you: you drift on the way you were going. Touching rock you
+# hold on to it, and can clamber along it, but never push off it. Only the rope gets you anywhere:
+# reel in and it pulls you along it, and held, it swings you round where it's hooked, to let go of
+# when you're heading the right way.
+float_drag 0.1              # how much of your speed you lose a second, drifting: hardly any
+float_crawl 30              # holding on to rock, the arrows move you along it, hand over hand, this fast
+throw_recoil 16             # throwing the rope pushes you back the other way, this fast
+space_reel_pull 320         # reeling in pulls you along the rope, this hard...
+space_reel_speed 130        # ...up to this fast

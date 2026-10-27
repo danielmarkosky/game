@@ -60,7 +60,9 @@ Ambience::Style Ambience::styleFor(const std::string& theme)
     } else if (theme == "ice") {
         s = {50, {-3.f, 6.f}, 5.f, true, {sf::Color(200, 240, 255, 220), sf::Color(140, 210, 255, 190), sf::Color(255, 255, 255, 200)}, 0.5f, sf::Color(170, 220, 255)};
     } else if (theme == "sky") {
-        s = {34, {28.f, -2.f}, 3.f, false, {sf::Color(255, 255, 255, 170), sf::Color(230, 240, 255, 130)}, 0.f, sf::Color::White};
+        // The same night, up high: loose stars blowing past on the wind, the camp's magic among them.
+        s = {40, {24.f, -3.f}, 4.f, true, {sf::Color(255, 255, 255, 200), sf::Color(190, 210, 255, 170), sf::Color(130, 235, 255, 160)},
+             0.2f, sf::Color(200, 215, 255)};
     } else if (theme == "grotto") {
         // Magic in the air: specks of light, blue, violet and gold, glowing and fading as they drift up.
         s = {60, {1.f, -5.f}, 8.f, true, {sf::Color(120, 240, 255, 230), sf::Color(200, 150, 255, 220), sf::Color(255, 225, 140, 210), sf::Color(220, 255, 250, 200)},
@@ -91,44 +93,64 @@ void Ambience::setTheme(const std::string& name)
     // the screen.
     style.count = style.count * 3 / 5;
     for (sf::Color& c : style.colors) c.a = static_cast<sf::Uint8>(c.a * 3 / 4);
+    // The last place's motes fade out while the new ones fade in, the first time straight away.
+    const bool first = time == 0.f;
+    if (!first) {
+        leaving = std::move(motes);
+    } else {
+        shownDarkness = style.darkness;
+    }
     motes.clear();
     std::uniform_real_distribution<float> unit(0.f, 1.f);
     for (int i = 0; i < style.count; ++i) {
         const float depth = i % 3 == 0 ? 1.f : 0.35f + 0.3f * unit(rng);
         motes.push_back({{unit(rng) * W, unit(rng) * H}, depth, unit(rng) * 6.28f, depth > 0.9f ? 2.f : 1.f,
-                         style.colors[static_cast<size_t>(i) % style.colors.size()]});
+                         style.colors[static_cast<size_t>(i) % style.colors.size()], first ? 1.f : 0.f});
     }
 }
 
 float Ambience::darkness() const
 {
-    return style.darkness;
+    return shownDarkness;
 }
 
 void Ambience::update(float dt, sf::Vector2f cameraMove)
 {
     time += dt;
-    for (Mote& m : motes) {
-        // Nearer ones move faster, and with the camera more: a little depth.
-        m.position += style.drift * (0.5f + 0.5f * m.depth) * dt - cameraMove * m.depth;
-        m.position.x = std::fmod(m.position.x + W + 8.f, W + 8.f);
-        m.position.y = std::fmod(m.position.y + H + 8.f, H + 8.f);
+    // Into a darker or lighter place, or a dark room, the light changes over a moment.
+    constexpr float CHANGE = 2.f; // of the way a second
+    const float darkness = style.darkness + (blendDarkness - style.darkness) * blendAmount;
+    shownDarkness += std::clamp(darkness - shownDarkness, -CHANGE * dt, CHANGE * dt);
+    shownDark += std::clamp((dark ? 1.f : 0.f) - shownDark, -CHANGE * dt, CHANGE * dt);
+    for (Mote& m : leaving) m.fade -= dt * 1.5f;
+    std::erase_if(leaving, [](const Mote& m) { return m.fade <= 0.f; });
+    for (Mote& m : motes) m.fade = std::min(1.f, m.fade + dt * 1.5f);
+    for (std::vector<Mote>* list : {&motes, &leaving}) {
+        for (Mote& m : *list) {
+            // Nearer ones move faster, and with the camera more: a little depth.
+            m.position += style.drift * (0.5f + 0.5f * m.depth) * dt - cameraMove * m.depth;
+            m.position.x = std::fmod(m.position.x + W + 8.f, W + 8.f);
+            m.position.y = std::fmod(m.position.y + H + 8.f, H + 8.f);
+        }
     }
 }
 
 void Ambience::draw(sf::RenderTarget& target, bool near) const
 {
     sf::RectangleShape dot;
-    for (const Mote& m : motes) {
-        if ((m.depth > 0.9f) != near) continue;
-        sf::Color c = m.color;
-        if (style.blink) c.a = static_cast<sf::Uint8>(c.a * (0.5f + 0.5f * std::sin(time * 2.3f + m.phase * 3.f)));
-        if (!near) c.a = static_cast<sf::Uint8>(c.a * 0.6f);
-        const float sway = std::sin(time * 1.3f + m.phase) * style.wobble * m.depth;
-        dot.setSize({m.size, m.size});
-        dot.setPosition(std::floor(m.position.x - 4.f + sway), std::floor(m.position.y - 4.f));
-        dot.setFillColor(c);
-        target.draw(dot);
+    for (const std::vector<Mote>* list : {&leaving, &motes}) {
+        for (const Mote& m : *list) {
+            if ((m.depth > 0.9f) != near) continue;
+            sf::Color c = m.color;
+            c.a = static_cast<sf::Uint8>(c.a * m.fade);
+            if (style.blink) c.a = static_cast<sf::Uint8>(c.a * (0.5f + 0.5f * std::sin(time * 2.3f + m.phase * 3.f)));
+            if (!near) c.a = static_cast<sf::Uint8>(c.a * 0.6f);
+            const float sway = std::sin(time * 1.3f + m.phase) * style.wobble * m.depth;
+            dot.setSize({m.size, m.size});
+            dot.setPosition(std::floor(m.position.x - 4.f + sway), std::floor(m.position.y - 4.f));
+            dot.setFillColor(c);
+            target.draw(dot);
+        }
     }
 }
 
@@ -140,6 +162,12 @@ void Ambience::drawFar(sf::RenderTarget& target) const
 void Ambience::drawNear(sf::RenderTarget& target) const
 {
     draw(target, true);
+}
+
+void Ambience::setBlend(const std::string& other, float amount)
+{
+    blendAmount = other.empty() ? 0.f : amount;
+    if (!other.empty()) blendDarkness = styleFor(other).darkness;
 }
 
 void Ambience::setDark(bool isDark)
@@ -154,12 +182,14 @@ bool Ambience::isDark() const
 
 void Ambience::drawLight(sf::RenderTarget& target, const std::vector<Light>& lights) const
 {
-    if (dark) {
+    if (shownDark > 0.f) {
         // The dark, with the lights adding to it, laid over everything: where it's black you see
-        // nothing, where a light falls you see what's there.
+        // nothing, where a light falls you see what's there. Coming into it, or out, it closes in
+        // or lifts over a moment.
         const sf::Vector2u size = target.getSize();
         if (lightMap.getSize() != size) lightMap.create(size.x, size.y);
-        lightMap.clear(sf::Color(14, 12, 22));
+        const auto towards = [&](float black) { return static_cast<sf::Uint8>(255.f + (black - 255.f) * shownDark); };
+        lightMap.clear(sf::Color(towards(14.f), towards(12.f), towards(22.f)));
         sf::Sprite spot(glow);
         const float glowSize = static_cast<float>(glow.getSize().x);
         for (const Light& light : lights) {
@@ -176,9 +206,9 @@ void Ambience::drawLight(sf::RenderTarget& target, const std::vector<Light>& lig
         target.draw(sf::Sprite(lightMap.getTexture()), sf::BlendMultiply);
         return;
     }
-    if (style.darkness > 0.f) {
+    if (shownDarkness > 0.f) {
         sf::Sprite shade(vignette);
-        shade.setColor(sf::Color(255, 255, 255, static_cast<sf::Uint8>(255.f * style.darkness)));
+        shade.setColor(sf::Color(255, 255, 255, static_cast<sf::Uint8>(255.f * shownDarkness)));
         target.draw(shade);
     }
     // Lights add their colour, so they show most where it's dark.

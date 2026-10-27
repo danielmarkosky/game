@@ -45,7 +45,34 @@ Rope::Rope(sf::Vector2f attachPos, sf::Vector2f anchor, std::shared_ptr<const Le
 
 sf::Vector2f Rope::anchor() const { return m_pivots.front(); }
 
-void Rope::moveAnchor(sf::Vector2f anchor) { m_pivots.front() = anchor; }
+void Rope::moveAnchor(sf::Vector2f anchor, sf::Vector2f attachPos)
+{
+    const auto measureWrapped = [this] {
+        m_wrappedLength = 0.f;
+        for (size_t ii = 1; ii < m_pivots.size(); ++ii) m_wrappedLength += distance(m_pivots[ii - 1], m_pivots[ii]);
+    };
+    // The part from the last corner to the player stays as it was...
+    const float free = freeLength();
+    m_pivots.front() = anchor;
+    measureWrapped();
+    m_length = std::clamp(m_wrappedLength + free, MIN_LENGTH, MAX_LENGTH);
+    // ...and where it straightens out past the first corner, it's the same rope, just not bent.
+    const size_t before = m_pivots.size();
+    while (m_pivots.size() > 1) {
+        const sf::Vector2f corner = m_pivots[1];
+        const sf::Vector2f next = m_pivots.size() > 2 ? m_pivots[2] : attachPos;
+        // Still bent round it the same way, or with rock in the way straight past it, and not up
+        // against it: keep it.
+        const bool bent = cross(corner - anchor, next - corner) * m_sides.front() >= 0.f;
+        if (distance(anchor, corner) > 2.f && (bent || isBlocked(anchor, next))) break;
+        m_pivots.erase(m_pivots.begin() + 1);
+        m_sides.erase(m_sides.begin());
+    }
+    if (m_pivots.size() != before) {
+        measureWrapped();
+        resetChain(attachPos);
+    }
+}
 
 sf::Vector2f Rope::pivot() const { return m_pivots.back(); }
 
@@ -214,7 +241,7 @@ void Rope::update(sf::Vector2f attachPos, float dt)
         sf::Vector2f velocity = node.position - node.previousPosition;
         node.previousPosition = node.position;
         node.position += velocity * damping;
-        node.position.y -= physics().gravity * dt * dt;
+        if (!m_level->isSpace()) node.position.y -= physics().gravity * dt * dt;
     }
 
     for (int it = 0; it < iterations; ++it) {

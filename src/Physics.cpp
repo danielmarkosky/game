@@ -53,9 +53,17 @@ namespace
         {"diving_air", &Physics::divingAir},
         {"bounce_speed", &Physics::bounceSpeed},
         {"cart_speed", &Physics::cartSpeed},
-        {"float_acceleration", &Physics::floatAcceleration},
-        {"float_speed", &Physics::floatSpeed},
+        {"stone_drag_speed", &Physics::stoneDragSpeed},
+        {"line_hand_speed", &Physics::lineHandSpeed},
+        {"line_steep", &Physics::lineSteep},
+        {"line_zip_speed", &Physics::lineZipSpeed},
+        {"line_climb_speed", &Physics::lineClimbSpeed},
+        {"line_jump_speed", &Physics::lineJumpSpeed},
         {"float_drag", &Physics::floatDrag},
+        {"float_crawl", &Physics::floatCrawl},
+        {"throw_recoil", &Physics::throwRecoil},
+        {"space_reel_pull", &Physics::spaceReelPull},
+        {"space_reel_speed", &Physics::spaceReelSpeed},
     };
 
     Physics current;

@@ -10,9 +10,30 @@ region('hollows')
 # The Hollows: a drop down a shaft to the floor of a cave. Left, under a low roof, a pit of spikes
 # with hook blocks over it, and the way on beyond it. Back up, the wall beside the shaft: climb
 # it, resting in the notches cut in it, onto the top, and jump up through the hole. (With the chalk
-# bag, from the den.)
+# bag, from the den.) By the foot of the shaft, a trapdoor of planks: down to the Quarry
+# (tools/world/quarry.py).
 # ----------------------------------------------------------------------------------------------
 
+# ----------------------------------------------------------------------------------------------
+# The Sinkhole: under the boards in the camp's clearing, a shaft down through the hill. Grass and
+# roots hanging in at the top, the rock wetter and darker going down. Boards across it on alternate
+# sides, a jump apart, to climb back up by; down the middle, clear, to boards over the drop to the
+# Hollows (drop through them).
+# ----------------------------------------------------------------------------------------------
+
+sink = room('sinkhole', 'The Sinkhole', 'cave', 12, 24)
+for y in (2, 8, 14, 20):
+    sink.fill(1, 3, y, y, '-')                  # boards on the left, the top ones under the way up...
+for y in (5, 11, 17):
+    sink.fill(7, 10, y, y, '-')                 # ...and on the right
+sink.fill(4, 6, 1, 1, '-')                      # and boards over the way down, to land on coming up
+sink.door('T', 1, 3).door('B', 4, 3)
+sink.put(2, 21, 'S')
+
+sink.props((5, 22, 'vine'), (9, 22, 'glow_roots'), (7, 22, 'glow_roots'), (2, 15, 'flowers'), (9, 18, 'mushrooms'),
+           (8, 12, 'mushrooms'), (2, 9, 'bones'), (9, 6, 'mushrooms'))
+
+# ----------------------------------------------------------------------------------------------
 hollows = room('hollows', 'The Hollows', 'cave', 40, 30)
 ground(hollows, 3)
 roof(hollows, 10, 0, 14)                        # the low roof on the left
@@ -21,11 +42,49 @@ pit(hollows, 4, 12, bottom=1, top=3)
 hollows.fill(21, 38, 4, 26, '#')                # the wall beside the shaft, up to under the hole
 hollows.fill(21, 22, 12, 14, '.').fill(21, 22, 20, 22, '.')  # notches in it, to rest in
 hollows.door('T', 18, 3).door('L', 4)
+hollows.fill(13, 15, 0, 3, '.').door('B', 13, 3).fill(13, 15, 0, 0, '-')  # a trapdoor of planks, down to the Quarry
 hollows.put(17, 4, 'S')
 hollows.put(19, 4, 'T', route='hollows', mark='start')
 
-hollows.props((15, 4, 'bones'), (13, 4, 'mushrooms'), (3, 9, 'stalactites'), (11, 9, 'stalactites'),
+hollows.props((16, 4, 'bones'), (3, 9, 'stalactites'), (11, 9, 'stalactites'),
               (24, 27, 'cold_fire'), (30, 27, 'stalagmite'), (35, 27, 'crystals'), (16, 28, 'stalactites'))
+
+# ----------------------------------------------------------------------------------------------
+# The Old Workings: where the stone for the camp was cut, long ago. In along the floor on the
+# right; the way on is shut by a gate, and a weight plate on the floor would hold it open, but
+# you're too light. Up on the shelf over it (hook the rock hanging over its end, reel in, step off),
+# a block of cut stone. Hooked from up there, reeling it in only brings it to your feet; hooked,
+# then lowering yourself off the end of the shelf and reeling it in from the floor, the rope over
+# the edge pulls it along the shelf and off, down onto the plate. Through the gate (a lever beside
+# it keeps it open after), a pit of spikes, hook blocks over the middle, and either side more, with
+# braziers hanging from them: a rope hooked in those hangs through the fire and burns, and swinging
+# too high on the middle ones swings it into a brazier. A gem over the far end of the shelf, too
+# high to jump to from it: from on top of the stone, it isn't (or the long rope, on the hook blocks
+# over it).
+# ----------------------------------------------------------------------------------------------
+
+works = room('old_workings', 'The Old Workings', 'cave', 44, 30)
+ground(works, 3)
+roof(works, 26)
+works.fill(0, 18, 11, 29, '#')                  # the low roof over the pit
+works.fill(9, 10, 10, 10, '%')                  # hook blocks in it, over the middle
+works.fill(6, 6, 10, 10, '%').fill(13, 13, 10, 10, '%')  # and either side, braziers hanging from them
+pit(works, 4, 15, bottom=1, top=3)
+works.put(6, 8, 'F').put(13, 8, 'F')
+works.fill(19, 21, 10, 25, '#')                 # the wall over the gate
+works.fill(20, 20, 4, 9, '=')                   # the gate
+works.put(18, 4, 'L')                           # its lever, on the far side
+works.put(26, 4, 'V')                           # the weight plate
+works.fill(29, 42, 7, 8, '#')                   # the shelf
+works.put(38, 9, 'O')                           # the stone on it
+works.fill(26, 31, 13, 25, '#').fill(26, 27, 12, 12, '%')  # rock hanging over its end, hook blocks under that
+works.fill(36, 39, 21, 25, '#').fill(36, 39, 20, 20, '%')  # and over the far end, for the long rope
+works.door('R', 4).door('L', 4)
+works.put(40, 4, 'S')
+works.put(38, 16, '*')                          # under the far end's hook blocks
+
+works.props((24, 4, 'rubble'), (33, 4, 'wheelbarrow'), (37, 4, 'mine_frame'), (42, 9, 'planks'), (31, 9, 'rubble'),
+            (2, 4, 'lantern_post'), (17, 4, 'bones'), (23, 25, 'hanging_lantern'), (6, 9, 'chains'), (13, 9, 'chains'))
 
 # ----------------------------------------------------------------------------------------------
 # The Dark Hollow: too dark to see more than a step ahead, but for lamps hanging in it; a rope

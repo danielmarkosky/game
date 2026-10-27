@@ -32,6 +32,8 @@ public:
     void drawNear(sf::RenderTarget& target) const;
     // Darkens the edges by how dark the place is, then lets the lights shine through.
     void drawLight(sf::RenderTarget& target, const std::vector<Light>& lights) const;
+    // Near a way into somewhere that looks different (`theme`): `amount` of its darkness, 0 to 1.
+    void setBlend(const std::string& theme, float amount);
     // A dark room: nothing to see but what's lit.
     void setDark(bool dark);
     bool isDark() const;
@@ -46,6 +48,7 @@ private:
         float phase;
         float size;
         sf::Color color;
+        float fade = 1.f;      // 0 to 1: coming into a new place, the old ones fade out as the new fade in
     };
     struct Style
     {
@@ -63,7 +66,12 @@ private:
     Style style;
     std::string theme;
     std::vector<Mote> motes;
+    std::vector<Mote> leaving; // the last place's, fading out
     float time = 0.f;
+    float shownDarkness = 0.f; // easing towards the style's, so it doesn't jump between rooms
+    float shownDark = 0.f;     // the same, for a dark room: 0 not, 1 dark
+    float blendDarkness = 0.f; // the darkness of somewhere near, that looks different...
+    float blendAmount = 0.f;   // ...and how much of it comes in
     std::mt19937 rng{11};
     sf::Texture vignette; // black, see-through in the middle
     sf::Texture glow;     // a soft white spot

@@ -5,6 +5,8 @@
 #include "src/Level.h"
 #include "src/Physics.h"
 #include "src/Player.h"
+#include "src/utils.h"
+#include "src/World.h"
 
 // The things in rooms that move or change: ice, crumbling blocks, clouds, icicles, updrafts,
 // wind, hook rings, and what the rope tugs (levers, lamps).
@@ -320,20 +322,105 @@ TEST(Mechanics, AHiddenPassageIsNotThere) {
     EXPECT_FALSE(level->ropeHit({20.f, 12.f}, {60.f, 12.f}, 50.f).has_value());
 }
 
-TEST(Mechanics, WithNoGravityYouFloatWhereverYouPush) {
-    auto level = Level::loadFromString("##########\n#........#\n#........#\n#........#\n#.S......#\n#........#\n##########\n");
-    level->setSpace(true);
+namespace
+{
+    // A room with no gravity, open in the middle.
+    std::shared_ptr<Level> spaceRoom()
+    {
+        auto level = Level::loadFromString("####################\n#..................#\n#..................#\n#..................#\n"
+                                           "#.S................#\n#..................#\n#..................#\n####################\n");
+        level->setSpace(true);
+        return level;
+    }
+
+    // Throws the rope at `aim` and holds it until it's caught (or a second's gone by).
+    void hookAt(Level& level, Player& player, sf::Vector2f aim)
+    {
+        PlayerInput in;
+        in.ropePressed = in.ropeHeld = true;
+        in.aim = aim;
+        for (int ii = 0; ii < static_cast<int>(1.f / DT) && !player.getRope(); ++ii) {
+            player.handleInput(in);
+            level.update(DT, player.hitbox());
+            player.update(DT);
+            in.ropePressed = false;
+        }
+    }
+}
+
+TEST(Mechanics, WithNoGravityTheArrowsDontMoveYouOutInTheOpen) {
+    auto level = spaceRoom();
     Player player(level);
-    player.respawn({16.f, 24.f});
+    player.respawn({60.f, 24.f});
     run(*level, player, {}, 1.f);
     EXPECT_FLOAT_EQ(player.getPosition().y, 24.f); // nothing pulls you down
+    PlayerInput push;
+    push.moveX = push.moveY = 1.f;
+    run(*level, player, push, 0.5f);
+    EXPECT_FLOAT_EQ(player.getPosition().x, 60.f); // and nothing to push off
+    EXPECT_FLOAT_EQ(player.getPosition().y, 24.f);
+    EXPECT_TRUE(player.isFloating());
+    EXPECT_FALSE(player.holdingOn());
+}
+
+TEST(Mechanics, WithNoGravityYouClamberAlongRockButNeverOffIt) {
+    auto level = spaceRoom();
+    Player player(level);
+    player.respawn({8.f, 24.f}); // against the left wall
+    run(*level, player, {}, 0.2f);
+    EXPECT_TRUE(player.holdingOn());
     PlayerInput up;
     up.moveY = 1.f;
-    run(*level, player, up, 0.3f);
-    EXPECT_GT(player.getPosition().y, 26.f);
-    run(*level, player, {}, 4.f); // drifting to a stop
-    EXPECT_LT(std::abs(player.getVelocity().y), 2.f);
-    EXPECT_TRUE(player.isFloating());
+    run(*level, player, up, 0.5f); // up along it
+    EXPECT_NEAR(player.getPosition().y, 24.f + physics().floatCrawl * 0.5f, 2.f);
+    EXPECT_FLOAT_EQ(player.getPosition().x, 8.f);
+    run(*level, player, moving(1.f), 0.5f); // away from it: no
+    EXPECT_FLOAT_EQ(player.getPosition().x, 8.f);
+    EXPECT_TRUE(player.holdingOn());
+}
+
+TEST(Mechanics, WithNoGravityThrowingTheRopePushesYouBack) {
+    auto level = spaceRoom();
+    Player player(level);
+    player.respawn({60.f, 24.f});
+    PlayerInput in;
+    in.ropePressed = in.ropeHeld = true;
+    in.aim = {150.f, 30.f};
+    run(*level, player, in, DT * 2.f);
+    EXPECT_LT(player.getVelocity().x, -physics().throwRecoil * 0.8f);
+}
+
+TEST(Mechanics, WithNoGravityReelingInPullsYouAlongTheRopeAndYouDriftOnAfter) {
+    auto level = spaceRoom();
+    Player player(level);
+    player.respawn({60.f, 24.f});
+    player.setRopeRange(100.f);
+    hookAt(*level, player, {152.f, 30.f}); // the right wall
+    ASSERT_NE(player.getRope(), nullptr);
+    PlayerInput reel;
+    reel.ropeHeld = true;
+    reel.moveY = 1.f;
+    run(*level, player, reel, 0.4f);
+    EXPECT_GT(player.getVelocity().x, 80.f);
+    const float speed = player.getVelocity().x;
+    run(*level, player, {}, 0.2f); // let go of the rope
+    EXPECT_EQ(player.getRope(), nullptr);
+    EXPECT_NEAR(player.getVelocity().x, speed, speed * 0.1f);
+}
+
+TEST(Mechanics, WithNoGravityTheRopeHeldSwingsYouRound) {
+    // Drifting past where it's hooked, the rope catches you and turns you: you go round, not on.
+    auto level = spaceRoom();
+    Player player(level);
+    player.respawn({60.f, 24.f});
+    hookAt(*level, player, {60.f, 56.f}); // the roof, straight up
+    ASSERT_NE(player.getRope(), nullptr);
+    player.setVelocity({60.f, 0.f});
+    PlayerInput hold;
+    hold.ropeHeld = true;
+    run(*level, player, hold, 0.5f);
+    EXPECT_GT(player.getVelocity().y, 10.f); // swung up towards the roof
+    EXPECT_LT(player.getPosition().x, 60.f + 60.f * 0.5f);
 }
 
 TEST(Mechanics, ACartRollsOnUntilAWallWrecksIt) {
@@ -386,4 +473,316 @@ TEST(Mechanics, PipFollowsTheWayYouWent) {
     EXPECT_EQ(dog.feet(), stopped);
     dog.point(you + sf::Vector2f(40.f, 0.f));
     EXPECT_TRUE(dog.isPointing());
+}
+
+TEST(Mechanics, ReeledInStandingTheRopeDragsAStone) {
+    auto level = Level::loadFromString(
+        "####################\n"
+        "#..................#\n"
+        "#..................#\n"
+        "#..S.........O.....#\n"
+        "####################\n");
+    Player player(level);
+    run(*level, player, {}, 0.2f);
+    const float startX = player.getPosition().x;
+    const float stoneX = level->stones()[0].position.x;
+    player.setRopeRange(100.f);
+    hookAt(*level, player, level->stones()[0].position + sf::Vector2f(8.f, 8.f));
+    ASSERT_NE(player.getRope(), nullptr);
+    PlayerInput reel;
+    reel.ropeHeld = true;
+    reel.moveY = 1.f;
+    run(*level, player, reel, 1.f);
+    EXPECT_LT(level->stones()[0].position.x, stoneX - physics().stoneDragSpeed * 0.8f); // it comes...
+    EXPECT_NEAR(player.getPosition().x, startX, 1.f);                                   // ...you don't
+    EXPECT_FLOAT_EQ(level->stones()[0].position.y, 8.f);                                // along the floor
+    level->reset();
+    EXPECT_FLOAT_EQ(level->stones()[0].position.x, stoneX); // and back where it was
+}
+
+TEST(Mechanics, AStoneIsSolidAndFalls) {
+    auto level = Level::loadFromString(
+        "##########\n"
+        "#........#\n"
+        "#....O...#\n"
+        "#........#\n"
+        "#........#\n"
+        "#.S......#\n"
+        "##########\n");
+    Player player(level);
+    run(*level, player, {}, 1.f);
+    EXPECT_FLOAT_EQ(level->stones()[0].position.y, 8.f); // fell to the floor
+    EXPECT_FALSE(level->isEmptySpace({44.f, 8.f}, 4.f, 4.f));
+    run(*level, player, moving(1.f), 1.f);
+    EXPECT_LE(player.getPosition().x + Player::WIDTH, level->stones()[0].position.x); // stopped by it
+}
+
+TEST(Mechanics, AStoneOnAWeightPlateHoldsTheGatesOpenAndYouDont) {
+    const std::string stone =
+        "##########\n"
+        "#........#\n"
+        "#........#\n"
+        "#.O......#\n"
+        "#......=.#\n"
+        "#......=.#\n"
+        "#.V....=S#\n"
+        "##########\n";
+    auto level = Level::loadFromString(stone);
+    Player player(level);
+    EXPECT_TRUE(level->isSolid(7, 2));
+    run(*level, player, {}, 1.f); // the stone drops onto the plate
+    EXPECT_TRUE(level->plates()[0].down);
+    EXPECT_FALSE(level->isSolid(7, 2));
+    // Without the stone, standing on the plate does nothing.
+    std::string empty = stone;
+    empty[empty.find('O')] = '.';
+    auto bare = Level::loadFromString(empty);
+    Player you(bare);
+    you.respawn({16.f, 8.f});
+    run(*bare, you, {}, 0.5f);
+    EXPECT_FALSE(bare->plates()[0].down);
+    EXPECT_TRUE(bare->isSolid(7, 2));
+}
+
+TEST(Mechanics, FireBurnsTheRopeThrough) {
+    auto level = Level::loadFromString(
+        "####################\n"
+        "#..................#\n"
+        "#..................#\n"
+        "#..................#\n"
+        "#..S.....F.........#\n"
+        "####################\n");
+    Player player(level);
+    player.setRopeRange(100.f);
+    run(*level, player, {}, 0.2f);
+    // Thrown through it: burnt off on the way, and back.
+    const sf::Vector2f through(76.f, 12.f);
+    ASSERT_TRUE(player.aimHit(through));
+    EXPECT_EQ(player.aimHit(through)->kind, RopeHit::Kind::Fire);
+    EXPECT_FALSE(player.ropeTarget(through));
+    PlayerInput in;
+    in.ropePressed = in.ropeHeld = true;
+    in.aim = through;
+    std::vector<PlayerEvent::Type> happened;
+    for (int ii = 0; ii < static_cast<int>(1.f / DT); ++ii) {
+        player.handleInput(in);
+        level->update(DT, player.hitbox());
+        player.update(DT);
+        in.ropePressed = false;
+        for (auto t : eventsOf(player)) happened.push_back(t);
+    }
+    EXPECT_TRUE(has(happened, PlayerEvent::Type::RopeBurnt));
+    EXPECT_EQ(player.getRope(), nullptr);
+    // Hooked over it and let out: the slack rope sags into it.
+    run(*level, player, {}, 2.f);
+    hookAt(*level, player, {100.f, 40.f}); // the roof, beyond it
+    ASSERT_NE(player.getRope(), nullptr);
+    PlayerInput out;
+    out.ropeHeld = true;
+    out.moveY = -1.f;
+    happened.clear();
+    for (int ii = 0; ii < static_cast<int>(2.f / DT) && player.getRope(); ++ii) {
+        player.handleInput(out);
+        level->update(DT, player.hitbox());
+        player.update(DT);
+        for (auto t : eventsOf(player)) happened.push_back(t);
+    }
+    EXPECT_TRUE(has(happened, PlayerEvent::Type::RopeBurnt));
+    EXPECT_EQ(player.getRope(), nullptr);
+}
+
+TEST(Mechanics, FireBurnsYou) {
+    auto level = Level::loadFromString("##########\n#........#\n#.S..F...#\n##########\n");
+    Player player(level);
+    bool burnt = false;
+    for (int ii = 0; ii < static_cast<int>(1.f / DT) && !burnt; ++ii) {
+        run(*level, player, moving(1.f), DT);
+        burnt = player.isTouchingDanger();
+    }
+    EXPECT_TRUE(burnt);
+}
+
+namespace
+{
+    // A ledge on the left to stand on, a long drop, and hook blocks low in a wall across it.
+    const char* const ACROSS =
+        "########################\n"
+        "#......................#\n"
+        "#......................#\n"
+        "#......................#\n"
+        "#.S...............%#####\n"
+        "####..............######\n"
+        "####..............######\n"
+        "####..............######\n"
+        "#.................######\n"
+        "########################\n";
+
+    // Tied off standing at the start, hooked at `hook`.
+    void tieOffAt(Level& level, Player& player, sf::Vector2f hook)
+    {
+        player.setCanTie(true);
+        player.setRopeRange(130.f);
+        player.respawn(level.getStartPos());
+        run(level, player, {}, 0.2f);
+        hookAt(level, player, hook);
+        ASSERT_NE(player.getRope(), nullptr);
+        PlayerInput tie;
+        tie.ropeHeld = true;
+        tie.tiePressed = true;
+        run(level, player, tie, DT);
+    }
+}
+
+TEST(Mechanics, TiedOffTheRopeStaysStrungAndUntiedItComesBack) {
+    auto level = Level::loadFromString(ACROSS);
+    Player player(level);
+    tieOffAt(*level, player, {144.f, 44.f});
+    EXPECT_TRUE(player.isTied());
+    EXPECT_EQ(player.getRope(), nullptr);
+    ASSERT_EQ(player.tiedLine().size(), 2u);
+    EXPECT_NEAR(player.tiedLine().back().y, level->getStartPos().y, 1.f); // the knot, at your feet
+    run(*level, player, {}, 1.f);                       // let go of the button: it stays
+    EXPECT_TRUE(player.isTied());
+    EXPECT_FALSE(player.canShootRope());                 // it's not in your hand
+    PlayerInput untie;
+    untie.tiePressed = true;
+    run(*level, player, untie, DT);
+    EXPECT_FALSE(player.isTied());
+    run(*level, player, {}, 2.f);
+    EXPECT_TRUE(player.canShootRope());
+}
+
+TEST(Mechanics, TheRopeIsntTiedOffWithoutTheKnotOrInMidAir) {
+    auto level = Level::loadFromString(ACROSS);
+    Player player(level);
+    player.setRopeRange(130.f);
+    run(*level, player, {}, 0.2f);
+    hookAt(*level, player, {144.f, 44.f});
+    PlayerInput tie;
+    tie.ropeHeld = true;
+    tie.tiePressed = true;
+    run(*level, player, tie, DT);
+    EXPECT_FALSE(player.isTied()); // no knot
+    player.setCanTie(true);
+    PlayerInput off;
+    off.ropeHeld = true;
+    off.moveX = 1.f;
+    off.moveY = -1.f;
+    run(*level, player, off, 0.4f); // off the ledge, swinging
+    ASSERT_FALSE(player.isGrounded());
+    EXPECT_FALSE(player.canTie());
+    run(*level, player, tie, DT);
+    EXPECT_FALSE(player.isTied());
+}
+
+TEST(Mechanics, OffTheLedgeYouGrabTheLineAndGoAlongItHandOverHand) {
+    auto level = Level::loadFromString(ACROSS);
+    Player player(level);
+    tieOffAt(*level, player, {144.f, 44.f});
+    run(*level, player, moving(1.f), 0.5f); // off the edge, and onto it
+    ASSERT_TRUE(player.isHanging());
+    EXPECT_GT(player.getPosition().y, 20.f); // caught, not fallen
+    const sf::Vector2f at = player.getPosition();
+    run(*level, player, moving(1.f), 1.f);
+    EXPECT_NEAR(player.getPosition().x - at.x, physics().lineHandSpeed, 8.f);
+    const float x = player.getPosition().x;
+    run(*level, player, {}, 0.5f); // holding on
+    EXPECT_TRUE(player.isHanging());
+    EXPECT_NEAR(player.getPosition().x, x, 2.f);
+    PlayerInput jump;
+    jump.jumpPressed = jump.jumpHeld = true;
+    run(*level, player, jump, DT * 2.f);
+    EXPECT_FALSE(player.isHanging());
+    EXPECT_GT(player.getVelocity().y, 0.f);
+}
+
+TEST(Mechanics, WhereTheLineIsSteepYouSlideDownIt) {
+    auto level = Level::loadFromString(
+        "########################\n"
+        "#......................#\n"
+        "#..S...................#\n"
+        "####...................#\n"
+        "####...................#\n"
+        "####...................#\n"
+        "####...................#\n"
+        "####......%%%..........#\n"
+        "####......###..........#\n"
+        "########################\n");
+    Player player(level);
+    tieOffAt(*level, player, {84.f, 22.f});
+    ASSERT_TRUE(player.isTied());
+    run(*level, player, moving(1.f), 0.4f); // off the top...
+    for (int ii = 0; ii < static_cast<int>(1.f / DT) && !player.isHanging(); ++ii) run(*level, player, {}, DT); // ...onto it
+    ASSERT_TRUE(player.isHanging());
+    float fastest = 0.f, furthest = 0.f;
+    for (int ii = 0; ii < static_cast<int>(0.5f / DT); ++ii) {
+        run(*level, player, {}, DT);
+        fastest = std::max(fastest, magnitude(player.getVelocity()));
+        furthest = std::max(furthest, player.getPosition().x);
+    }
+    EXPECT_GT(fastest, physics().lineHandSpeed * 2.f); // sliding, not hand over hand
+    EXPECT_GT(furthest, 60.f);                         // down it, towards the hook
+    EXPECT_TRUE(player.isHanging());                   // and holding on at the end
+}
+
+TEST(Mechanics, ABreathingFireBurnsHalfTheTimeAndFlickersFirst) {
+    auto level = Level::loadFromString("##########\n#........#\n#........#\n#.S......#\n##########\n");
+    level->addFire({5, 1}, 2.f, 0.f, true); // a flue: burning a second, cold a second
+    const Fire& flue = level->fires()[0];
+    EXPECT_FLOAT_EQ(level->fireBox(flue).height, 3.f * Level::TILE_SIZE); // up to the roof
+    Player player(level);
+    EXPECT_TRUE(level->isBurning(flue));
+    run(*level, player, {}, 1.2f);
+    EXPECT_FALSE(level->isBurning(flue));
+    EXPECT_FALSE(level->isAboutToBurn(flue));
+    EXPECT_FALSE(level->burnsAlong({44.f, 20.f}, {44.f, 30.f}));
+    run(*level, player, {}, 0.6f);
+    EXPECT_TRUE(level->isAboutToBurn(flue)); // a moment before it lights
+    run(*level, player, {}, 0.3f);
+    EXPECT_TRUE(level->isBurning(flue));
+    EXPECT_TRUE(level->burnsAlong({44.f, 20.f}, {44.f, 30.f}));
+}
+
+TEST(Mechanics, InTheCuttingTheStoneIsAStepUpToTheKnot) {
+    // The way the room's made to be done: under the ledge, wait for the flue to go cold, hook the
+    // stone, reel it in to your feet, step up onto it, and up onto the ledge.
+    std::shared_ptr<Level> level;
+    for (auto& room : loadWorld(config::assetPath("world.ldtk"))) {
+        if (room.name == "cutting") level = room.level;
+    }
+    ASSERT_TRUE(level);
+    Player player(level);
+    player.respawn({72.f, 32.f});
+    const Fire& flue = level->fires()[0];
+    while (!level->isBurning(flue)) run(*level, player, {}, DT); // too short a while: let it burn
+    while (level->isBurning(flue)) run(*level, player, {}, DT);  // and go out
+    hookAt(*level, player, level->stones()[0].position + sf::Vector2f(1.f, 8.f));
+    ASSERT_NE(player.getRope(), nullptr);
+    PlayerInput reel;
+    reel.ropeHeld = true;
+    reel.moveY = 1.f;
+    run(*level, player, reel, 1.6f);
+    EXPECT_FLOAT_EQ(level->stones()[0].position.x, player.getPosition().x + Player::WIDTH); // at your feet
+    run(*level, player, {}, 0.5f);                        // let go of it
+    PlayerInput onto;
+    onto.moveX = 1.f;
+    onto.jumpPressed = onto.jumpHeld = true;
+    run(*level, player, onto, 0.25f);
+    run(*level, player, {}, 0.5f);
+    EXPECT_FLOAT_EQ(player.getPosition().y, 48.f); // on the stone
+    PlayerInput up;
+    up.moveX = -1.f;
+    up.jumpPressed = up.jumpHeld = true;
+    run(*level, player, up, 0.5f);
+    run(*level, player, {}, 0.5f);
+    EXPECT_FLOAT_EQ(player.getPosition().y, 72.f); // on the ledge
+    // Without the stone, a jump from the floor doesn't make it.
+    player.respawn({76.f, 32.f});
+    level->reset();
+    PlayerInput jump;
+    jump.moveX = -1.f;
+    jump.jumpPressed = jump.jumpHeld = true;
+    run(*level, player, jump, 0.6f);
+    run(*level, player, {}, 0.5f);
+    EXPECT_FLOAT_EQ(player.getPosition().y, 32.f);
 }

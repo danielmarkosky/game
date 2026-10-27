@@ -96,9 +96,10 @@ TEST(World, OpeningsLineUp) {
 }
 
 TEST(World, EveryRoomIsConnectedAndTheEndCanBeReached) {
-    // Flood fills the empty tiles of the whole world from the first room's start. (This doesn't
-    // check the jumps are possible.)
+    // Flood fills the empty tiles of the whole world from the first room's start, through gates,
+    // which open. (This doesn't check the jumps are possible, or that the gates can be opened.)
     const auto rooms = shippedWorld();
+    for (const Room& room : rooms) room.level->setGatesOpen(true);
     const sf::Vector2f start = rooms[0].level->getStartPos();
     std::vector<std::pair<int, int>> todo = {{rooms[0].info.position.x + static_cast<int>(start.x / Level::TILE_SIZE),
                                               rooms[0].info.position.y + static_cast<int>(start.y / Level::TILE_SIZE)}};

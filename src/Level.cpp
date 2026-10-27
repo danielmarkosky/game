@@ -208,6 +208,9 @@ std::shared_ptr<Level> Level::fromRows(const std::vector<std::string>& rows)
                 case 'Y': level->addIcicle({x, y}); break;
                 case 'U': level->addUpdraft({x, y}); break;
                 case 'Q': level->addLamp({x, y}); break;
+                case 'O': level->addStone({x, y}); break;
+                case 'V': level->addPlate({x, y}); break;
+                case 'F': level->addFire({x, y}); break;
                 case 'R': level->addRing({x, y}, {x + 6, y}, 4.f); break;
                 case 'L': level->addLever({x, y}); break;
                 case 'S': level->setStart({x, y}); break;
@@ -289,6 +292,11 @@ void Level::setGatesOpen(bool open)
 bool Level::gatesOpen() const
 {
     return m_gatesOpen;
+}
+
+bool Level::gatesHeld() const
+{
+    return m_gatesHeld;
 }
 
 void Level::drawLevers(sf::RenderTarget& target, sf::Vector2f centr) const
@@ -393,6 +401,49 @@ void Level::drawRock(sf::Sprite& sprite, sf::RenderTarget& target, sf::Vector2f 
     if (openBottom && tileAt(x, y - 1) == 0 && hash % 5 == 0) drawTile(sheet::DRIP, x, y - 1);
 }
 
+void Level::drawPlankSupports(sf::RenderTarget& target, sf::Vector2f centr, int x0, int x1, int y0, int y1) const
+{
+    // Planks are put up by someone: an end that isn't on rock stands on a post down to the ground
+    // (or the planks below), or failing that, hangs on a rope from the rock above. Long runs get a
+    // post in the middle too.
+    constexpr int REACH = 16; // tiles
+    sf::VertexArray quads(sf::Quads);
+    const auto bar = [&](float x, float top, float bottom, float width, sf::Color colour) {
+        const sf::Vector2f a = viewCoordinates({x, top}, centr), b = viewCoordinates({x + width, bottom}, centr);
+        const float l = std::floor(a.x), r = std::floor(b.x), t = std::floor(a.y), u = std::floor(b.y);
+        quads.append({{l, t}, colour});
+        quads.append({{r, t}, colour});
+        quads.append({{r, u}, colour});
+        quads.append({{l, u}, colour});
+    };
+    const sf::Color wood(70, 48, 34), light(112, 78, 52), cord(150, 135, 110);
+    const auto support = [&](int x, int y, float px) {
+        for (int below = y - 1; below >= y - REACH; --below) {
+            if (!isSolid(x, below) && tileAt(x, below) != TILE_PLATFORM) continue;
+            const float top = y * TILE_SIZE, bottom = (below + 1) * TILE_SIZE;
+            bar(px, top, bottom, 2.f, wood);
+            bar(px, top, bottom, 1.f, light);
+            return;
+        }
+        for (int above = y + 1; above <= y + REACH; ++above) {
+            if (!isSolid(x, above)) continue;
+            bar(px + 0.5f, above * TILE_SIZE, (y + 1) * TILE_SIZE, 1.f, cord);
+            return;
+        }
+    };
+    for (int y = y0; y <= y1; ++y) {
+        for (int x = x0; x <= x1; ++x) {
+            if (tileAt(x, y) != TILE_PLATFORM || tileAt(x - 1, y) == TILE_PLATFORM) continue;
+            int end = x;
+            while (tileAt(end + 1, y) == TILE_PLATFORM) ++end;
+            if (!isSolid(x - 1, y)) support(x, y, x * TILE_SIZE + 1.f);
+            if (!isSolid(end + 1, y)) support(end, y, (end + 1) * TILE_SIZE - 3.f);
+            if (end - x >= 7) support((x + end) / 2, y, ((x + end) / 2) * TILE_SIZE + 3.f);
+        }
+    }
+    target.draw(quads);
+}
+
 void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
 {
     // Only visit the tiles that can be on screen.
@@ -409,6 +460,7 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
         target.draw(sprite);
     };
 
+    drawPlankSupports(target, centr, x0 - 1, x1 + 1, y0 - 16, y1 + 16); // posts and ropes reach in from off screen
     for (int x = x0 - 1; x <= x1 + 1; ++x) {
         for (int y = y0 - 1; y <= y1 + 1; ++y) {
             const int tile = tileAt(x, y);
@@ -442,7 +494,7 @@ void Level::draw(sf::RenderTarget& target, sf::Vector2f centr) const
                 target.draw(sprite);
                 sprite.setColor(sf::Color::White);
             } else if (tile == TILE_GATE) {
-                if (!m_gatesOpen) drawTile(sheet::GATE, x, y);
+                if (!m_gatesOpen && !m_gatesHeld) drawTile(sheet::GATE, x, y);
             } else if (tile == TILE_PLATFORM) {
                 const bool openLeft = !isPlatform(x - 1, y) && !isSolid(x - 1, y);
                 const bool openRight = !isPlatform(x + 1, y) && !isSolid(x + 1, y);
@@ -594,7 +646,7 @@ bool Level::isSolid(int x, int y) const
         return !state || state->gone <= 0.f;
     }
     return tile == TILE_ROCK || tile == TILE_METAL || tile == TILE_SLICK || tile == TILE_ICE || tile == TILE_BOUNCE ||
-           (tile == TILE_GATE && !m_gatesOpen);
+           (tile == TILE_GATE && !m_gatesOpen && !m_gatesHeld);
 }
 
 bool Level::isDangerous(int x, int y) const
@@ -622,11 +674,17 @@ bool Level::isOnPlatform(sf::Vector2f feet, float width) const
 
 bool Level::isEmptySpace(sf::Vector2f pos, float height, float width) const
 {
+    for (size_t ii = 0; ii < m_stones.size(); ++ii) {
+        if (overlaps(pos, height, width, stoneBox(ii))) return false;
+    }
     return !anyTileIn(pos, height, width, [this](int x, int y) { return isSolid(x, y); });
 }
 
 bool Level::isDangerousSpace(sf::Vector2f pos, float height, float width) const
 {
+    for (const Fire& fire : m_fires) {
+        if (isBurning(fire) && overlaps(pos, height, width, fireBox(fire))) return true;
+    }
     // Icicles, hanging or falling: their sharp end.
     for (const Icicle& icicle : m_icicles) {
         if (icicle.state == Icicle::State::Gone) continue;

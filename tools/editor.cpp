@@ -86,9 +86,10 @@ namespace
         {'B', "Bench", {180, 124, 72}},    {'L', "Lever", {232, 68, 58}},        {'D', "Prop", {138, 138, 160}},
         {'Y', "Icicle", {207, 239, 255}},  {'U', "Updraft", {255, 140, 60}},     {'R', "Ring", {232, 185, 74}},
         {'Q', "Lamp", {255, 216, 106}},    {'K', "Mine cart", {138, 122, 106}},  {'E', "End of the line", {106, 90, 74}},
-        {'T', "Timed run post", {126, 240, 142}},
+        {'T', "Timed run post", {126, 240, 142}}, {'O', "Stone block", {150, 140, 150}}, {'V', "Weight plate", {120, 200, 170}},
+        {'F', "Fire", {255, 140, 60}},
     };
-    const std::vector<std::string> ABILITIES = {"rope", "long_rope", "wall_climb", "air_throw", "double_jump", "stopwatch"};
+    const std::vector<std::string> ABILITIES = {"rope", "long_rope", "wall_climb", "air_throw", "double_jump", "stopwatch", "tie_off"};
 
     const Brush* brushOf(char c)
     {
